@@ -42,7 +42,7 @@
    - `whoop_app.json` — `{"client_id": "…", "client_secret": "…", "redirect_uri": "https://health.local/whoop"}`
 4. «Настройки» → «Подключить» FatSecret и Whoop. Данные загрузятся за год.
 
-Сборка (`npm run app:mac`) встраивает эти ключи приложения внутрь `.app`: собранное приложение можно давать знакомым,
+Сборка (`npm run app:mac`, `npm run dist:win`) встраивает эти ключи приложения внутрь приложения: собранное приложение можно давать знакомым,
 но не выкладывать публично — ключ из него можно достать.
 
 ## Разработка
@@ -82,6 +82,13 @@ cd desktop && HEALTH_DOCUMENTS=/tmp/health-docs HEALTH_SMOKE=1 HEALTH_PAGE=train
 
 ```bash
 cd desktop && npm run app:mac
+```
+
+Версия для Windows собирается на том же Mac — один файл `dist/Здоровье-<версия>-win-x64.exe`, работает без установки
+(без подписи: при первом запуске «Подробнее» → «Выполнить в любом случае»):
+
+```bash
+cd desktop && npm run dist:win
 ```
 
 Выпуск версии: пункты копятся в разделе «Не выпущено» файла `desktop/CHANGELOG.md`, затем

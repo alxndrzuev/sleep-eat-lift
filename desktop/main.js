@@ -20,6 +20,7 @@ const datadir = require('./datadir');
 const alcohol = require('./alcohol');
 const secretsFile = require('./secrets');
 const whatsnew = require('./whatsnew');
+const menu = require('./menu');
 
 protocol.registerSchemesAsPrivileged([{scheme: 'app', privileges: {standard: true, secure: true, supportFetchAPI: true}}]);
 
@@ -243,31 +244,11 @@ function go(dir) {
   if (h && (dir === 'goBack' ? h.canGoBack() : h.canGoForward())) h[dir]();
 }
 
-/** Меню Mac по-русски; «Вид» — «Назад ⌘[» / «Вперёд ⌘]»; «Справка» — «Что нового» вместо ссылок Electron; инструменты разработчика — только не в сборке. */
+/** Меню по-русски (menu.js): Mac и Windows. */
 function setMenu() {
-  if (process.platform !== 'darwin') return;
-  const sep = {type: 'separator'}, name = '«Здоровье»';
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    {label: app.name, submenu: [{role: 'about', label: `О программе ${name}`}, sep, {role: 'services', label: 'Службы'}, sep,
-      {role: 'hide', label: `Скрыть ${name}`}, {role: 'hideOthers', label: 'Скрыть остальные'}, {role: 'unhide', label: 'Показать все'}, sep,
-      {role: 'quit', label: `Завершить ${name}`}]},
-    {label: 'Файл', submenu: [{role: 'close', label: 'Закрыть окно'}]},
-    {label: 'Правка', submenu: [{role: 'undo', label: 'Отменить'}, {role: 'redo', label: 'Повторить'}, sep,
-      {role: 'cut', label: 'Вырезать'}, {role: 'copy', label: 'Скопировать'}, {role: 'paste', label: 'Вставить'},
-      {role: 'pasteAndMatchStyle', label: 'Вставить и сохранить стиль'}, {role: 'delete', label: 'Удалить'},
-      {role: 'selectAll', label: 'Выбрать все'}]},
-    {label: 'Вид', submenu: [{label: 'Назад', accelerator: 'CmdOrCtrl+[', click: () => go('goBack')},
-      {label: 'Вперёд', accelerator: 'CmdOrCtrl+]', click: () => go('goForward')}, sep,
-      {role: 'reload', label: 'Обновить страницу'},
-      ...(app.isPackaged ? [] : [{role: 'toggleDevTools', label: 'Инструменты разработчика'}]), sep,
-      {role: 'resetZoom', label: 'Фактический размер'}, {role: 'zoomIn', label: 'Увеличить'}, {role: 'zoomOut', label: 'Уменьшить'}, sep,
-      {role: 'togglefullscreen', label: 'Во весь экран'}]},
-    {label: 'Окно', role: 'window', submenu: [{role: 'minimize', label: 'Свернуть'}, {role: 'zoom', label: 'Масштаб'}, sep,
-      {role: 'front', label: 'Все окна — на передний план'}]},
-    {label: 'Справка', role: 'help', submenu: [{label: `Что нового в ${name}`,
-      click: () => { if (win && !win.isDestroyed() && DATA && !win.webContents.getURL().endsWith('/whatsnew.html'))
-        win.loadURL('app://h/portal/whatsnew.html'); }}]},
-  ]));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menu.template({platform: process.platform, packaged: app.isPackaged, go,
+    whatsNew: () => { if (win && !win.isDestroyed() && DATA && !win.webContents.getURL().endsWith('/whatsnew.html'))
+      win.loadURL('app://h/portal/whatsnew.html'); }})));
 }
 
 function createWindow() {

@@ -46,7 +46,7 @@ tests/                   ← Python unittest: lib, формат данных, с
 dist/                    ← собранные приложения (не в git)
 ```
 
-## Приложение (desktop/, Electron, пока только Mac) — установлено в /Applications, данные смотрим в нём
+## Приложение (desktop/, Electron, Mac и Windows) — на Mac установлено в /Applications, данные смотрим в нём
 - Дизайн и план — `docs/superpowers/specs/2026-11-21-electron-app-design.md`, `docs/superpowers/plans/2026-11-21-electron-app.md`
 - Папку данных спрашивает при первом запуске (по умолчанию `Документы/Здоровье/data`); «Сменить папку…» — в «Настройках».
   FatSecret и Whoop — кнопками в «Настройках»; обновление — при запуске и кнопкой «Обновить данные» (Whoop → разметка ночей
@@ -61,6 +61,8 @@ dist/                    ← собранные приложения (не в gi
 - Сборка: `cd desktop && npm run dist:mac` → `dist/Здоровье-<версия>-mac-arm64.zip` и `…-x64.zip` (ad-hoc подпись; собирается в
   ~/Library/Caches/health-app-build — в «Документах» codesign падает). Ключи приложений берёт из `<папка данных>/secrets`:
   FatSecret — `fatsecret_app.json`, пока нет — consumer-поля из `fatsecret.json` (временно); Whoop — `whoop_app.json`.
+  Windows — `npm run dist:win` (с этого Mac, без Wine) → `dist/Здоровье-<версия>-win-x64.exe` (portable, без подписи — SmartScreen
+  предупредит; запуск exe здесь не проверить — нужна Windows). Меню обеих систем — `menu.js` (тест).
   Проверка приватности после сборки встроена. Каждый модуль, который подключает main.js, — в `build.files` (тест)
 - **Правило: функционал готов (тесты прошли, коммит) — сразу `cd desktop && npm run app:mac`**, не спрашивая: сборка →
   открытое «Здоровье» закрывается → новое ставится в /Applications (вместо старого) → открывается для проверки. Сказать

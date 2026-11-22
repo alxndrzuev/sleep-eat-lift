@@ -10,7 +10,8 @@
     "test": "node --test test/",
     "release": "node scripts/release.js",
     "dist:mac": "node scripts/prepare.js && electron-builder --mac -c.directories.output=\"$HOME/Library/Caches/health-app-build\" && node scripts/collect.js",
-    "app:mac": "npm run dist:mac && node scripts/install.js"
+    "app:mac": "npm run dist:mac && node scripts/install.js",
+    "dist:win": "node scripts/prepare.js && electron-builder --win -c.directories.output=\"$HOME/Library/Caches/health-app-build\" && node scripts/collect.js"
   },
   "devDependencies": {
     "electron": "^45.4.1",
@@ -42,6 +43,7 @@
       "secrets.js",
       "changelog.js",
       "whatsnew.js",
+      "menu.js",
       "CHANGELOG.md",
       "schema.json",
       "fatsecret_app.json",
@@ -72,6 +74,17 @@
       "category": "public.app-category.healthcare-fitness",
       "artifactName": "Здоровье-${version}-mac-${arch}.${ext}",
       "hardenedRuntime": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Здоровье-${version}-win-${arch}.${ext}"
     },
     "afterPack": "scripts/afterpack.js"
   }
