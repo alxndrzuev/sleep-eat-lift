@@ -12,8 +12,10 @@ CLAUDE.md                ← этот файл · README.md — обзор пр�
 CLAUDE.local.md          ← личное (не в git)
 docs/                    ← 06 фото: как снимать и разбирать · 07 формат данных (CSV) · privacy-policy.html (для экрана входа Whoop)
                            · superpowers/ — дизайн и планы приложения
-                           · logo/ — логотип SEL (sleep · eat · lift): sel-mark.svg, sel-logo-light/dark.svg (плитки — README);
-                             sel-icon.svg — значок приложения (три дуги) → desktop/build/icon.png, 1024×1024, прозрачные углы
+                           · logo/ — логотип SEL (sleep · eat · lift). Основной — три плитки + SEL по центру над фразой:
+                             sel-logo-light/dark.svg (README) собираются из Nav.logoSvg в portal/nav.js (тест), там же
+                             плитки для меню; sel-mark.svg — одни плитки. Круг из трёх дуг — только где нужен квадрат:
+                             sel-icon.svg — значок приложения → desktop/build/icon.png, 1024×1024, прозрачные углы
 ~/Documents/SEL/data      ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — путь берётся из настроек приложения
                            (~/Library/Application Support/SEL/config.json → dataDir; scripts/csv.js → dataDir; HEALTH_DATA — подменить).
                            Ниже и в тексте «data/» = эта папка. Формат — docs/07_формат_данных.md

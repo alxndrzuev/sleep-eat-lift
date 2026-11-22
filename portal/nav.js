@@ -11,18 +11,42 @@ var Nav = (function () {
     ["settings.html", "Настройки", (d, inApp) => inApp],
   ];
 
-  // знак SEL (sleep · eat · lift) — три дуги, как на значке приложения (docs/logo/sel-icon.svg); слева в меню — знак и слово SEL,
-  // он же — в окне «Что нового», на пустой странице и в «Настройках» → «О приложении»
-  const ARCS = [["#7F77DD", -80], ["#1D9E75", 40], ["#D85A30", 160]];
+  // Логотип SEL (sleep · eat · lift). Основной — три плитки (сон, еда, железо) и SEL по центру над «sleep · eat · lift»:
+  // меню, «О приложении», пустая страница, README (docs/logo/sel-logo-*.svg собираются из logoSvg — тест). Круг из трёх
+  // дуг (как на значке приложения, docs/logo/sel-icon.svg) — только где нужен квадрат: знак перед заголовком «Что нового».
   const TAG = "SEL — sleep · eat · lift";
-  /** Знак (svg) размером px. */
+  const TILES = [
+    ["#7F77DD", "#EEEDFE", '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>'],
+    ["#1D9E75", "#E1F5EE", '<path d="M6 3v5a2.5 2.5 0 0 0 5 0V3"/><path d="M8.5 3v18"/><path d="M18 21V3c-2.4 1.2-3.5 4-3.5 8.5h3.5"/>'],
+    ["#D85A30", "#FAECE7", '<path d="M7 12h10"/><rect x="4" y="7" width="3" height="10" rx="1"/><rect x="17" y="7" width="3" height="10" rx="1"/><path d="M2 10v4"/><path d="M22 10v4"/>'],
+  ];
+  const r2 = v => +v.toFixed(2);
+  /** Три плитки в ряд: левый верх (x, y), сторона size, зазор gap; sw — толщина линий значка (в его 24-единицах). */
+  const tiles = (x, y, size, gap, sw = 2) => TILES.map(([bg, fg, icon], i) => {
+    const tx = x + i * (size + gap);
+    return `<rect x="${r2(tx)}" y="${r2(y)}" width="${r2(size)}" height="${r2(size)}" rx="${r2(size * 0.26)}" fill="${bg}"/>` +
+      `<g transform="translate(${r2(tx + size * 0.225)} ${r2(y + size * 0.225)}) scale(${r2(size * 0.55 / 24)})" fill="none" stroke="${fg}" ` +
+      `stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${icon}</g>`;
+  }).join("");
+  const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
+  const TEXT_W = 206;   // ширина «sleep · eat · lift»; SEL растянут на ту же ширину и стоит по центру над ней
+  /** Логотип целиком (svg 588×140): плитки, SEL, «sleep · eat · lift»; sel, tag — цвета надписей (#… или var(--…)). */
+  function logoSvg(sel, tag, attrs = 'width="588" height="140"') {
+    const cx = 372 + TEXT_W / 2;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 588 140" ${attrs} role="img"><title>${TAG}</title>` + tiles(10, 22, 96, 16) +
+      `<text x="${cx}" y="85" text-anchor="middle" textLength="${TEXT_W}" lengthAdjust="spacing" style="fill:${sel};font:600 80px ${FONT}">SEL</text>` +
+      `<text x="${cx}" y="117" text-anchor="middle" textLength="${TEXT_W}" lengthAdjust="spacing" style="fill:${tag};font:400 22px ${FONT}">sleep · eat · lift</text></svg>`;
+  }
+  /** Знак-круг из трёх дуг размером px — для квадратного места. */
+  const ARCS = [["#7F77DD", -80], ["#1D9E75", 40], ["#D85A30", 160]];
   const mark = px => `<svg class="selmark" viewBox="0 0 24 24" width="${px}" height="${px}" aria-hidden="true"><g fill="none" stroke-width="3.2" stroke-linecap="round">` +
     ARCS.map(([c, a]) => `<circle cx="12" cy="12" r="8.5" stroke="${c}" stroke-dasharray="13.9 39.5" transform="rotate(${a} 12 12)"/>`).join("") +
     "</g></svg>";
-  const MARK = `<span class="brand" title="${TAG}" aria-label="${TAG}" role="img">${mark(22)}<b class="wm">SEL</b></span>`;
-  /** Крупный логотип: знак, SEL и «sleep · eat · lift» под ним; extra — ещё строка (версия). */
-  const logo = (px, extra) => `<div class="sellogo" role="img" aria-label="${TAG}">${mark(px)}<div><b class="wm">SEL</b>` +
-    `<div class="tag">sleep · eat · lift${extra ? " · " + extra : ""}</div></div></div>`;
+  /** Слева в меню: три маленькие плитки и слово SEL. */
+  const MARK = `<span class="brand" title="${TAG}" aria-label="${TAG}" role="img">` +
+    `<svg viewBox="0 0 64 20" width="64" height="20" aria-hidden="true">${tiles(0, 0, 20, 2, 2.4)}</svg><b class="wm">SEL</b></span>`;
+  /** Крупный логотип в странице: высота px, цвета темы. */
+  const logo = px => `<div class="sellogo">${logoSvg("var(--text-primary)", "var(--text-secondary)", `height="${px}" width="${r2(px * 588 / 140)}"`)}</div>`;
 
   /** Пункты меню: [href, название][]. */
   function items(data, inApp) {
@@ -110,5 +134,5 @@ var Nav = (function () {
     render();
     if (inApp()) { appBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, NAMES, MARK, mark, logo};
+  return {items, title, render, inApp, statusText, NAMES, MARK, mark, logo, logoSvg};
 })();

@@ -1,7 +1,9 @@
 // portal/nav.js — меню приложения: пункты по данным, знак SEL.
 const test = require('node:test');
 const assert = require('node:assert');
-const {load, J} = require('./_portal');
+const fs = require('node:fs');
+const path = require('node:path');
+const {load, J, ROOT} = require('./_portal');
 
 const js = load('nav.js');
 const hrefs = (data, inApp) => js(`Nav.items(${J(data)}, ${J(inApp)}).map(x => x[0])`);
@@ -25,21 +27,36 @@ test('no data, in the app', () => {
   assert.deepStrictEqual(hrefs({nutrition: [], weight: [], whoop_daily: []}, true), ['dashboard.html', 'photos.html', 'settings.html']);
 });
 
-test('SEL mark: three arcs in sleep/eat/lift colours, title for hover and screen reader, not a menu item', () => {
+test('menu brand: three tiles (sleep, eat, lift colours) and the word SEL, title for hover and screen reader, not a menu item', () => {
   const mark = js('Nav.MARK');
-  assert.strictEqual(mark.split('<circle').length - 1, 3);
+  assert.strictEqual(mark.split('width="20" height="20"').length - 1, 3);
   for (const color of ['#7F77DD', '#1D9E75', '#D85A30']) assert.ok(mark.includes(color), color);
   assert.ok(mark.includes('title="SEL — sleep · eat · lift"'));
+  assert.ok(mark.includes('<b class="wm">SEL</b>'));
   assert.ok(!mark.includes('<a'));
-  assert.ok(mark.includes('<b class="wm">SEL</b>'), 'word SEL next to the mark');
 });
 
-test('SEL logo: mark of the given size, SEL, tagline and optional extra line', () => {
-  assert.ok(js('Nav.mark(40)').includes('width="40" height="40"'));
-  const logo = js('Nav.logo(44, "версия 1.2.0")');
-  assert.ok(logo.includes('width="44"') && logo.includes('>SEL</b>'));
-  assert.ok(logo.includes('sleep · eat · lift · версия 1.2.0'));
-  assert.ok(js('Nav.logo(44)').includes('sleep · eat · lift</div>'));
+test('square mark: three arcs of the given size', () => {
+  const m = js('Nav.mark(40)');
+  assert.strictEqual(m.split('<circle').length - 1, 3);
+  assert.ok(m.includes('width="40" height="40"'));
+});
+
+test('logo: tiles, SEL centred over the tagline and as wide as it; page logo uses theme colours', () => {
+  const svg = js('Nav.logoSvg("#000", "#555")');
+  const texts = [...svg.matchAll(/<text x="([\d.]+)"[^>]*textLength="(\d+)"[^>]*>([^<]+)</g)].map(m => [m[1], m[2], m[3]]);
+  assert.deepStrictEqual(texts.map(t => t[2]), ['SEL', 'sleep · eat · lift']);
+  assert.strictEqual(texts[0][0], texts[1][0], 'same centre');
+  assert.strictEqual(texts[0][1], texts[1][1], 'same width');
+  assert.ok(svg.includes('text-anchor="middle"'));
+  const page = js('Nav.logo(48)');
+  assert.ok(page.includes('fill:var(--text-primary)') && page.includes('height="48"'));
+});
+
+test('docs/logo light and dark files are built from Nav.logoSvg', () => {
+  const read = f => fs.readFileSync(path.join(ROOT, 'docs', 'logo', f), 'utf8').trim();
+  assert.strictEqual(read('sel-logo-light.svg'), js('Nav.logoSvg("#2C2C2A", "#5F5E5A")'));
+  assert.strictEqual(read('sel-logo-dark.svg'), js('Nav.logoSvg("#F1EFE8", "#B4B2A9")'));
 });
 
 test('page titles', () => {
