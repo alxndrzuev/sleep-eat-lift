@@ -40,3 +40,16 @@ const data = dataDir();
 test('project has no personal data from the data folder', {skip: !(data && fs.existsSync(path.join(data, 'secrets'))) && 'нет папки данных на этом компьютере'}, () => {
   assert.deepStrictEqual(pc.leaks(pc.ROOT, pc.publicFiles(pc.ROOT), data), []);
 });
+
+test('tracked symlinks are reported (a link carries a local path into the public repo)', () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-link-'));
+  const {execFileSync} = require('node:child_process');
+  const git = (...a) => execFileSync('git', a, {cwd: repo});
+  git('init', '-q');
+  fs.writeFileSync(path.join(repo, 'a.txt'), 'x');
+  fs.symlinkSync('/Users/someone/elsewhere', path.join(repo, 'node_modules'));
+  git('add', 'a.txt', 'node_modules');
+  assert.deepStrictEqual(pc.symlinks(repo), ['node_modules']);
+  git('rm', '-q', '--cached', 'node_modules');
+  assert.deepStrictEqual(pc.symlinks(repo), []);
+});

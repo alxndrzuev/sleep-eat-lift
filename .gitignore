@@ -11,7 +11,7 @@
 /data/data.js
 
 # приложение: зависимости и сборки
-/desktop/node_modules/
+/desktop/node_modules
 # ключи приложений, которые кладёт сборка (и копии «… 2.json», которые делает синхронизация «Документов»)
 /desktop/*_app*.json
 /dist/

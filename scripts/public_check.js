@@ -71,6 +71,12 @@ function leaks(root, files, data) {
   return out;
 }
 
+/** Ссылки (symlink) в индексе git → пути. Ссылка уносит в публичный репозиторий путь этого компьютера. */
+function symlinks(root) {
+  return execFileSync('git', ['ls-files', '-s', '-z'], {cwd: root}).toString().split('\0')
+    .filter(l => l.startsWith('120000 ')).map(l => l.slice(l.indexOf('\t') + 1));
+}
+
 /** Почта для коммитов в этом репозитории — noreply GitHub. */
 function authorOk(root) {
   try { return execFileSync('git', ['config', 'user.email'], {cwd: root}).toString().trim().endsWith('@users.noreply.github.com'); }
@@ -86,6 +92,10 @@ function main() {
   const files = publicFiles(ROOT);
   const found = leaks(ROOT, files, data);
   for (const [p, kind] of found) console.log(`ЛИЧНОЕ: ${p} — ${kind}`);
+  for (const p of symlinks(ROOT)) {
+    console.log(`ЛИЧНОЕ: ${p} — ссылка в git (путь этого компьютера): git rm --cached ${p}`);
+    found.push([p, 'ссылка']);
+  }
   if (!authorOk(ROOT)) {
     console.log('ЛИЧНОЕ: почта автора коммитов не noreply GitHub — git config user.email <id>+<логин>@users.noreply.github.com');
     found.push(['git config', 'почта']);
@@ -96,4 +106,4 @@ function main() {
 
 if (require.main === module) process.exit(main());
 
-module.exports = {needles, publicFiles, leaks, authorOk, ROOT};
+module.exports = {needles, publicFiles, leaks, symlinks, authorOk, ROOT};
