@@ -1,5 +1,6 @@
 // Приложение SEL (sleep · eat · lift; раньше — «Здоровье»): одно окно с порталом. Страницы — из приложения (portal/), данные пользователя —
-// «Документы/SEL/data» (CSV, ключи доступа, фото, data.js). Протокол app://h/ отдаёт только разрешённое (protocol.js).
+// «Документы/SEL/data» (CSV, ключи доступа, фото). Протокол app://h/ отдаёт только разрешённое (protocol.js);
+// data.js для страниц собирается из CSV при каждом открытии страницы (store.dataJs), на диск не пишется.
 // HEALTH_DOCUMENTS — другая папка «Документы» (проверки); HEALTH_SMOKE=1 — загрузить страницу, вывести меню и выйти;
 // HEALTH_CONNECT=fatsecret|whoop — сразу открыть вход сервиса (проверка до появления «Настроек»);
 // HEALTH_WHATSNEW=<версия> — показать окно «Что нового», как будто последней была эта версия (настройки не трогаются).
@@ -8,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const store = require('./store');
-const {resolve, inside, CSP} = require('./protocol');
+const {resolve, inside, isDataJs, CSP} = require('./protocol');
 const oauthwin = require('./oauthwin');
 const fatsecret = require('./fatsecret');
 const whoop = require('./whoop');
@@ -41,25 +42,22 @@ function today() {
 
 // ---------- ключи доступа пользователя ----------
 const userKey = name => store.readJson(path.join(secretsDir(), `${name}.json`));
-/** Сохранить токены сервиса (остальные поля файла не трогаем — см. secrets.js); null — «Отключить». */
-function saveUserKey(name, obj) {
-  const f = path.join(secretsDir(), `${name}.json`);
-  if (obj) secretsFile.save(f, Object.fromEntries(Object.entries(obj).filter(([k]) => secretsFile.TOKENS.includes(k))));
-  else secretsFile.clear(f);
-}
+/** Токены сервисов (остальные поля файла не трогаем — см. secrets.js). Сохранение берётся в начале входа или обновления
+ *  (keys.saver): после «Отключить» (keys.clear) запоздавший ответ сервиса токены не вернёт. */
+const keys = secretsFile.keeper(name => path.join(secretsDir(), `${name}.json`));
 
 // ---------- сервисы ----------
 const services = {
   fatsecret: {
     connected: () => !!userKey('fatsecret').access_token,
     update: (dir, first) => fatsecret.update({dir, app: appKey('fatsecret', {packaged: app.isPackaged}), user: userKey('fatsecret'),
-      months: (first ? updaterLib.firstRange : updaterLib.recentRange)(new Date())}),
+      months: updaterLib.fatsecretRange(first ? null : updaterLib.since(dir, 'fatsecret'), new Date())}),   // пропуски догружаются
   },
   whoop: {
     connected: () => !!userKey('whoop').refresh_token,
     update: async (dir, first) => {
       const r = await whoop.update({dir, app: appKey('whoop', {packaged: app.isPackaged}), user: userKey('whoop'),
-        days: first ? 365 : 14, saveUser: u => saveUserKey('whoop', u)});
+        days: updaterLib.whoopDays(first ? null : updaterLib.since(dir, 'whoop'), new Date()), saveUser: keys.saver('whoop')});
       if (r.ok) {   // ночи «похоже на алкоголь» за последние 30 дней, но не раньше meta.alcohol_from
         const floor = store.readJson(path.join(dir, 'meta.json')).alcohol_from || '';
         const from = alcohol.fromDate(today());
@@ -69,7 +67,7 @@ const services = {
     },
   },
 };
-const updater = updaterLib.create(services, today);
+const updater = updaterLib.create(services);
 
 /** Подключить сервис: окно входа → ключ доступа → загрузка за год. → {ok} | {ok: false, cancelled} | {ok: false, error}. */
 const pending = {};
@@ -92,12 +90,12 @@ async function connect(name) {
     if (name === 'whoop') {
       const key = appKey('whoop', {packaged: app.isPackaged});
       if (!key) return {ok: false, error: 'В этой сборке нет ключа Whoop'};
-      const state = whoop.newState();
+      const state = whoop.newState(), save = keys.saver('whoop');
       const back = await oauthwin.open({url: whoop.authUrl(key, state), callbackPrefix: key.redirect_uri || whoop.CALLBACK,
                                         partition: 'whoop-login', parent: win, title: 'Вход в Whoop'});
       if (!back) return {ok: false, cancelled: true};
       const user = await whoop.exchange(key, whoop.codeFrom(back, state), {fetch: globalThis.fetch});
-      saveUserKey('whoop', user);
+      if (!save(user)) return {ok: false, cancelled: true};             // пока шёл вход, нажали «Отключить»
       const r = await updateAll('whoop');
       return {ok: true, update: r.whoop};
     }
@@ -106,11 +104,11 @@ async function connect(name) {
 }
 
 async function finishFatSecret(verifier, token) {
-  const t = pending.fatsecret;
+  const t = pending.fatsecret, save = keys.saver('fatsecret');
   if (!t || (token && token !== t.token)) return {ok: false, error: 'Вход устарел — нажмите «Подключить» ещё раз'};
   const user = await fatsecret.accessToken(appKey('fatsecret', {packaged: app.isPackaged}), t.token, t.secret, verifier);
   delete pending.fatsecret;
-  saveUserKey('fatsecret', user);
+  if (!save(user)) return {ok: false, cancelled: true};               // пока шёл вход, нажали «Отключить»
   const r = await updateAll('fatsecret');
   return {ok: true, update: r.fatsecret};
 }
@@ -160,7 +158,7 @@ function status() {
   const svc = {};
   for (const name of Object.keys(services))
     svc[name] = Object.assign({connected: services[name].connected(), hasKey: !!appKey(name, {packaged: app.isPackaged})},
-                              updater.status[name]);
+                              updater.status[name], {lastUpdate: updater.status[name].lastUpdate || store.readSync(DATA)[name] || null});
   return {version: app.getVersion(), dataDir: DATA, modules: store.modules(DATA), updating: updater.busy, services: svc,
           oob: !!(pending.fatsecret && pending.fatsecret.oob)};
 }
@@ -189,21 +187,19 @@ function setupIpc() {
   ipc('health:code', async v => {
     try { const r = await finishFatSecret(String(v || '')); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
   });
-  ipc('health:disconnect', s => { if (s in services) saveUserKey(s, null); store.writeDataJs(DATA, today()); pushStatus(); reload(); return {ok: true}; });
-  ipc('health:targets', v => { const r = settings.saveTargets(DATA, v || {}, today()); if (r.ok) { store.writeDataJs(DATA, today()); } return r; });
-  ipc('health:removeTarget', (kind, date) => { const r = settings.removeTarget(DATA, String(kind), String(date)); if (r.ok) store.writeDataJs(DATA, today()); return r; });
-  // план и БАДы из «Настроек»: после записи — пересобрать data.js
-  const saved = r => { if (r.ok) store.writeDataJs(DATA, today()); return r; };
-  ipc('health:plan', v => saved(settings.savePlan(DATA, v || {}, today())));
-  ipc('health:removePlan', date => saved(settings.removePlan(DATA, String(date))));
-  ipc('health:supplementAdd', v => saved(settings.addSupplement(DATA, v || {}, today())));
-  ipc('health:supplementStop', v => saved(settings.stopSupplement(DATA, v || {}, today())));
-  ipc('health:supplementRemove', v => saved(settings.removeSupplement(DATA, v || {})));
-  const alcoholDone = r => { if (r.ok) store.writeDataJs(DATA, today()); return r; };
-  ipc('health:alcohol', (morning, value) => alcoholDone(alcohol.answer(DATA, String(morning), typeof value === 'boolean' ? value : String(value))));
-  ipc('health:alcoholAdd', (evening, lvl, note) => alcoholDone(alcohol.add(DATA, String(evening), String(lvl), String(note || '').slice(0, 80), today())));
-  ipc('health:alcoholLevel', (evening, lvl) => alcoholDone(alcohol.setLevel(DATA, String(evening), String(lvl))));
-  ipc('health:alcoholRemove', evening => alcoholDone(alcohol.removeEvening(DATA, String(evening))));
+  ipc('health:disconnect', s => { if (s in services) keys.clear(s); pushStatus(); reload(); return {ok: true}; });
+  ipc('health:targets', v => settings.saveTargets(DATA, v || {}, today()));
+  ipc('health:removeTarget', (kind, date) => settings.removeTarget(DATA, String(kind), String(date)));
+  // план, БАДы, алкоголь: пишем CSV — страница при следующей загрузке получит их из CSV (store.dataJs)
+  ipc('health:plan', v => settings.savePlan(DATA, v || {}, today()));
+  ipc('health:removePlan', date => settings.removePlan(DATA, String(date)));
+  ipc('health:supplementAdd', v => settings.addSupplement(DATA, v || {}, today()));
+  ipc('health:supplementStop', v => settings.stopSupplement(DATA, v || {}, today()));
+  ipc('health:supplementRemove', v => settings.removeSupplement(DATA, v || {}));
+  ipc('health:alcohol', (morning, value) => alcohol.answer(DATA, String(morning), typeof value === 'boolean' ? value : String(value)));
+  ipc('health:alcoholAdd', (evening, lvl, note) => alcohol.add(DATA, String(evening), String(lvl), String(note || '').slice(0, 80), today()));
+  ipc('health:alcoholLevel', (evening, lvl) => alcohol.setLevel(DATA, String(evening), String(lvl)));
+  ipc('health:alcoholRemove', evening => alcohol.removeEvening(DATA, String(evening)));
   ipc('health:folder', () => shell.openPath(DATA));
   ipc('health:changeFolder', async () => {
     const d = await askDataDir({change: true});
@@ -225,10 +221,17 @@ function setupIpc() {
 
 // ---------- окно ----------
 function serve(req) {
+  if (isDataJs(req.url)) {                             // данные страниц — из CSV прямо сейчас (store.dataJs)
+    let js;
+    try { js = store.dataJs(DATA, today()); }
+    catch (e) { return new Response('Данные не читаются: ' + e.message, {status: 500, headers: {'Content-Type': 'text/plain; charset=utf-8'}}); }
+    return new Response(js, {headers: {'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store',
+                                       'Content-Security-Policy': CSP}});
+  }
   const p = resolve(req.url, PORTAL, DATA);
   if (!p || !fs.existsSync(p)) return new Response('Not found', {status: 404});
   const real = fs.realpathSync(p);                       // симлинк наружу разрешённой папки — не отдаём
-  const bases = [PORTAL, path.join(DATA, 'photos'), DATA].map(b => fs.existsSync(b) ? fs.realpathSync(b) : b);
+  const bases = [PORTAL, path.join(DATA, 'photos')].map(b => fs.existsSync(b) ? fs.realpathSync(b) : b);
   if (!bases.some(b => inside(b, real))) return new Response('Not found', {status: 404});
   return net.fetch(pathToFileURL(real).toString()).then(r => new Response(r.body, {
     status: r.status, headers: {'Content-Type': r.headers.get('Content-Type') || '', 'Cache-Control': 'no-store',
@@ -289,7 +292,6 @@ app.whenReady().then(async () => {
   protocol.handle('app', serve);
   setupIpc();
   store.init(DATA);
-  store.writeDataJs(DATA, today());
   if (process.env.HEALTH_SMOKE && process.env.HEALTH_SMOKE_UPDATE) await updater.runAll(DATA);   // проверка: обновить до окна
   win.loadURL(START);
   if (process.env.HEALTH_SMOKE) {
@@ -313,4 +315,4 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => app.quit());
 
-module.exports = {connect, finishFatSecret, services, updater, saveUserKey, userKey};
+module.exports = {connect, finishFatSecret, services, updater, keys, userKey};

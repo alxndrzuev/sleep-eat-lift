@@ -1,15 +1,14 @@
-// Протокол app://h/ — белый список: страницы приложения, data.js и фото; остальное — null (404).
+// Протокол app://h/ — белый список: страницы приложения и фото; data.js — не файл (собирается из CSV); остальное — null (404).
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
-const {resolve} = require('../protocol');
+const {resolve, isDataJs} = require('../protocol');
 
 const PORTAL = '/app/portal', DATA = '/Users/u/Documents тест/SEL/data';
 
 test('allowed', () => {
   assert.strictEqual(resolve('app://h/portal/dashboard.html', PORTAL, DATA), path.join(PORTAL, 'dashboard.html'));
   assert.strictEqual(resolve('app://h/portal/vendor/libheif.js', PORTAL, DATA), path.join(PORTAL, 'vendor/libheif.js'));
-  assert.strictEqual(resolve('app://h/data/data.js', PORTAL, DATA), path.join(DATA, 'data.js'));
   assert.strictEqual(resolve('app://h/data/photos/aligned/a%20b.jpg', PORTAL, DATA), path.join(DATA, 'photos/aligned/a b.jpg'));
   assert.strictEqual(resolve('app://h/data/photos/photos.js?v=3', PORTAL, DATA), path.join(DATA, 'photos/photos.js'));
 });
@@ -18,8 +17,14 @@ test('denied', () => {
   for (const u of ['app://h/data/body.csv', 'app://h/data/meta.json', 'app://h/data/secrets/fatsecret.json',
                    'app://h/data/../data/secrets/x', 'app://h/data/photos/../secrets/x', 'app://h/data/photos/%2e%2e/secrets/x',
                    'app://h/portal/../../etc/passwd', 'app://h/portal/%2e%2e/%2e%2e/etc/passwd', 'app://other/portal/dashboard.html',
-                   'app://h/', 'app://h/data/photos'])
+                   'app://h/', 'app://h/data/photos', 'app://h/data/data.js'])
     assert.strictEqual(resolve(u, PORTAL, DATA), null, u);
+});
+
+test('data.js is built from CSV, not a file from the data folder', () => {
+  for (const u of ['app://h/data/data.js', 'app://h/data/data.js?v=2']) assert.ok(isDataJs(u), u);
+  for (const u of ['app://h/portal/data.js', 'app://h/data/photos/data.js', 'app://other/data/data.js', 'file:///data/data.js', 'nonsense'])
+    assert.ok(!isDataJs(u), u);
 });
 
 test('CSP: nothing from outside, no plugins, wasm allowed for photos', () => {

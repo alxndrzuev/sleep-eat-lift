@@ -68,6 +68,18 @@ var Nav = (function () {
     const data = typeof DATA !== "undefined" ? DATA : {};
     try { if (title(cur)) sessionStorage.setItem("navLast", cur); } catch (e) {}   // для «← …» на странице «Что нового»
     el.innerHTML = MARK + items(data, inApp()).map(([h, t]) => `<a href="${h}"${h === cur ? ' class="on"' : ""}>${t}</a>`).join("");
+    const bad = dataErrors(data.errors);
+    if (bad && !document.getElementById("dataerr")) {          // испорченный CSV: страница открылась, но эти данные пустые
+      const div = document.createElement("div");
+      div.id = "dataerr"; div.className = "err"; div.style.cssText = "margin:8px 0;font-size:13px;color:var(--critical)";
+      div.textContent = bad;                                    // текст из файла — только как текст
+      el.insertAdjacentElement("afterend", div);
+    }
+  }
+
+  /** Строка про файлы данных, которые не читаются (DATA.errors), или "". */
+  function dataErrors(errors) {
+    return errors && errors.length ? "Не читается файл в папке данных — эти данные не показаны, пока его не поправить: " + errors.join(" · ") : "";
   }
 
   // ---------- только в приложении: «Обновить», статус, подвалы с указанием источника ----------
@@ -88,6 +100,17 @@ var Nav = (function () {
     if (errs.length) return {text: errs.join(" · "), err: true};
     const last = on.map(([, v]) => v.lastUpdate).filter(Boolean).sort().pop();
     return {text: last ? "обновлено " + when(last) : "", err: false};
+  }
+
+  /** Сводка: когда данные подключённых сервисов на самом деле загружены (data/sync.json → DATA.sync), а не когда собран data.js.
+      Один день у всех — одно (последнее) время; иначе — по сервисам. */
+  function syncText(sync, modules) {
+    const on = ["fatsecret", "whoop"].filter(n => (modules || []).includes(n));
+    if (!on.length) return "";
+    const at = on.map(n => (sync || {})[n] || null);
+    const day = iso => iso && new Date(iso).toDateString();
+    if (at.every(Boolean) && at.every(x => day(x) === day(at[0]))) return "Обновлено " + when(at.slice().sort().pop());
+    return "Обновлено: " + on.map((n, i) => NAMES[n] + " — " + (at[i] ? when(at[i]) : "ещё не загружен")).join(" · ");
   }
 
   const UPDATE_PAGES = ["nutrition.html", "training.html", "recovery.html"];   // «Обновить данные» — на профильных страницах сервисов; ещё — в «Настройках» у FatSecret и Whoop
@@ -134,5 +157,5 @@ var Nav = (function () {
     render();
     if (inApp()) { appBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, NAMES, MARK, mark, logo, logoSvg};
+  return {items, title, render, inApp, statusText, syncText, dataErrors, NAMES, MARK, mark, logo, logoSvg};
 })();

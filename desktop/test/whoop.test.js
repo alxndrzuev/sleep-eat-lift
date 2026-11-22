@@ -82,9 +82,23 @@ test('whoop fails, fatsecret still updates', async () => {
   const u = updater.create({
     fatsecret: {connected: () => true, update: async d => { store.upsert(d, 'body.csv', {'2026-11-20': {weight_kg: 73}}); return {ok: true}; }},
     whoop: {connected: () => true, update: async () => ({ok: false, error: 'Доступ к Whoop пропал — подключите заново'})},
-  }, () => '2026-11-21');
+  });
   const r = await u.runAll(dir);
   assert.strictEqual(r.fatsecret.ok, true);
   assert.strictEqual(r.whoop.ok, false);
   assert.strictEqual(store.read(dir, 'body.csv')[0].weight_kg, '73');
+});
+
+test('hung request or body → network error after the timeout (API and token), files untouched', async () => {
+  const hang = (url, opt = {}) => new Promise((_, fail) => opt.signal.addEventListener('abort', () => fail(opt.signal.reason)));
+  const hangBody = (url, opt = {}) => Promise.resolve(new Response(new ReadableStream({start(c) {
+    opt.signal.addEventListener('abort', () => c.error(opt.signal.reason)); }})));
+  for (const fetch of [hang, hangBody])
+    for (const expires_at of [0, 9e9]) {                                  // 0 — сначала обновление токена
+      const dir = tmp(), before = fs.readFileSync(path.join(dir, 'whoop_daily.csv'), 'utf8');
+      const r = await whoop.update({dir, app: APP, user: {access_token: 'a', refresh_token: 'r', expires_at}, days: 14,
+                                    fetch, timeout: 20, saveUser: () => {}, sleep: async () => {}});
+      assert.deepStrictEqual(r, {ok: false, kind: 'network', error: 'Нет связи с Whoop — попробуйте позже'});
+      assert.strictEqual(fs.readFileSync(path.join(dir, 'whoop_daily.csv'), 'utf8'), before);
+    }
 });

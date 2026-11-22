@@ -22,7 +22,7 @@ docs/                    ← 06 фото: как снимать и разбир�
   *.csv                  ← вся история (только дописываем)
   README.md              ← описание папки для LLM (пишет приложение из desktop/data_readme.md — править там)
   meta.json              ← только alcohol_from; план — plans.csv, цели — targets.csv / goal_weight.csv
-  data.js                ← сырые таблицы для страниц (const RAW), пишет приложение; расчёт — portal/dataset.js
+  sync.json              ← когда FatSecret и Whoop последний раз обновились (пишет приложение; с него — догрузка пропусков)
   photos/                ← фото формы: originals/ · aligned/ · view/ · thumbs/ · photos.js (индекс) — docs/06
   secrets/               ← ключи приложений и токены FatSecret, Whoop — не показывать в чате
   docs/                  ← личные документы (профиль, план, журнал, решения, анализ)
@@ -35,12 +35,13 @@ portal/                  ← страницы приложения: dashboard.ht
                            Ещё в common.js: периоды кнопок #range — periodDays/prevDays, плитки #tiles — tileCards.
                            **Текст из CSV и от сервисов (заметки, вид спорта, описания) — в innerHTML только через esc()** (тест RENDER=1);
                            meta.json пишем мы сами, в нём бывает разметка — его не экранируем
-                           dataset.js — расчёт DATA из RAW; nav.js — меню по данным, «Обновить данные», статус, подвалы fatsecret/Whoop
+                           RAW (сырые таблицы) — app://h/data/data.js: main.js собирает из CSV при открытии страницы (store.dataJs),
+                           на диске файла нет; dataset.js — расчёт DATA из RAW; nav.js — меню по данным, «Обновить данные», статус, подвалы fatsecret/Whoop
                            photos_core.js (логика, тесты в Node) + photos_app.js (загрузка, HEIC, поиск фигуры, выравнивание)
                            photos_fs.js — папка фото в приложении · vendor/ — библиотеки «Фото» (MediaPipe, libheif, exifr; в git, ~35 МБ)
 scripts/                 ← Node без зависимостей (берёт модули из desktop/) — служебное
   csv.js                 ← данные из чата: `node scripts/csv.js upsert body.csv '{"2026-11-22": {"weight_kg": 75.4}}'`
-                           (тот же store.js, что в приложении; пересобирает data.js) · read <файл> [N] · remove · dir
+                           (тот же store.js, что в приложении; в SEL видно после ⌘R) · read <файл> [N] · remove · dir
   vendor_fetch.js        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
   public_check.js        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
 dist/                    ← собранные приложения (не в git): dist/<версия>/ — release-notes.md + zip Mac + exe Windows;

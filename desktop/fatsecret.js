@@ -7,7 +7,8 @@ const {pyRound} = require('./pyround');
 const API = 'https://platform.fatsecret.com/rest/server.api';
 const AUTH = 'https://authentication.fatsecret.com/oauth';
 const CALLBACK = 'https://health.local/fatsecret';
-const TEXTS = {network: 'Нет связи с FatSecret, данные со вчера. Попробуйте позже',
+const TIMEOUT = 30000;              // мс на запрос вместе с ответом: зависшая сеть — ошибка «нет связи», а не вечное «обновляю…»
+const TEXTS = {network: 'Нет связи с FatSecret — попробуйте позже',
                token: 'Доступ к FatSecret пропал — подключите заново'};
 
 class FatSecretError extends Error {
@@ -32,14 +33,15 @@ function signedUrl(http, url, params, consumerSecret, tokenSecret = '', nonce, t
 async function call(http, url, params, cs, ts, deps = {}) {
   const fetch = deps.fetch || globalThis.fetch;
   const u = signedUrl(http, url, params, cs, ts, crypto.randomBytes(12).toString('hex'), Math.floor(Date.now() / 1000));
-  let r;
+  const signal = AbortSignal.timeout(deps.timeout || TIMEOUT);
+  let r, text;
   try {
     if (http === 'POST') {          // FatSecret проверяет подпись POST только по параметрам в теле
       const [base, q] = u.split(/\?(.*)/s);
-      r = await fetch(base, {method: 'POST', body: q, headers: {'Content-Type': 'application/x-www-form-urlencoded'}});
-    } else r = await fetch(u, {method: http});
+      r = await fetch(base, {method: 'POST', body: q, headers: {'Content-Type': 'application/x-www-form-urlencoded'}, signal});
+    } else r = await fetch(u, {method: http, signal});
+    text = await r.text();
   } catch (e) { throw new FatSecretError('network'); }
-  const text = await r.text();
   if (!r.ok) throw new FatSecretError('api', `HTTP ${r.status}: ${text.slice(0, 200)}`);
   return text;
 }
@@ -100,8 +102,8 @@ function months(a, b) {
 }
 
 /** Выгрузить месяцы [a, b] → nutrition_daily.csv и body.csv; файлы пишутся только после всех запросов. */
-async function update({dir, app, user, months: [a, b], fetch}) {
-  const deps = {fetch}, food = {}, wt = {};
+async function update({dir, app, user, months: [a, b], fetch, timeout}) {
+  const deps = {fetch, timeout}, food = {}, wt = {};
   try {
     for (const ym of months(a, b)) {
       Object.assign(food, await month(app, user, ym, deps));

@@ -1,5 +1,5 @@
 /* Расчёт данных портала из сырых таблиц. data.js (const RAW = {tables: {"<имя>.csv": [строки]}, meta, modules, updated})
-   пишет приложение (desktop/store.js). Подключается сразу после ../data/data.js; создаёт глобальный DATA, с которым работают страницы. */
+   приложение собирает из CSV при открытии страницы (desktop/store.js → dataJs), на диске файла нет. Подключается сразу после ../data/data.js; создаёт глобальный DATA, с которым работают страницы. */
 var Dataset = (function () {
   const FULL_DAY_KCAL = 1200;   // дни в FatSecret меньше — «не заполнен», в средние не идут (lib.FULL_DAY_KCAL)
   const STRENGTH = ["weightlifting_msk", "functional-fitness", "powerlifting", "weightlifting"];
@@ -106,12 +106,22 @@ var Dataset = (function () {
     const p = inEffect(d.plans, raw.updated);
     d.plan_now = p ? {start: p.start, text: p.text} : null;
     d.updated = raw.updated;
+    d.sync = raw.sync || {};
+    d.errors = raw.errors || [];                           // файлы, которые не читаются (Nav покажет строку на всех страницах)                               // когда сервисы на самом деле обновились (sync.json)
     Object.assign(d, raw.meta || {});
     d.modules = raw.modules || [];
     return d;
   }
 
-  return {build, workoutKind, round1, foodDay, macroDevs, GOAL_HIT, GOAL_NEAR};
+  /** Тренировки DATA.workouts ([начало, вид, …]) за `days` календарных дней по день `end` включительно → {strength, cardio}. */
+  function workoutsIn(workouts, end, days) {
+    const from = new Date(Date.parse(end + "T00:00:00Z") - (days - 1) * 864e5).toISOString().slice(0, 10);
+    const out = {strength: 0, cardio: 0};
+    for (const [start, kind] of workouts) { const d = start.slice(0, 10); if (d >= from && d <= end && kind in out) out[kind]++; }
+    return out;
+  }
+
+  return {build, workoutKind, workoutsIn, round1, foodDay, macroDevs, GOAL_HIT, GOAL_NEAR};
 })();
 
 if (typeof RAW !== "undefined") var DATA = Dataset.build(RAW);

@@ -62,3 +62,10 @@ test('docs/logo light and dark files are built from Nav.logoSvg', () => {
 test('page titles', () => {
   assert.deepStrictEqual(js('[Nav.title("photos.html"), Nav.title("whatsnew.html")]'), ['Фото', null]);
 });
+
+test('broken data file: one line for every page, file and line named', () => {
+  assert.strictEqual(js('Nav.dataErrors([])'), '');
+  assert.strictEqual(js('Nav.dataErrors(undefined)'), '');
+  assert.strictEqual(js('Nav.dataErrors(["nutrition_daily.csv, строка 3: «kcal» = «abc» — не число"])'),
+    'Не читается файл в папке данных — эти данные не показаны, пока его не поправить: nutrition_daily.csv, строка 3: «kcal» = «abc» — не число');
+});

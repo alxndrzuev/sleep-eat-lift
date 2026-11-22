@@ -23,3 +23,25 @@ test('new file and clear of missing file', () => {
   secrets.clear(path.join(d, 'nope.json'));
   assert.ok(!fs.existsSync(path.join(d, 'nope.json')));
 });
+
+test('«Отключить» во время обновления: токены, полученные после него, не сохраняются', async () => {
+  const store = require('../store'), whoop = require('../whoop');
+  const dir = store.dataDir(fs.mkdtempSync(path.join(os.tmpdir(), 'health-sec-')));
+  store.init(dir);
+  const file = name => path.join(dir, 'secrets', name + '.json');
+  const keys = secrets.keeper(file);
+  keys.save('whoop', {refresh_token: 'r', access_token: 'a', expires_at: 0});
+  let answer;                                                              // ответ на обновление токена придёт позже
+  const fetch = url => url.startsWith(whoop.TOKEN_URL)
+    ? new Promise(r => { answer = () => r(new Response(JSON.stringify({access_token: 'new', refresh_token: 'new-r', expires_in: 3600}))); })
+    : Promise.resolve(new Response(JSON.stringify({records: []})));
+  const run = whoop.update({dir, app: {client_id: 'c', client_secret: 's'}, user: {refresh_token: 'r', access_token: 'a', expires_at: 0},
+                            days: 14, fetch, saveUser: keys.saver('whoop'), sleep: async () => {}});
+  await new Promise(r => setImmediate(r));
+  keys.clear('whoop');                                                     // «Отключить», пока запрос идёт
+  answer();
+  await run;
+  assert.ok(!fs.existsSync(file('whoop')));
+  keys.saver('whoop')({refresh_token: 'again'});                           // новое подключение — сохраняется
+  assert.strictEqual(JSON.parse(fs.readFileSync(file('whoop'))).refresh_token, 'again');
+});

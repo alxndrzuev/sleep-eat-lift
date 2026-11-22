@@ -1,5 +1,5 @@
 // Данные пользователя приложения: CSV в «Документы/SEL/data» — единственный код записи (им же пишет scripts/csv.js)
-// (колонки по схеме, сортировка по ключу, LF, числа без лишних нулей) и data.js (const RAW) для страниц портала.
+// (колонки по схеме, сортировка по ключу, LF, числа без лишних нулей); RAW для страниц портала — dataJs(), из CSV в момент запроса.
 const fs = require('node:fs');
 const path = require('node:path');
 const SCHEMA = require('./schema.json');
@@ -14,14 +14,17 @@ function dataDir(documents) { return path.join(documents, 'SEL', 'data'); }
 const keyOf = name => SCHEMA.key[name] || 'date';
 const sortOf = name => SCHEMA.sort[name] || keyOf(name);
 
-/** Папки и CSV с заголовками; существующее не трогает. → имена созданных CSV. */
+/** Папки, CSV с заголовками и README.md; существующие CSV не трогает. → имена созданных CSV.
+ *  data.js прежних версий (копия CSV на диске) удаляет: страницы получают данные прямо из CSV (dataJs). */
 function init(dir) {
   for (const sub of ['', 'secrets', 'photos']) fs.mkdirSync(path.join(dir, sub), {recursive: true});
+  for (const old of ['data.js', 'data.js.tmp']) fs.rmSync(path.join(dir, old), {force: true});
   const created = [];
   for (const [name, cols] of Object.entries(SCHEMA.schema)) {
     const f = path.join(dir, name);
     if (!fs.existsSync(f)) { fs.writeFileSync(f, cols.join(',') + '\n'); created.push(name); }
   }
+  writeReadme(dir);
   return created;
 }
 
@@ -51,11 +54,12 @@ function read(dir, name) {
   const f = path.join(dir, name);
   if (!fs.existsSync(f)) return [];
   const [head, ...rows] = parseCsv(fs.readFileSync(f, 'utf8'));
+  if (!head) return [];                                                  // пустой файл (0 байт) — строк нет
   const cols = SCHEMA.schema[name], dropped = (SCHEMA.dropped || {})[name] || [];
   // новые колонки добавляются только в конец: старый файл без них читается (пустыми), при записи они появятся;
   // убранные из схемы (schema.json → dropped) в старом файле пропускаются и исчезают при записи
   const kept = head.filter(c => !dropped.includes(c));
-  if (cols && kept.join(',') !== cols.slice(0, kept.length).join(',')) throw new Error(`${name}: заголовок ${head}, ожидался ${cols}`);
+  if (cols && kept.join(',') !== cols.slice(0, kept.length).join(',')) throw new Error(`${name}: заголовок «${head}», ожидался «${cols}»`);
   const all = cols || head;
   return rows.filter(r => r.length > 1 || r[0] !== '').map(r => Object.fromEntries(all.map(c => [c, r[head.indexOf(c)] ?? ''])));
 }
@@ -110,17 +114,17 @@ function remove(dir, name, keys) {
   return rows.length - keep.length;
 }
 
-// ---------- data.js ----------
+// ---------- RAW для страниц портала ----------
 /** Строки CSV для портала: числа — числами (кроме schema.json → text), пустое → null, по дате. */
 function load(dir, name) {
-  return read(dir, name).map(row => {
+  return read(dir, name).map((row, i) => {
     const r = {};
     for (const [c, v0] of Object.entries(row)) {
       const v = (v0 || '').trim();
       if (TEXT.has(c)) { r[c] = v || null; continue; }
       if (!v) { r[c] = null; continue; }
       const x = Number(v.replace(',', '.'));
-      if (Number.isNaN(x)) throw new Error(`${name}: «${c}» = «${v}» — не число`);
+      if (Number.isNaN(x)) throw new Error(`${name}, строка ${i + 2}: «${c}» = «${v}» — не число`);   // +2: заголовок и счёт с 1
       r[c] = x;
     }
     return r;
@@ -140,19 +144,30 @@ function modules(dir) {
   return out;
 }
 
-function raw(dir, today, mods) {
-  const meta = fs.existsSync(path.join(dir, 'meta.json')) ? readJson(path.join(dir, 'meta.json')) : JSON.parse(JSON.stringify(META_EMPTY));
-  const tables = {};
-  for (const name of Object.keys(SCHEMA.schema)) tables[name] = load(dir, name);
-  return {tables, meta, modules: mods || modules(dir), updated: today};
+// ---------- sync.json: когда сервис последний раз обновился успешно ({fatsecret: ISO, whoop: ISO}) ----------
+const SYNC = 'sync.json';
+const readSync = dir => readJson(path.join(dir, SYNC));
+function saveSync(dir, name, iso) {
+  const f = path.join(dir, SYNC);
+  fs.writeFileSync(f + '.tmp', JSON.stringify(Object.assign(readSync(dir), {[name]: iso}), null, 2) + '\n');
+  fs.renameSync(f + '.tmp', f);
 }
 
-function writeDataJs(dir, today, mods) {
-  const js = '// Собрано приложением SEL из CSV — не править руками; расчёт — portal/dataset.js\nconst RAW = ' +
+function raw(dir, today, mods) {
+  const meta = fs.existsSync(path.join(dir, 'meta.json')) ? readJson(path.join(dir, 'meta.json')) : JSON.parse(JSON.stringify(META_EMPTY));
+  // испорченный файл (не тот заголовок, не число) — таблица пустая, ошибка — страницам (Nav покажет), файл не трогаем:
+  // приложение открывается, а исправить файл можно руками
+  const tables = {}, errors = [];
+  for (const name of Object.keys(SCHEMA.schema)) {
+    try { tables[name] = load(dir, name); } catch (e) { tables[name] = []; errors.push(e.message); }
+  }
+  return {tables, meta, modules: mods || modules(dir), updated: today, sync: readSync(dir), errors};
+}
+
+/** Скрипт app://h/data/data.js — `const RAW = …` из CSV прямо сейчас (на диск не пишется); расчёт — portal/dataset.js. */
+function dataJs(dir, today, mods) {
+  return '// Собрано приложением SEL из CSV при открытии страницы; расчёт — portal/dataset.js\nconst RAW = ' +
     JSON.stringify(raw(dir, today, mods)) + ';\n';
-  fs.writeFileSync(path.join(dir, 'data.js.tmp'), js);
-  fs.renameSync(path.join(dir, 'data.js.tmp'), path.join(dir, 'data.js'));
-  writeReadme(dir);
 }
 
 /** README.md в папке данных — описание файлов для того, кто читает папку (человек или LLM); шаблон — data_readme.md.
@@ -167,4 +182,4 @@ function writeReadme(dir) {
   fs.renameSync(f + '.tmp', f);
 }
 
-module.exports = {dataDir, init, read, write, upsert, remove, load, raw, writeDataJs, modules, fmtNum, readJson, SCHEMA};
+module.exports = {dataDir, init, read, write, upsert, remove, load, raw, dataJs, writeReadme, modules, fmtNum, readJson, readSync, saveSync, SCHEMA};

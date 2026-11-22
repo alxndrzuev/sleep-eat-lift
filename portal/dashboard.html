@@ -105,8 +105,8 @@ function tiles(){
   const rhr7 = mean(within(DATA.rhr,7).map(x=>x[1]));
   const rhr28 = mean(within(DATA.rhr,35,new Date(today-7*DAY)).map(x=>x[1]));
   const kc = mean(within(kcalFull,28).map(x=>x[1]));
-  const str4 = weeksBetween(27).reduce((s,[,w])=>s+w.strength,0);
-  const ca4 = weeksBetween(27).reduce((s,[,w])=>s+w.cardio,0);
+  const w28 = Dataset.workoutsIn(DATA.workouts, iso(today), 28);   // ровно 4 недели = 28 дней по сегодня (цель в неделю × 4)
+  const str4 = w28.strength, ca4 = w28.cardio;
   const wt = DATA.weight[DATA.weight.length-1];
   const lastM = Object.entries(DATA.macros_month).sort().pop();
   const pr28 = within(DATA.nutrition.filter(x=>x[1]>=FULL_DAY).map(x=>[x[0],x[2]]),28);
@@ -224,7 +224,7 @@ function render(){
 }
 
 function staticParts(){
-  $('#updated').textContent = 'Обновлено ' + fmtDY(today);
+  $('#updated').textContent = Nav.syncText(DATA.sync, DATA.modules);   // настоящее время загрузки, не дата сборки data.js
   const show = (id, on)=>{ const c=$(id); c.hidden=!on; const two=c.parentElement; if(two.classList.contains('two')) two.hidden=[...two.children].every(x=>x.hidden); };
   const pl = DATA.plan_now;
   show('#card-plan', !!pl); show('#card-supps', DATA.supplements.length);

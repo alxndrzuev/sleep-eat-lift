@@ -273,26 +273,28 @@
       const e = entries[i];
       let d = null;
       try {
+        // замена снимка: сначала всё разобрать и отрисовать в памяти, потом писать; прежний оригинал — удалить последним.
+        // Не разобрался (HEIC, библиотеки, фигура, нет места) — прежний оригинал и запись в индексе остаются как были
         const old = index.photos[e.name];
-        if (e.upload) {
-          say(i, "сохраняю оригинал");
-          const original = `originals/${e.name}.${extOf(e.file)}`;
-          await writeFile(dir, original, e.file);
-          if (old && old.original && old.original !== original) await removeFile(dir, old.original);
-          e.original = original;
-        }
         say(i, "читаю снимок");
         const sha = await sha256(e.file), shot = await readExif(e.file);   // чтобы узнать те же снимки при повторной загрузке
         d = await decode(e.file);
         say(i, "ищу фигуру");
         const kp = await detect(d.img);
-        await writeFile(dir, `view/${e.name}.jpg`, await renderScaled(d.img, 2400, 0.85));
-        index.photos[e.name] = {date: e.date, pose: e.pose, original: e.original || (old && old.original), kp, by: null, feet_cut: false, v,
-                                sha, shot: shot ? shot.getTime() : null};
+        const view = await renderScaled(d.img, 2400, 0.85), thumb = kp ? null : await renderScaled(d.img, 240, 0.8);
+        if (e.upload) {
+          say(i, "сохраняю оригинал");
+          e.original = `originals/${e.name}.${extOf(e.file)}`;
+          await writeFile(dir, e.original, e.file);                        // тот же формат — замена файла целиком (photosfs: .tmp → rename)
+        }
+        await writeFile(dir, `view/${e.name}.jpg`, view);
         if (!kp) {
           await removeFile(dir, `aligned/${e.name}.jpg`);
-          await writeFile(dir, `thumbs/${e.name}.jpg`, await renderScaled(d.img, 240, 0.8));
+          await writeFile(dir, `thumbs/${e.name}.jpg`, thumb);
         } else e.ok = true;
+        index.photos[e.name] = {date: e.date, pose: e.pose, original: e.original || (old && old.original), kp, by: null, feet_cut: false, v,
+                                sha, shot: shot ? shot.getTime() : null};
+        if (e.upload && old && old.original && old.original !== e.original) await removeFile(dir, old.original);
       } catch (err) {
         failed.push({name: e.name, error: String(err && err.message || err)});
       } finally { if (d) release(d.img); }

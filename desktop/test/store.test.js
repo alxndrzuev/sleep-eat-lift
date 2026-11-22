@@ -6,6 +6,8 @@ const os = require('node:os');
 const path = require('node:path');
 const store = require('../store');
 
+const tmp = () => { const {dir} = tmpDocs(); store.init(dir); return dir; };
+
 function tmpDocs() {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'health-store-'));
   const docs = path.join(base, 'Документы тест');
@@ -48,14 +50,14 @@ test('csv quoting of commas and quotes', () => {
   assert.deepStrictEqual(store.read(dir, 'events.csv')[0].description, 'а, "б"');
 });
 
-test('data.js is RAW with numbers', () => {
+test('data.js is RAW with numbers, built on request and never written to disk', () => {
   const {dir} = tmpDocs();
   store.init(dir);
   store.upsert(dir, 'body.csv', {'2026-01-01': {weight_kg: 70.5}});
-  store.writeDataJs(dir, '2026-11-21', ['photos']);
-  const js = fs.readFileSync(path.join(dir, 'data.js'), 'utf8');
+  const js = store.dataJs(dir, '2026-11-21', ['photos']);
+  assert.ok(!fs.existsSync(path.join(dir, 'data.js')));
   const raw = JSON.parse(js.slice(js.indexOf('const RAW = ') + 12).trim().replace(/;$/, ''));
-  assert.deepStrictEqual(Object.keys(raw).sort(), ['meta', 'modules', 'tables', 'updated']);
+  assert.deepStrictEqual(Object.keys(raw).sort(), ['errors', 'meta', 'modules', 'sync', 'tables', 'updated']);
   assert.strictEqual(raw.tables['body.csv'][0].weight_kg, 70.5);
   assert.strictEqual(raw.tables['body.csv'][0].note, null);
   assert.deepStrictEqual(raw.modules, ['photos']);
@@ -143,18 +145,25 @@ test('upsert into supplements.csv is refused', () => {
   assert.throws(() => store.upsert(dir, 'supplements.csv', {'2026-11-19': {name: 'A'}}), /supplements\.csv/);
 });
 
-test('writeDataJs puts README.md (data folder description for LLM) from the template', () => {
+test('init removes data.js of older versions', () => {
+  const {dir} = tmpDocs();
+  fs.mkdirSync(dir, {recursive: true});
+  for (const f of ['data.js', 'data.js.tmp']) fs.writeFileSync(path.join(dir, f), 'const RAW = {};\n');
+  store.init(dir);
+  for (const f of ['data.js', 'data.js.tmp']) assert.ok(!fs.existsSync(path.join(dir, f)), f);
+});
+
+test('init puts README.md (data folder description for LLM) from the template', () => {
   const {dir} = tmpDocs();
   store.init(dir);
-  store.writeDataJs(dir, '2026-11-21', []);
   const want = fs.readFileSync(path.join(__dirname, '..', 'data_readme.md'), 'utf8');
   assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), want);
   for (const name of Object.keys(store.SCHEMA.schema)) assert.ok(want.includes('`' + name + '`'), name);   // описан каждый CSV
   fs.writeFileSync(path.join(dir, 'README.md'), '# Папка данных SEL (прошлая версия)\n');   // свой прежний — обновляется
-  store.writeDataJs(dir, '2026-11-21', []);
+  store.init(dir);
   assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), want);
   fs.writeFileSync(path.join(dir, 'README.md'), '# Мои заметки\n');                           // чужой — не трогаем
-  store.writeDataJs(dir, '2026-11-21', []);
+  store.init(dir);
   assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), '# Мои заметки\n');
 });
 
@@ -162,4 +171,30 @@ test('remove by key from supplements.csv is refused (one date — several supple
   const {dir} = tmpDocs();
   store.init(dir);
   assert.throws(() => store.remove(dir, 'supplements.csv', ['2026-11-19']), /supplements\.csv/);
+});
+
+test('broken CSV: the app still opens — table empty, error with file and line in data.js, file untouched', () => {
+  const dir = tmp();
+  store.upsert(dir, 'whoop_daily.csv', {'2026-11-20': {steps: 1000}});
+  const f = path.join(dir, 'nutrition_daily.csv');
+  fs.writeFileSync(f, 'date,kcal,protein,fat,carbs,fiber\n2026-11-01,2000,,,,\n2026-11-02,abc,,,,\n');
+  fs.writeFileSync(path.join(dir, 'body.csv'), 'дата,вес\n');
+  const before = fs.readFileSync(f, 'utf8');
+  const r = store.raw(dir, '2026-11-22', []);
+  assert.deepStrictEqual(r.tables['nutrition_daily.csv'], []);
+  assert.deepStrictEqual(r.tables['body.csv'], []);
+  assert.strictEqual(r.tables['whoop_daily.csv'].length, 1);
+  assert.deepStrictEqual(r.errors.slice().sort(), ['body.csv: заголовок «дата,вес», ожидался «date,weight_kg,note»',
+                                                  'nutrition_daily.csv, строка 3: «kcal» = «abc» — не число']);
+  assert.doesNotThrow(() => store.dataJs(dir, '2026-11-22'));
+  assert.strictEqual(fs.readFileSync(f, 'utf8'), before);
+  assert.deepStrictEqual(store.raw(tmp(), '2026-11-22', []).errors, []);
+});
+
+test('empty (zero-byte) CSV reads as no rows; upsert writes the header back', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'body.csv'), '');
+  assert.deepStrictEqual(store.read(dir, 'body.csv'), []);
+  store.upsert(dir, 'body.csv', {'2026-11-20': {weight_kg: 80}});
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'body.csv'), 'utf8'), 'date,weight_kg,note\n2026-11-20,80,\n');
 });

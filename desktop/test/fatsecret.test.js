@@ -36,7 +36,7 @@ test('error kinds and texts', async () => {
   await assert.rejects(fs_.month(APP, USER, '2026-11', {fetch: () => resp({error: {code: 9, message: 'Invalid token'}})}),
     e => e.kind === 'token' && e.message === 'Доступ к FatSecret пропал — подключите заново');
   await assert.rejects(fs_.month(APP, USER, '2026-11', {fetch: () => Promise.reject(new TypeError('fetch failed'))}),
-    e => e.kind === 'network' && e.message === 'Нет связи с FatSecret, данные со вчера. Попробуйте позже');
+    e => e.kind === 'network' && e.message === 'Нет связи с FatSecret — попробуйте позже');
   await assert.rejects(fs_.month(APP, USER, '2026-11', {fetch: () => resp({error: {code: 21, message: 'Invalid IP'}})}),
     e => e.kind === 'api' && e.message === 'FatSecret ответил ошибкой: Invalid IP');
 });
@@ -67,7 +67,7 @@ test('failed update leaves files byte for byte', async () => {
   const fetch = fakeApi({food: {'2026-10': [['2026-10-02', 2000, 1, 1, 1]]}, failAt: 2, fail: () => Promise.reject(new TypeError('net'))});
   const r = await fs_.update({dir, app: APP, user: USER, months: ['2026-10', '2026-11'], fetch});
   assert.strictEqual(r.ok, false);
-  assert.strictEqual(r.error, 'Нет связи с FatSecret, данные со вчера. Попробуйте позже');
+  assert.strictEqual(r.error, 'Нет связи с FatSecret — попробуйте позже');
   assert.deepStrictEqual(['nutrition_daily.csv', 'body.csv'].map(f => fs.readFileSync(path.join(dir, f), 'utf8')), before);
 });
 
@@ -77,12 +77,12 @@ test('ranges', () => {
   assert.deepStrictEqual(updater.recentRange(new Date(2026, 0, 5)), ['2025-12', '2026-01']);
 });
 
-test('runAll: one at a time, data.js written, busy cleared after failure', async () => {
+test('runAll: one at a time, no data.js on disk, busy cleared after failure', async () => {
   const dir = tmp();
   let release;
   const slow = {connected: () => true, update: () => new Promise(r => { release = r; })};
-  const failing = {connected: () => true, update: async () => ({ok: false, error: 'Нет связи с Whoop, данные со вчера. Попробуйте позже'})};
-  const u = updater.create({fatsecret: slow, whoop: failing}, () => '2026-11-21');
+  const failing = {connected: () => true, update: async () => ({ok: false, error: 'Нет связи с Whoop — попробуйте позже'})};
+  const u = updater.create({fatsecret: slow, whoop: failing});
   const first = u.runAll(dir);
   assert.strictEqual(u.busy, true);
   assert.deepStrictEqual(await u.runAll(dir), {busy: true});
@@ -91,14 +91,30 @@ test('runAll: one at a time, data.js written, busy cleared after failure', async
   assert.deepStrictEqual(r.fatsecret, {ok: true});
   assert.strictEqual(r.whoop.ok, false);
   assert.strictEqual(u.busy, false);
-  assert.ok(fs.existsSync(path.join(dir, 'data.js')));
-  assert.strictEqual(u.status.whoop.lastError, 'Нет связи с Whoop, данные со вчера. Попробуйте позже');
+  assert.ok(!fs.existsSync(path.join(dir, 'data.js')));
+  assert.strictEqual(u.status.whoop.lastError, 'Нет связи с Whoop — попробуйте позже');
 });
 
 test('runAll skips services that are not connected', async () => {
   const dir = tmp();
   let called = false;
-  const u = updater.create({fatsecret: {connected: () => false, update: async () => { called = true; return {ok: true}; }}}, () => '2026-11-21');
+  const u = updater.create({fatsecret: {connected: () => false, update: async () => { called = true; return {ok: true}; }}});
   assert.deepStrictEqual(await u.runAll(dir), {});
   assert.strictEqual(called, false);
+});
+
+/** Запрос, который не отвечает, пока его не отменят (signal) — как зависшая сеть. */
+const hang = (url, opt = {}) => new Promise((_, fail) => opt.signal.addEventListener('abort', () => fail(opt.signal.reason)));
+/** Ответ пришёл, а тело читается вечно. */
+const hangBody = (url, opt = {}) => Promise.resolve(new Response(new ReadableStream({start(c) {
+  opt.signal.addEventListener('abort', () => c.error(opt.signal.reason)); }})));
+
+test('hung request or body → network error after the timeout, files untouched', async () => {
+  for (const fetch of [hang, hangBody]) {
+    await assert.rejects(fs_.month(APP, USER, '2026-11', {fetch, timeout: 20}), e => e.kind === 'network');
+    const dir = tmp(), before = fs.readFileSync(path.join(dir, 'nutrition_daily.csv'), 'utf8');
+    const r = await fs_.update({dir, app: APP, user: USER, months: ['2026-11', '2026-11'], fetch, timeout: 20});
+    assert.deepStrictEqual(r, {ok: false, kind: 'network', error: 'Нет связи с FatSecret — попробуйте позже'});
+    assert.strictEqual(fs.readFileSync(path.join(dir, 'nutrition_daily.csv'), 'utf8'), before);
+  }
 });

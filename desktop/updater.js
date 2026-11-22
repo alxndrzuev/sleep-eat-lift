@@ -1,5 +1,6 @@
-// Обновление всех подключённых сервисов: по очереди и независимо (ошибка одного не мешает другому), затем data.js.
+// Обновление всех подключённых сервисов: по очереди и независимо (ошибка одного не мешает другому), страницы перечитают CSV после перезагрузки.
 // Одно обновление за раз. Сервис: {connected(dir) → bool, update(dir, first) → {ok, error?}}.
+// Успех — время в data/sync.json: с него следующее обновление и грузит (пропуски догружаются), его показывает сводка.
 const store = require('./store');
 
 const ym = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -8,7 +9,36 @@ const firstRange = today => [ym(new Date(today.getFullYear(), today.getMonth() -
 /** Обычное обновление — прошлый и текущий месяц. */
 const recentRange = today => [ym(new Date(today.getFullYear(), today.getMonth() - 1, 1)), ym(today)];
 
-function create(services, today) {
+const OVERLAP = 3;                       // дней внахлёст: поздние правки в сервисе и часовые пояса
+const DAY = 864e5;
+/** Файлы сервиса и колонка, по которой видно, что данные за день пришли. */
+const FILES = {whoop: [['whoop_daily.csv', null]], fatsecret: [['nutrition_daily.csv', null], ['body.csv', 'weight_kg']]};
+
+/** С какого дня данные сервиса уже есть: последнее успешное обновление (sync.json), а если его нет — последняя дата
+ *  в файлах сервиса (до sync.json; первая загрузка оборвалась). Ничего — null (грузить за год). */
+function since(dir, name) {
+  const s = store.readSync(dir)[name];
+  if (s) return s.slice(0, 10);
+  const dates = (FILES[name] || []).flatMap(([f, col]) => store.read(dir, f).filter(r => !col || r[col] !== '').map(r => r.date));
+  return dates.length ? dates.sort().pop() : null;
+}
+
+/** Whoop: сколько дней грузить — от `since` с запасом, не меньше 14, не больше 365. */
+function whoopDays(from, now) {
+  if (!from) return 365;
+  const gap = Math.ceil((now - Date.parse(from + 'T00:00:00Z')) / DAY);
+  return Math.min(365, Math.max(14, gap + OVERLAP));
+}
+
+/** FatSecret: месяцы [с месяца `since` минус запас, текущий] — не меньше двух, не больше двенадцати. */
+function fatsecretRange(from, now) {
+  const [first, cur] = firstRange(now), [recent] = recentRange(now);
+  if (!from) return [first, cur];
+  const d = new Date(Date.parse(from + 'T00:00:00Z') - OVERLAP * DAY).toISOString().slice(0, 7);
+  return [d < first ? first : d < recent ? d : recent, cur];
+}
+
+function create(services, now = () => new Date()) {
   const u = {busy: false, status: {}};
   for (const name of Object.keys(services)) u.status[name] = {lastUpdate: null, lastError: null};
 
@@ -24,14 +54,15 @@ function create(services, today) {
         try { r = await svc.update(dir, first === name); }
         catch (e) { r = {ok: false, error: String(e.message || e)}; }
         out[name] = r;
-        u.status[name] = r.ok ? {lastUpdate: new Date().toISOString(), lastError: null}
+        const at = now().toISOString();
+        if (r.ok) store.saveSync(dir, name, at);
+        u.status[name] = r.ok ? {lastUpdate: at, lastError: null}
                               : {lastUpdate: u.status[name].lastUpdate, lastError: r.error};
       }
-      store.writeDataJs(dir, today());
     } finally { u.busy = false; }
     return out;
   };
   return u;
 }
 
-module.exports = {create, firstRange, recentRange};
+module.exports = {create, firstRange, recentRange, since, whoopDays, fatsecretRange};

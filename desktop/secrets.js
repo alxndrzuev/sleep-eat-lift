@@ -24,4 +24,19 @@ function clear(f) {
   if (Object.keys(rest).length) writeJson(f, rest); else fs.rmSync(f);
 }
 
-module.exports = {save, clear, read, TOKENS};
+/** Токены сервисов (file(name) → путь): сохраняются только поля токенов. saver(name) — сохранение для начатого входа или
+ *  обновления: после clear(name) («Отключить») оно ничего не пишет — запрос, начатый до отключения, не подключит сервис снова. */
+function keeper(file) {
+  const gen = {};
+  const put = (name, obj) => save(file(name), Object.fromEntries(Object.entries(obj).filter(([k]) => TOKENS.includes(k))));
+  return {
+    save: put,
+    clear(name) { gen[name] = (gen[name] || 0) + 1; clear(file(name)); },
+    saver(name) {
+      const g = gen[name] || 0;
+      return obj => { if ((gen[name] || 0) !== g) return false; put(name, obj); return true; };
+    },
+  };
+}
+
+module.exports = {save, clear, read, keeper, TOKENS};

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Данные пользователя из командной строки — для работы с Claude в чате: те же правила записи, что в приложении
 // (desktop/store.js: колонки по схеме desktop/schema.json, сортировка, LF, числа без лишних нулей).
-// После записи пересобирает data.js — страницы приложения покажут новое после перезагрузки (⌘R).
+// Страницы приложения берут данные из CSV при загрузке — новое видно после перезагрузки страницы (⌘R).
 //
 //   node scripts/csv.js dir                                        # папка данных
 //   node scripts/csv.js read body.csv [N]                          # последние N строк (по умолчанию 10), JSON
@@ -20,8 +20,6 @@ function dataDir(env = process.env, userData = datadir.appUserData()) {
   return datadir.current(userData).dir;
 }
 
-const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
-
 function known(name) {
   if (!store.SCHEMA.schema[name]) throw new Error(`${name}: такого файла нет в схеме (${Object.keys(store.SCHEMA.schema).join(', ')})`);
 }
@@ -39,13 +37,11 @@ function run(args, dir) {
     known(name);
     const fresh = JSON.parse(rest[0] || '');
     const r = store.upsert(dir, name, fresh);
-    store.writeDataJs(dir, today());
     return `${name}: добавлено ${r.added}, обновлено ${r.updated}, всего ${r.total}`;
   }
   if (cmd === 'remove') {
     known(name);
     const n = store.remove(dir, name, rest);
-    store.writeDataJs(dir, today());
     return `${name}: удалено ${n}`;
   }
   throw new Error('команды: dir · read <файл.csv> [N] · upsert <файл.csv> <json> · remove <файл.csv> <ключ…>');

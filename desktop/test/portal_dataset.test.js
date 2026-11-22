@@ -117,3 +117,17 @@ test('food targets: only rows with macros, repeated macros collapsed', () => {
   assert.deepStrictEqual(d.food_targets.map(t => [t.start, t.protein]), [['2026-01-01', 120], ['2026-08-01', 140]]);
   assert.deepStrictEqual(build(raw({targets: [tg('2026-07-01', {sleep_h: 8})]})).food_targets, []);
 });
+
+test('read errors and sync times go through to pages', () => {
+  const d = build(Object.assign(raw(), {errors: ['body.csv: заголовок «x»'], sync: {whoop: '2026-11-21T08:00:00.000Z'}}));
+  assert.deepStrictEqual(d.errors, ['body.csv: заголовок «x»']);
+  assert.deepStrictEqual(d.sync, {whoop: '2026-11-21T08:00:00.000Z'});
+  assert.deepStrictEqual(build(raw()).errors, []);
+});
+
+test('workouts in the last N days: exactly N calendar days up to the given day, by kind', () => {
+  const w = [['2026-10-25 20:00', 'strength'], ['2026-10-26 20:00', 'strength'], ['2026-11-10 20:00', 'cardio'],
+             ['2026-11-22 20:00', 'strength'], ['2026-11-23 09:00', 'cardio']];
+  assert.deepStrictEqual(js(`Dataset.workoutsIn(${J(w)}, "2026-11-22", 28)`), {strength: 2, cardio: 1});   // 26.10–22.11
+  assert.deepStrictEqual(js(`Dataset.workoutsIn([], "2026-11-22", 28)`), {strength: 0, cardio: 0});
+});

@@ -10,7 +10,8 @@ const API = 'https://api.prod.whoop.com/developer';
 const UA = 'health-dashboard/1.0 (personal; electron)';   // Cloudflare у Whoop режет стандартные User-Agent
 const SCOPES = 'offline read:recovery read:cycles read:workout read:sleep read:profile read:body_measurement';
 const CALLBACK = 'https://health.local/whoop';
-const TEXTS = {network: 'Нет связи с Whoop, данные со вчера. Попробуйте позже', token: 'Доступ к Whoop пропал — подключите заново'};
+const TIMEOUT = 30000;              // мс на запрос вместе с ответом: зависшая сеть — ошибка «нет связи», а не вечное «обновляю…»
+const TEXTS = {network: 'Нет связи с Whoop — попробуйте позже', token: 'Доступ к Whoop пропал — подключите заново'};
 
 class WhoopError extends Error {
   constructor(kind, detail) { super(TEXTS[kind] || `Whoop ответил ошибкой: ${detail}`); this.kind = kind; }
@@ -33,13 +34,14 @@ function codeFrom(url, state) {
 }
 
 async function tokenRequest(app, data, deps) {
-  let r;
+  let r, text;
   try {
     r = await deps.fetch(TOKEN_URL, {method: 'POST', body: new URLSearchParams(Object.assign({}, data,
       {client_id: app.client_id, client_secret: app.client_secret})).toString(),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA, Accept: 'application/json'}});
+      headers: {'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA, Accept: 'application/json'},
+      signal: AbortSignal.timeout(deps.timeout || TIMEOUT)});
+    text = await r.text();
   } catch (e) { throw new WhoopError('network'); }
-  const text = await r.text();
   if (r.status === 400 || r.status === 401) throw new WhoopError('token');
   if (!r.ok) throw new WhoopError('api', `HTTP ${r.status}: ${text.slice(0, 200)}`);
   const t = JSON.parse(text);
@@ -61,13 +63,14 @@ async function get(app, user, p, params, deps) {
   const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
   for (let attempt = 0; attempt < 5; attempt++) {
     if (!user.access_token || Date.now() / 1000 >= (user.expires_at || 0)) await refresh(app, user, deps);
-    let r;
+    let r, text;
     try {
-      r = await deps.fetch(`${API}${p}?${q}`, {headers: {Authorization: 'Bearer ' + user.access_token, 'User-Agent': UA, Accept: 'application/json'}});
+      r = await deps.fetch(`${API}${p}?${q}`, {headers: {Authorization: 'Bearer ' + user.access_token, 'User-Agent': UA, Accept: 'application/json'},
+                                               signal: AbortSignal.timeout(deps.timeout || TIMEOUT)});
+      text = await r.text();
     } catch (e) { throw new WhoopError('network'); }
-    if (r.status === 429) { await deps.sleep((Number(r.headers.get('X-RateLimit-Reset')) || 30) * 1000 + 1000); continue; }
+    if (r.status === 429) { await deps.sleep(Math.min(Number(r.headers.get('X-RateLimit-Reset')) || 30, 120) * 1000 + 1000); continue; }
     if (r.status === 401) { user.expires_at = 0; continue; }
-    const text = await r.text();
     if (!r.ok) throw new WhoopError('api', `HTTP ${r.status} ${p}: ${text.slice(0, 200)}`);
     return JSON.parse(text);
   }
@@ -147,8 +150,8 @@ const isoZ = d => d.toISOString().slice(0, 19) + '.000Z';
 
 /** Выгрузить последние `days` дней → whoop_daily.csv, whoop_workouts.csv (удалённые в Whoop тренировки периода — убрать).
  *  Файлы пишутся только после всех запросов. */
-async function update({dir, app, user, days, fetch, saveUser, now = new Date(), sleep = ms => new Promise(r => setTimeout(r, ms))}) {
-  const deps = {fetch: fetch || globalThis.fetch, saveUser, sleep};
+async function update({dir, app, user, days, fetch, saveUser, timeout, now = new Date(), sleep = ms => new Promise(r => setTimeout(r, ms))}) {
+  const deps = {fetch: fetch || globalThis.fetch, saveUser, sleep, timeout};
   const start = isoZ(new Date(now - days * 864e5)), end = isoZ(now);
   let got;
   try {
