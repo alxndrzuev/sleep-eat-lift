@@ -1,0 +1,24 @@
+# личное в data/, но не в git: ключи, логи, черновики, фото (data/README.md)
+/data/secrets/
+/data/logs/
+/data/inbox/*
+!/data/inbox/README.md
+/data/photos/
+/data/photos_old/
+.DS_Store
+__pycache__/
+
+# данные портала (прежний путь; теперь data.js пишет приложение в папку данных)
+/data/data.js
+
+# приложение: зависимости и сборки
+/desktop/node_modules/
+/desktop/fatsecret_app.json
+/desktop/whoop_app.json
+/dist/
+
+# данные — вне проекта, в папке из настроек приложения (~/Documents/Здоровье/data), без git
+/data/
+
+# личное для Claude (цели, разборы) — только локально
+/CLAUDE.local.md

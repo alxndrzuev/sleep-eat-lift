@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Настройки · здоровье</title>
+<link rel="stylesheet" href="common.css">
+<style>
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;max-width:720px}
+.svc{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.state{font-weight:600}
+.state.on{color:var(--good)} .state.off{color:var(--text-secondary)}
+.err{color:var(--critical);margin-top:6px}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 14px;margin-top:8px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--text-secondary)}
+.form input[readonly]{background:transparent;border-style:dashed;color:var(--text-secondary)}
+.form input,.code input{font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-0,transparent);color:var(--text-primary)}
+.btn{border:1px solid var(--border);background:var(--series-1);color:#fff;border-radius:8px;padding:6px 14px;font:inherit;cursor:pointer}
+.btn.plain{background:var(--surface-1);color:var(--text-secondary)}
+.btn:disabled{opacity:.5;cursor:default}
+.ok{color:var(--good)}
+table.hist{border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+table.hist th,table.hist td{text-align:left;padding:5px 14px 5px 0;border-bottom:1px solid var(--border)}
+table.hist th{font-weight:500;color:var(--text-secondary);font-size:13px}
+table.hist tr.now td{font-weight:600}
+.linkbtn{border:0;background:none;color:var(--text-secondary);cursor:pointer;font:inherit;text-decoration:underline;padding:0}
+.hist-h{margin-top:14px;font-weight:600}
+.card a{color:var(--series-1)}
+</style>
+</head>
+<body>
+<div class="viz-root">
+<div class="wrap">
+<nav class="nav" id="nav"></nav>
+<header><div><h1>Настройки</h1><div class="sub" id="sub"></div></div></header>
+
+<div id="outside" class="card" hidden><h2>Настройки есть только в приложении «Здоровье»</h2></div>
+
+<div id="app" hidden>
+  <div class="card" id="fatsecret">
+    <h2>FatSecret</h2>
+    <div class="desc">Питание и вес — из вашего дневника FatSecret. Нажмите «Подключить», войдите в FatSecret и разрешите доступ.</div>
+    <div class="svc"><span class="state"></span><button class="btn connect">Подключить FatSecret</button><button class="btn plain refresh" hidden>Обновить данные</button><button class="btn plain disconnect">Отключить</button><span class="muted last"></span></div>
+    <div class="code" hidden style="margin-top:8px">Код со страницы FatSecret: <input id="fscode" size="12"> <button class="btn" id="fscodebtn">Готово</button></div>
+    <div class="err" hidden></div>
+  </div>
+
+  <div class="card" id="whoop">
+    <h2>Whoop</h2>
+    <div class="desc">Сон, восстановление, пульс, шаги и тренировки — из Whoop. Нажмите «Подключить», войдите в Whoop и разрешите доступ.</div>
+    <div class="svc"><span class="state"></span><button class="btn connect">Подключить Whoop</button><button class="btn plain refresh" hidden>Обновить данные</button><button class="btn plain disconnect">Отключить</button><span class="muted last"></span></div>
+    <div class="err" hidden></div>
+  </div>
+
+  <div class="card">
+    <h2>Цели</h2>
+    <div class="desc">Цель действует с указанной даты до следующей цели. Можно задать и прошлые цели — тогда графики покажут,
+      к чему вы стремились в то время. Пустое поле — как в цели, действовавшей на эту дату. Калории считаются из БЖУ сами.</div>
+    <div class="form">
+      <label>Действует с<input id="date" type="date"></label>
+      <label>Белки, г<input id="protein" inputmode="numeric"></label>
+      <label>Жиры, г<input id="fat" inputmode="numeric"></label>
+      <label>Углеводы, г<input id="carbs" inputmode="numeric"></label>
+      <label>Калории, ккал — по БЖУ<input id="kcal" readonly tabindex="-1" title="4 ккал на грамм белка и углеводов, 9 — на грамм жира"></label>
+      <label>Целевой вес, кг<input id="goalWeight" inputmode="decimal"></label>
+    </div>
+    <div class="svc"><button class="btn" id="save">Сохранить</button><span id="saved"></span></div>
+  </div>
+
+  <div class="card" id="history">
+    <h2>История целей</h2>
+    <div class="desc">Все цели по датам. Ошибочную можно удалить — графики пересчитаются.</div>
+    <div class="hist-h">Калории и БЖУ</div><div id="histT"></div>
+    <div class="hist-h">Целевой вес</div><div id="histW"></div>
+  </div>
+
+  <div class="card">
+    <h2>Данные</h2>
+    <div class="desc">Всё хранится только на этом компьютере, в папке: <b id="datadir"></b></div>
+    <div class="svc"><button class="btn plain" id="folder">Открыть папку с данными</button><button class="btn plain" id="chfolder">Сменить папку…</button></div>
+  </div>
+
+  <div class="card">
+    <h2>О приложении</h2>
+    <div class="svc"><span id="version"></span><a href="whatsnew.html">Что нового</a></div>
+  </div>
+</div>
+</div>
+</div>
+<script src="../data/data.js"></script>
+<script src="dataset.js"></script>
+<script src="nav.js"></script>
+<script src="whatsnew.js"></script>
+<script>
+(function () {
+  try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  const $ = s => document.querySelector(s);
+  if (!window.health) { $('#outside').hidden = false; return; }
+  $('#app').hidden = false;
+  const H = window.health;
+  const when = iso => new Date(iso).toLocaleString('ru-RU', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+
+  function showService(name, s, all) {
+    const box = $('#' + name), v = s || {};
+    const st = box.querySelector('.state');
+    st.textContent = !v.hasKey ? 'нет ключа в этой сборке' : v.connected ? 'подключено' : 'не подключено';
+    st.className = 'state ' + (v.connected ? 'on' : 'off');
+    box.querySelector('.connect').hidden = v.connected || !v.hasKey;
+    box.querySelector('.connect').disabled = all.updating;
+    box.querySelector('.disconnect').hidden = !v.connected;
+    const rf = box.querySelector('.refresh');
+    if (rf) { rf.hidden = !v.connected; rf.disabled = all.updating; rf.textContent = all.updating ? 'Обновляю…' : 'Обновить данные'; }
+    box.querySelector('.last').textContent = v.connected && v.lastUpdate ? 'обновлено ' + when(v.lastUpdate) : '';
+    const e = box.querySelector('.err'); e.hidden = !v.lastError; e.textContent = v.lastError || '';
+  }
+  function show(s) {
+    showService('fatsecret', s.services.fatsecret, s);
+    showService('whoop', s.services.whoop, s);
+    $('#fatsecret .code').hidden = !s.oob;
+    $('#version').textContent = 'Версия ' + s.version;
+    $('#datadir').textContent = s.dataDir || '';
+    $('#sub').textContent = s.updating ? 'Обновляю данные…' : '';
+  }
+  function err(name, r) {
+    if (r && !r.ok && r.error) { const e = $('#' + name + ' .err'); e.hidden = false; e.textContent = r.error; }
+  }
+  H.status().then(show); H.onStatus(show);
+  for (const name of ['fatsecret', 'whoop']) {
+    $('#' + name + ' .connect').onclick = async () => err(name, await H.connect(name));
+    $('#' + name + ' .disconnect').onclick = () => H.disconnect(name);
+    const rf = $('#' + name + ' .refresh'); if (rf) rf.onclick = () => H.update();
+  }
+  $('#fscodebtn').onclick = async () => err('fatsecret', await H.codeEntered($('#fscode').value));
+
+  // цели: текущие значения — из последних строк targets.csv и goal_weight.csv
+  const last = (rows, k) => rows.slice().sort((a, b) => (a[k] < b[k] ? -1 : 1)).pop();
+  const t = last(DATA.targets, 'start') || {}, g = last(DATA.goal_weight, 'date') || {};
+  for (const k of ['protein', 'fat', 'carbs']) $('#' + k).placeholder = t[k] != null ? t[k] : '—';
+  // калории = 4·Б + 9·Ж + 4·У; пустое поле — значение действующей цели (подсказка в поле)
+  const val = k => { const v = $('#' + k).value.trim().replace(',', '.'); return v !== '' ? Number(v) : (t[k] != null ? Number(t[k]) : NaN); };
+  function calc() {
+    const k = 4 * val('protein') + 9 * val('fat') + 4 * val('carbs');
+    $('#kcal').value = Number.isFinite(k) ? Math.round(k).toLocaleString('ru-RU') : '';
+    $('#kcal').placeholder = Number.isFinite(k) ? '' : 'введите Б, Ж и У';
+  }
+  for (const k of ['protein', 'fat', 'carbs']) $('#' + k).addEventListener('input', calc);
+  calc();
+  $('#goalWeight').placeholder = g.goal_weight_kg != null ? g.goal_weight_kg : '—';
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  $('#date').value = $('#date').max = iso(new Date());
+  $('#date').min = '2000-01-01';
+
+  // история: новые сверху; «сейчас» — последняя цель не позже сегодня
+  const fmt = ds => new Date(ds + 'T00:00:00').toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'});
+  const nf = v => v == null ? '—' : Number(v).toLocaleString('ru-RU');
+  function table(rows, key, cols, kind) {
+    if (!rows.length) return '<div class="muted" style="margin-top:6px">Пока нет</div>';
+    const sorted = rows.slice().sort((a, b) => (a[key] < b[key] ? 1 : -1));
+    const nowKey = (sorted.find(r => r[key] <= iso(new Date())) || {})[key];
+    return `<table class="hist"><thead><tr><th>С даты</th>${cols.map(c => `<th>${c[1]}</th>`).join('')}<th></th></tr></thead><tbody>` +
+      sorted.map(r => `<tr class="${r[key] === nowKey ? 'now' : ''}"><td>${fmt(r[key])}${r[key] === nowKey ? ' · сейчас' : ''}</td>` +
+        cols.map(c => `<td>${nf(r[c[0]])}</td>`).join('') +
+        `<td><button class="linkbtn" data-kind="${kind}" data-date="${r[key]}">удалить</button></td></tr>`).join('') + '</tbody></table>';
+  }
+  $('#histT').innerHTML = table(DATA.targets, 'start', [['kcal', 'ккал'], ['protein', 'Б, г'], ['fat', 'Ж, г'], ['carbs', 'У, г']], 'targets');
+  $('#histW').innerHTML = table(DATA.goal_weight, 'date', [['goal_weight_kg', 'кг']], 'goal_weight');
+  document.querySelectorAll('#history .linkbtn').forEach(b => b.onclick = async () => {
+    if (!confirm(`Удалить цель с ${fmt(b.dataset.date)}?`)) return;
+    const r = await H.removeTarget(b.dataset.kind, b.dataset.date);
+    if (r.ok) location.reload(); else alert(r.error);
+  });
+
+  $('#save').onclick = async () => {
+    const vals = {date: $('#date').value};
+    for (const k of ['protein', 'fat', 'carbs', 'goalWeight']) vals[k] = $('#' + k).value;   // ккал считает приложение из БЖУ
+    const r = await H.saveTargets(vals);
+    $('#saved').className = r.ok ? 'ok' : 'err';
+    $('#saved').textContent = r.ok ? 'Сохранено' : r.error;
+    if (r.ok) setTimeout(() => location.reload(), 600);
+  };
+  $('#folder').onclick = () => H.openDataFolder();
+  $('#chfolder').onclick = () => H.changeDataFolder();   // приложение перезапустится с новой папкой
+})();
+</script>
+</body>
+</html>

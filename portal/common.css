@@ -1,0 +1,78 @@
+/* hidden сильнее любых display — пустые блоки и страницы прячутся атрибутом hidden */
+[hidden]{display:none!important}
+/* Общие стили всех страниц портала: тема (светлая/тёмная), каркас, навигация, карточки, графики, таблицы.
+   Подключается каждой страницей: <link rel="stylesheet" href="common.css">. */
+.viz-root{
+  color-scheme: light;
+  --page:#f4f3f0; --surface-1:#fcfcfb; --border:#e4e2dc; --grid:#ecebe6;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#7c7b76;
+  --series-1:#2a78d6; --series-1-soft:#9ec5f4; --series-2:#eb6834; --series-3:#1baf7a;
+  --good:#0ca30c; --warning:#fab219; --critical:#d03b3b;
+  --cell-partial:#d9d7d0; --cell-empty:#f4f3f0;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])) .viz-root{
+    color-scheme: dark;
+    --page:#111110; --surface-1:#1a1a19; --border:#2e2e2b; --grid:#262624;
+    --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
+    --series-1:#3987e5; --series-1-soft:#2c4a70; --series-2:#d95926; --series-3:#199e70;
+    --cell-partial:#4a4945; --cell-empty:#111110;
+  }
+}
+:root[data-theme="dark"] .viz-root{
+  color-scheme: dark;
+  --page:#111110; --surface-1:#1a1a19; --border:#2e2e2b; --grid:#262624;
+  --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
+  --series-1:#3987e5; --series-1-soft:#2c4a70; --series-2:#d95926; --series-3:#199e70;
+  --cell-partial:#4a4945; --cell-empty:#111110;
+}
+*{box-sizing:border-box}
+body{margin:0}
+.viz-root{background:var(--page);color:var(--text-primary);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;min-height:100vh;padding:28px 20px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+h1{font-size:26px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--text-secondary);margin-top:2px}
+.nav{display:flex;gap:4px;margin-bottom:10px}
+.nav a{color:var(--text-secondary);text-decoration:none;padding:3px 10px;border-radius:6px;border:1px solid transparent}
+.nav a.on{color:var(--text-primary);font-weight:600;background:var(--surface-1);border-color:var(--border)}
+.nav a:hover{color:var(--text-primary)}
+.seg{display:inline-flex;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:2px}
+.seg button{border:0;background:none;color:var(--text-secondary);font:inherit;padding:5px 12px;border-radius:6px;cursor:pointer}
+.seg button.on{background:var(--page);color:var(--text-primary);font-weight:600}
+.iconbtn{border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary);border-radius:8px;padding:5px 10px;font:inherit;cursor:pointer}
+.card h2{font-size:15px;margin:0}
+.card .desc{color:var(--text-secondary);font-size:13px;margin:2px 0 6px}
+.cardhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.swl{width:14px;height:0;border-top:2px solid;display:inline-block}
+.swd{width:14px;height:0;border-top:2px dashed;display:inline-block}
+.chart{position:relative;overflow:hidden}
+.tip .t{color:var(--text-secondary);margin-bottom:2px}
+.muted{color:var(--text-muted)}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--grid)}
+th{color:var(--text-secondary);font-weight:600}
+.tablewrap{max-height:260px;overflow:auto;margin-top:6px}
+footer{margin-top:26px;color:var(--text-muted);font-size:12.5px}
+/* приложение (desktop/): «Обновить» в меню и подвал с источником данных */
+.nav .app{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:13px}
+.nav .app .err{color:var(--critical)}
+.foot{margin:28px 0 8px;color:var(--text-muted);font-size:12.5px;display:flex;gap:6px 18px;flex-wrap:wrap}
+.foot a{color:var(--text-secondary)}
+/* «Что нового» (whatsnew.js): окно после обновления и страница истории */
+.wn-dialog{border:1px solid var(--border);border-radius:14px;padding:20px 24px 16px;width:min(600px,92vw);max-height:82vh;
+  background:var(--surface-1);color:var(--text-primary);display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.25)}
+.wn-dialog:not([open]){display:none}
+.wn-dialog::backdrop{background:rgba(0,0,0,.35)}
+.wn-dialog h2{font-size:19px;margin:0 0 6px}
+.wn-body{overflow:auto;min-height:0}
+.wn-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border);padding-top:12px;margin-top:10px}
+.wn-foot a{color:var(--text-secondary)}
+.wn-ok{border:1px solid var(--border);background:var(--series-1);color:#fff;border-radius:8px;padding:6px 18px;font:inherit;cursor:pointer}
+.wn-rel{padding:6px 0 4px}
+.wn-rel + .wn-rel{border-top:1px solid var(--grid);margin-top:8px}
+.wn-rel h3{font-size:15px;margin:8px 0 2px}
+.wn-rel h4{font-size:13px;margin:10px 0 2px;color:var(--text-secondary);font-weight:600}
+.wn-rel ul{margin:2px 0 0;padding-left:20px}
+.wn-rel li{margin:4px 0}

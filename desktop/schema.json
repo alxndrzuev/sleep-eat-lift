@@ -1,0 +1,161 @@
+{
+ "_": "Копия схемы CSV из scripts/lib.py (SCHEMA, KEY, SORT, TEXT) — не править руками; тест tests/test_desktop_schema.py",
+ "schema": {
+  "nutrition_daily.csv": [
+   "date",
+   "kcal",
+   "protein",
+   "fat",
+   "carbs",
+   "fiber"
+  ],
+  "body.csv": [
+   "date",
+   "weight_kg",
+   "waist_cm",
+   "bodyfat_pct",
+   "note"
+  ],
+  "whoop_daily.csv": [
+   "date",
+   "recovery",
+   "hrv",
+   "rhr",
+   "spo2",
+   "skin_temp",
+   "strain",
+   "kcal",
+   "steps",
+   "sleep_h",
+   "deep_h",
+   "rem_h",
+   "light_h",
+   "awake_h",
+   "sleep_perf",
+   "sleep_eff",
+   "resp_rate",
+   "bed",
+   "wake",
+   "note"
+  ],
+  "whoop_workouts.csv": [
+   "id",
+   "date",
+   "start",
+   "sport",
+   "duration_min",
+   "strain",
+   "avg_hr",
+   "max_hr",
+   "kcal",
+   "z0_min",
+   "z1_min",
+   "z2_min",
+   "z3_min",
+   "z4_min",
+   "z5_min"
+  ],
+  "alcohol_check.csv": [
+   "date",
+   "hrv_dev_pct",
+   "rhr_dev",
+   "temp_dev",
+   "strength",
+   "kind",
+   "status",
+   "note"
+  ],
+  "targets.csv": [
+   "start",
+   "kcal",
+   "protein",
+   "fat",
+   "carbs",
+   "note"
+  ],
+  "goal_weight.csv": [
+   "date",
+   "goal_weight_kg",
+   "note"
+  ],
+  "checkins.csv": [
+   "date",
+   "feel",
+   "energy",
+   "stress",
+   "sleep_quality",
+   "note"
+  ],
+  "events.csv": [
+   "start",
+   "end",
+   "type",
+   "description",
+   "level"
+  ],
+  "supplements.csv": [
+   "start",
+   "end",
+   "name",
+   "dose",
+   "timing",
+   "purpose",
+   "note"
+  ],
+  "labs.csv": [
+   "date",
+   "marker",
+   "value",
+   "unit",
+   "ref_low",
+   "ref_high",
+   "note"
+  ],
+  "photo_notes.csv": [
+   "date",
+   "note"
+  ],
+  "workout_labels.csv": [
+   "id",
+   "date",
+   "start",
+   "label",
+   "note"
+  ]
+ },
+ "key": {
+  "whoop_workouts.csv": "id",
+  "workout_labels.csv": "id",
+  "targets.csv": "start",
+  "events.csv": "start",
+  "supplements.csv": "start"
+ },
+ "sort": {
+  "whoop_workouts.csv": "start",
+  "workout_labels.csv": "start"
+ },
+ "text": [
+  "bed",
+  "date",
+  "description",
+  "dose",
+  "end",
+  "id",
+  "kind",
+  "label",
+  "level",
+  "marker",
+  "name",
+  "note",
+  "purpose",
+  "sport",
+  "start",
+  "status",
+  "strength",
+  "timing",
+  "type",
+  "unit",
+  "wake"
+ ],
+ "full_day_kcal": 1200
+}

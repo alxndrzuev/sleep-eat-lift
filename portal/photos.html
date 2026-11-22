@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Фото формы · здоровье</title>
+<style>
+.viz-root{
+  color-scheme: light;
+  --page:#f4f3f0; --surface-1:#fcfcfb; --border:#e4e2dc; --grid:#ecebe6;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#7c7b76;
+  --series-1:#2a78d6; --series-2:#eb6834; --warn:#b4540a; --bad:#c0362c; --good:#2f7d32;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])) .viz-root{
+    color-scheme: dark;
+    --page:#111110; --surface-1:#1a1a19; --border:#2e2e2b; --grid:#262624;
+    --text-primary:#f0efec; --text-secondary:#c3c2b7; --text-muted:#8f8e86;
+    --series-1:#3987e5; --series-2:#d95926; --warn:#e8913f; --bad:#ec6a5e; --good:#6cc070;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0}
+.viz-root{background:var(--page);color:var(--text-primary);font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;min-height:100vh;padding:28px 20px 60px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:26px;margin:0;letter-spacing:-.01em}
+.sub{color:var(--text-secondary);margin:2px 0 18px}
+.nav{display:flex;gap:4px;margin-bottom:10px}
+.nav a{color:var(--text-secondary);text-decoration:none;padding:3px 10px;border-radius:6px;border:1px solid transparent}
+.nav a.on{color:var(--text-primary);font-weight:600;background:var(--surface-1);border-color:var(--border)}
+.nav a:hover{color:var(--text-primary)}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--text-secondary);padding:5px 11px;font:inherit;cursor:pointer}
+.seg button.on{background:var(--page);color:var(--text-primary);font-weight:600}
+select,input[type=date]{font:inherit;color:var(--text-primary);background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:4px 8px}
+.btn{font:inherit;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);border-radius:8px;padding:5px 12px;cursor:pointer}
+.btn.main{background:var(--series-1);border-color:var(--series-1);color:#fff;font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.link{background:none;border:0;padding:0;font:inherit;color:var(--text-secondary);text-decoration:underline;cursor:pointer}
+.lab{color:var(--text-muted);font-size:12px;margin-right:4px}
+.dotA,.dotB{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.dotA{background:var(--series-1)}.dotB{background:var(--series-2)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:900px;margin:0 auto}
+.pair figure{margin:0}
+.pair img{width:100%;border-radius:8px;display:block;background:#000}
+figcaption{margin-top:6px;color:var(--text-secondary)}
+figcaption b{color:var(--text-primary)}
+.slider{position:relative;max-width:560px;margin:0 auto;border-radius:8px;overflow:hidden;user-select:none;touch-action:none;cursor:ew-resize}
+.slider img{display:block;width:100%}
+.slider .top{position:absolute;inset:0;overflow:hidden}
+.slider .top img{position:absolute;top:0;left:0;height:100%;width:auto;max-width:none}
+.slider .line{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.slider .tag{position:absolute;top:8px;padding:2px 8px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;font-size:12px}
+.note{color:var(--text-secondary);margin-top:8px;font-size:13px}
+.strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
+.th{flex:0 0 auto;width:96px;text-align:center;cursor:pointer;color:var(--text-secondary);font-size:12px}
+.th img{width:96px;height:128px;object-fit:cover;border-radius:6px;border:2px solid transparent;display:block}
+.th.a img{border-color:var(--series-1)}.th.b img{border-color:var(--series-2)}
+.th b{display:block;color:var(--text-primary);font-weight:600}
+h2{font-size:15px;margin:0 0 10px}
+.muted{color:var(--text-muted);font-size:12px}
+.summary p{margin:4px 0}
+.foot{display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:6px}
+/* загрузка */
+.drop-hint{display:none;position:fixed;inset:12px;border:3px dashed var(--series-1);border-radius:16px;background:rgba(42,120,214,.08);z-index:20;
+  align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--series-1);pointer-events:none}
+.dragging .drop-hint{display:flex}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;z-index:30;overflow:auto;padding:30px 12px}
+.modal[hidden]{display:none}
+.mbox{background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;width:min(960px,100%);padding:18px 18px 14px}
+.mbox h2{font-size:17px;margin:0 0 4px}
+.ser{border-top:1px solid var(--border);padding:12px 0}
+.ser-head{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.ups{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.up{font-size:12px;color:var(--text-secondary)}
+.up img,.up .noprev{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:8px;display:block;background:var(--grid);margin-bottom:6px}
+.up .noprev{display:flex;align-items:center;justify-content:center;text-align:center;padding:8px}
+.up select{width:100%;margin-bottom:4px}
+.up .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.warn{color:var(--warn)}.bad{color:var(--bad)}.good{color:var(--good)}
+.up.dup img,.up.dup .noprev{outline:3px solid var(--warn);outline-offset:-3px}
+.up.dup.off img{opacity:.45}
+.up .keep{width:100%;margin-bottom:4px}
+.nophoto{aspect-ratio:3330/5470;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;border-radius:8px;background:var(--grid);color:var(--text-muted)}
+.del{font-size:12px;margin-left:4px}
+.up img{cursor:zoom-in}
+.viewer{position:fixed;inset:0;z-index:50;background:#0b0b0b;display:flex;flex-direction:column;color:#f0efec}
+.viewer[hidden]{display:none}
+.vbar{display:flex;gap:8px 14px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.12)}
+.vbar b{font-size:15px}.vbar .muted{color:#a9a8a2}
+.vbar .sp{margin-left:auto}
+.vbar .btn{background:rgba(255,255,255,.08);color:#f0efec;border-color:rgba(255,255,255,.2)}
+.vbar .btn.main{background:var(--series-1);border-color:var(--series-1)}
+.vbar .kept{color:#7fd18a;font-weight:600}
+.vimg{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center}
+.vimg img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in}
+.vimg.zoom{display:block}
+.vimg.zoom img{max-width:none;max-height:none;cursor:zoom-out}
+.path{font:13px ui-monospace,Menlo,monospace;background:var(--grid);padding:6px 9px;border-radius:6px;display:inline-block;user-select:all;word-break:break-all}
+.dups{background:color-mix(in srgb,var(--warn) 12%,transparent);border-radius:8px;padding:8px 10px;margin-bottom:10px;color:var(--text-primary)}
+.errs{color:var(--bad);margin:8px 0 0;padding-left:18px}
+.mfoot{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px;margin-top:4px}
+.mfoot .muted{margin-right:auto}
+.progress{padding:24px 0;font-size:15px}
+.bar-p{height:6px;border-radius:3px;background:var(--grid);overflow:hidden;margin-top:10px}
+.bar-p i{display:block;height:100%;background:var(--series-1);width:0;transition:width .2s}
+@media (max-width:640px){.pair{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="viz-root"><div class="wrap">
+<nav class="nav" id="nav"></nav>
+<div class="head">
+  <div><h1>Фото формы</h1><div class="sub" id="sub"></div></div>
+  <div><button class="btn main" id="uploadBtn">Загрузить фото</button><input type="file" id="fileInput" multiple hidden
+    accept="image/heic,image/heif,image/jpeg,image/png,.heic,.heif,.jpg,.jpeg,.png"></div>
+</div>
+
+<div class="card" id="empty" hidden>
+  <h2>Фото пока нет</h2>
+  <p>Нажмите «Загрузить фото» и выберите снимки серии — или перетащите их на страницу. Снимать удобно 5 поз: спереди, сбоку, сзади, спина-бицепс, бицепс.</p>
+  <p class="muted">Фото сохраняются в папку <b>data/photos</b> внутри папки проекта: оригинал как есть и версия, выровненная под один масштаб фигуры. В первый раз Chrome попросит один раз выбрать папку — выберите папку проекта <b>health</b> (в ней лежат portal и data): страница сама найдёт или создаст в ней data/photos. Так устроена защита в браузере: страница с диска может писать только туда, куда вы разрешили.</p>
+</div>
+
+<div class="card summary" id="summary" hidden></div>
+
+<div class="card" id="compare">
+  <div class="bar">
+    <div class="seg" id="poses"></div>
+    <div class="seg" id="mode"><button data-m="pair" class="on">Рядом</button><button data-m="slider">Ползунок</button></div>
+    <div class="seg" id="src"><button data-s="aligned" class="on">Выровнено</button><button data-s="orig">Оригинал</button></div>
+    <span><span class="dotA"></span><select id="selA"></select></span>
+    <span><span class="dotB"></span><select id="selB"></select></span>
+  </div>
+  <div id="view"></div>
+  <div class="note" id="notes"></div>
+</div>
+
+<div class="card" id="stripCard">
+  <h2>Все серии</h2>
+  <div class="muted" style="margin-bottom:8px">Клик — поставить справа (оранжевая), Shift+клик — слева (синяя)</div>
+  <div class="strip" id="strip"></div>
+</div>
+<div class="muted">Фото хранятся только на этом компьютере — в папке data/photos внутри папки проекта (originals/ — оригиналы как есть, aligned/ — выровненные); вся обработка идёт в браузере, в интернет ничего не уходит. Нужен Chrome или Edge. Клик по фото — открыть в полном размере. «Выровнено» — все фото приведены к одному масштабу по росту (подгонка по многим точкам: макушка, глаза, уши, плечи, колени, щиколотки, пятки, подошвы), наклон выпрямлен, подошвы на одной линии, корпус по центру; ширину плеч, талии и живота можно сравнивать ползунком. Свет выровнять нельзя — сравнивать лучше серии с похожим светом; новые снимать утром, до еды, на том же месте.</div>
+<div class="muted foot"><button class="link" id="rebuildBtn">Пересобрать всё</button><button class="link" id="forgetBtn">Выбрать другую папку</button></div>
+</div>
+
+<div class="drop-hint">Отпустите — загрузить снимки</div>
+<div class="modal" id="modal" hidden><div class="mbox" id="mbox"></div></div>
+<div class="viewer" id="viewer" hidden></div>
+</div>
+
+<script src="../data/data.js"></script>
+<script src="dataset.js"></script>
+<script src="nav.js"></script>
+<script src="whatsnew.js"></script>
+<script src="../data/photos/photos.js"></script>
+<script src="photos_core.js"></script>
+<script src="photos_fs.js"></script>
+<script src="photos_app.js"></script>
+<script>
+const BASE = "../data/photos/";
+const P = PhotosCore, APP = PhotosApp;
+const POSES = P.POSES.map(p => [p, P.POSE_NAMES[p]]);
+const DATA_ = typeof DATA !== "undefined" ? DATA : {};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+let D, dates = [], pose = "front", mode = "pair", src = "aligned", A, B;
+const fmt = d => new Date(d + "T12:00").toLocaleDateString("ru-RU", {day:"numeric", month:"short", year:"numeric"});
+const plural = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many;
+const S = d => D.sessions.find(s => s.date === d);
+const wt = s => s && s.weight ? `${String(s.weight).replace(".", ",")} кг` : "вес —";
+const img = (d, p) => (src === "aligned" && D.aligned[`${d}_${p}`]) || D.img[`${d}_${p}`] || "";
+const th = (d, p) => D.thumb[`${d}_${p}`] || "";
+
+/** Индекс фото (data/photos/photos.js) → данные страницы и всё, что от них зависит. */
+function setIndex(index, newest) {
+  D = P.buildView(index || {photos: {}}, DATA_, BASE);
+  dates = D.sessions.map(s => s.date);
+  if (!dates.includes(A)) A = dates[0];
+  if (newest || !dates.includes(B)) B = dates[dates.length - 1];
+  for (const id of ["selA", "selB"]) {
+    const s = $(id); s.innerHTML = "";
+    dates.forEach(d => s.add(new Option(`${fmt(d)} · ${wt(S(d))}`, d)));
+  }
+  $("sub").textContent = dates.length ? `${dates.length} ${plural(dates.length, "серия", "серии", "серий")} · ${fmt(dates[0])} — ${fmt(dates[dates.length - 1])}` : "";
+  $("summary").innerHTML = D.summary ? `<h2>Что видно по фото</h2>${D.summary}` : "";
+  $("summary").hidden = !D.summary || !dates.length;
+  $("compare").hidden = $("stripCard").hidden = !dates.length;
+  $("empty").hidden = !!dates.length;
+  poseButtons();
+  if (dates.length) render();
+}
+
+const poses = $("poses");
+/** Кнопки поз — только для тех, что есть в папке (например, «Сбоку слева» — если такие снимки загружены). */
+function poseButtons() {
+  const list = D.poses.length ? D.poses : P.POSES;
+  poses.innerHTML = "";
+  list.forEach(k => { const b = document.createElement("button"); b.textContent = P.POSE_NAMES[k]; b.dataset.p = k; poses.appendChild(b); });
+  if (!list.includes(pose)) pose = list[0];
+}
+poses.onclick = e => { if (e.target.dataset.p) { pose = e.target.dataset.p; render(); } };
+$("mode").onclick = e => { if (e.target.dataset.m) { mode = e.target.dataset.m; render(); } };
+$("src").onclick = e => { if (e.target.dataset.s) { src = e.target.dataset.s; render(); } };
+for (const id of ["selA", "selB"]) $(id).onchange = () => { if (id === "selA") A = $(id).value; else B = $(id).value; render(); };
+
+function cap(d, cls, has) {
+  const s = S(d);
+  return `<figcaption><span class="${cls}"></span><b>${fmt(d)}</b> · ${wt(s)}${has ? ` · <button class="link del" data-del="${d}_${pose}">удалить снимок</button>` : ""}</figcaption>`;
+}
+function fig(d, cls) {
+  const u = img(d, pose);
+  return u ? `<figure><a href="${u}" target="_blank"><img src="${u}" onerror="this.onerror=null;this.src=th('${d}','${pose}')"></a>${cap(d, cls, true)}</figure>`
+           : `<figure><div class="nophoto">Снимка «${P.POSE_NAMES[pose]}» за эту дату нет</div>${cap(d, cls, false)}</figure>`;
+}
+
+function render() {
+  poses.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.p === pose));
+  document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("on", b.dataset.m === mode));
+  document.querySelectorAll("#src button").forEach(b => b.classList.toggle("on", b.dataset.s === src));
+  $("selA").value = A; $("selB").value = B;
+  const v = $("view");
+  if (mode === "pair" || !img(A, pose) || !img(B, pose)) {           // для ползунка нужны оба снимка
+    v.innerHTML = `<div class="pair">${fig(A, "dotA")}${fig(B, "dotB")}</div>`;
+  } else {
+    v.innerHTML = `<div class="slider" id="sl"><img src="${img(B, pose)}" onerror="this.onerror=null;this.src=th('${B}','${pose}')"><div class="top" id="top"><img src="${img(A, pose)}" id="topimg" onerror="this.onerror=null;this.src=th('${A}','${pose}')"></div><div class="line" id="ln"></div>
+      <span class="tag" style="left:8px">${fmt(A)} · ${wt(S(A))}</span><span class="tag" style="right:8px">${fmt(B)} · ${wt(S(B))}</span></div>`;
+    const sl = $("sl"), top = $("top"), ln = $("ln"), ti = $("topimg");
+    const set = x => { const r = sl.getBoundingClientRect(); const p = Math.max(0, Math.min(1, (x - r.left) / r.width)); top.style.width = p * 100 + "%"; ln.style.left = p * 100 + "%"; ti.style.width = r.width + "px"; };
+    const r0 = () => set(sl.getBoundingClientRect().left + sl.getBoundingClientRect().width / 2);
+    sl.querySelector("img").onload = r0; r0();
+    let drag = false;
+    sl.onpointerdown = e => { drag = true; sl.setPointerCapture(e.pointerId); set(e.clientX); };
+    sl.onpointermove = e => { if (drag) set(e.clientX); };
+    sl.onpointerup = () => drag = false;
+  }
+  const n = [[A, "dotA"], [B, "dotB"]].filter(([d]) => S(d).note).map(([d, c]) => `<div><span class="${c}"></span>${fmt(d)}: ${esc(S(d).note)}</div>`);
+  [A, B].filter((d, i, a) => D.feet_cut.includes(d) && a.indexOf(d) === i).forEach(d => n.push(`<div class="muted">${fmt(d)}: стопы у края кадра или обрезаны — масштаб и линия пола оценены по другим точкам</div>`));
+  [A, B].filter((d, i, a) => a.indexOf(d) === i && !D.aligned[`${d}_${pose}`] && D.img[`${d}_${pose}`])
+    .forEach(d => n.push(`<div class="muted">${fmt(d)}: фигура на снимке не найдена — показан оригинал без выравнивания</div>`));
+  $("notes").innerHTML = n.join("");
+  $("strip").innerHTML = D.sessions.map(s =>
+    `<div class="th ${s.date === A ? "a" : ""} ${s.date === B ? "b" : ""}" data-d="${s.date}"><img src="${th(s.date, pose)}"><b>${fmt(s.date).replace(" г.", "")}</b>${wt(s)}</div>`).join("");
+}
+$("strip").onclick = e => { const t = e.target.closest(".th"); if (!t) return; if (e.shiftKey) A = t.dataset.d; else B = t.dataset.d; render(); };
+window.addEventListener("resize", () => mode === "slider" && dates.length && render());
+
+// ---------- загрузка ----------
+const modal = $("modal"), mbox = $("mbox");
+let job = null, busy = false;
+const isImage = f => /\.(heic|heif|jpe?g|png)$/i.test(f.name) || /^image\/(jpeg|png|hei[cf])/.test(f.type);
+const existing = () => new Set(Object.keys((window.PHOTOS_INDEX || {}).photos || {}));
+
+function progress(text, i, n) {
+  mbox.innerHTML = `<h2>${esc(job && job.title || "Фото")}</h2><div class="progress">${esc(text)}<div class="bar-p"><i style="width:${n ? Math.round((i + 1) / n * 100) : 0}%"></i></div></div>`;
+}
+function closeModal() {
+  if (busy) return;
+  closeViewer();
+  if (job) (job.items || []).forEach(it => { if (it.preview) URL.revokeObjectURL(it.preview); if (it.full) URL.revokeObjectURL(it.full); });
+  job = null; modal.hidden = true;
+}
+function message(title, html) {
+  mbox.innerHTML = `<h2>${esc(title)}</h2><div style="margin:10px 0 14px">${html}</div><div class="mfoot"><button class="btn" id="mClose">Закрыть</button></div>`;
+  $("mClose").onclick = closeModal;
+}
+const failText = e => esc(e && e.message || e);
+window.addEventListener("beforeunload", e => { if (busy) { e.preventDefault(); e.returnValue = ""; } });
+
+$("uploadBtn").onclick = () => $("fileInput").click();
+$("fileInput").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) openUpload(f); };
+let dragDepth = 0;
+const hasFiles = e => [...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files");
+document.addEventListener("dragenter", e => { if (hasFiles(e)) { dragDepth++; document.body.classList.add("dragging"); } });
+document.addEventListener("dragleave", e => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); } });
+document.addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
+document.addEventListener("drop", e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging");
+  openUpload([...e.dataTransfer.files]);
+});
+
+/** Снимки выбраны → прочитать дату, сделать превью, разложить по сериям и позам → окно проверки. */
+async function openUpload(files) {
+  if (busy) return;
+  const imgs = files.filter(isImage);
+  job = {title: "Загрузка фото", items: []};
+  modal.hidden = false;
+  if (!imgs.length) return message("Загрузка фото", "Среди выбранных файлов нет снимков — нужны HEIC, JPEG или PNG.");
+  busy = true;
+  try {
+    progress("Подключаю обработку снимков…", 0, 0);
+    await APP.loadVendor();
+    for (let i = 0; i < imgs.length; i++) {
+      progress(`Читаю снимки и определяю позы: ${i + 1} из ${imgs.length}`, i, imgs.length);
+      const f = imgs[i], named = P.parseName(f.name), dt = P.exifDate(await APP.readExif(f), f.lastModified);
+      const it = {id: i, file: f, name: f.name, date: named ? named.date : dt.date, time: dt.time, fromExif: !!named || dt.fromExif,
+                  sha: await APP.sha256(f)};
+      try {
+        const d = await APP.decode(f);
+        it.preview = URL.createObjectURL(await APP.renderScaled(d.img, 320, 0.8));
+        try { it.guess = P.guessPose(await APP.detect(d.img)); } catch (e) { /* поза не определилась — выберет пользователь */ }
+        APP.release(d.img);
+      } catch (e) { it.error = "не читается: " + (e.message || e); }
+      job.items.push(it);
+    }
+    const already = P.findAlready(job.items, (window.PHOTOS_INDEX || {}).photos);   // те же снимки, что уже загружены
+    job.items.forEach(it => { if (already[it.id]) it.already = already[it.id]; });
+    job.series = P.planSeries(job.items, existing());
+    for (const s of job.series) for (const r of s.rows) if (job.items[r.id].error) r.pose = "skip";
+  } catch (e) {
+    busy = false;
+    return message("Загрузка фото", `<p class="bad">Не получилось подготовить снимки: ${failText(e)}</p>`);
+  }
+  busy = false;
+  renderPlan();
+}
+
+const alreadyText = name => { const d = name.slice(0, 10), p = name.slice(11); return `${fmt(d)}, ${P.POSE_NAMES[p] || p}`; };
+/** Подсказка над серией: какие снимки уже загружены раньше (тот же файл или тот же кадр). */
+function alreadyNote(s) {
+  const n = s.rows.filter(r => r.already).length;
+  if (!n) return "";
+  return `<div class="dups"><b>${n === s.rows.length ? "Все снимки серии уже загружены" : `Уже загружены раньше: ${n} ${plural(n, "снимок", "снимка", "снимков")}`}</b>
+    — повторно не сохранятся. Если нужно заменить — выберите позу вручную и отметьте «заменить существующее».</div>`;
+}
+
+// ---------- просмотр оригинала (клик по снимку в окне загрузки): качество, выбор среди дублей ----------
+const viewer = $("viewer");
+let vw = null;                                   // {si, group: [строки серии], pos, zoom}
+const isHeicFile = it => /\.(heic|heif)$/i.test(it.name) || /hei[cf]/i.test(it.file.type || "");
+
+/** Оригинал в полном разрешении: JPEG/PNG — как есть, HEIC — через декодер (Chrome его не показывает). */
+async function fullUrl(it) {
+  if (it.full) return it.full;
+  if (!isHeicFile(it)) return it.full = URL.createObjectURL(it.file);
+  const d = await APP.decode(it.file);
+  try { return it.full = URL.createObjectURL(await APP.renderScaled(d.img, Math.max(d.w, d.h), 0.92)); }
+  finally { APP.release(d.img); }
+}
+
+function openViewer(si, ri) {
+  const group = P.dupGroup(job.series[si].rows, ri);
+  vw = {si, group, pos: group.indexOf(ri), zoom: false};
+  showViewer();
+}
+function closeViewer() { vw = null; viewer.hidden = true; viewer.innerHTML = ""; }
+
+async function showViewer() {
+  if (!vw) return;
+  const s = job.series[vw.si], ri = vw.group[vw.pos], r = s.rows[ri], it = job.items[r.id], n = vw.group.length;
+  const poseName = P.POSE_NAMES[r.dup || r.pose] || "поза не выбрана";
+  const keep = r.dup ? (r.pose === "skip" ? `<button class="btn main" id="vKeep">Оставить этот</button>` : `<span class="kept">✓ оставлен</span>`) : "";
+  viewer.innerHTML = `<div class="vbar"><b>${esc(poseName)}</b>
+      ${n > 1 ? `<span>дубль ${vw.pos + 1} из ${n}</span><button class="btn" id="vPrev">←</button><button class="btn" id="vNext">→</button>` : ""}
+      <span class="muted">${esc(it.name)} · ${(it.file.size / 1048576).toFixed(1).replace(".", ",")} МБ · <span id="vSize">…</span></span>
+      ${keep}<span class="muted sp">клик — 100% / во весь экран · Esc — закрыть</span><button class="btn" id="vClose">Закрыть</button></div>
+    <div class="vimg${vw.zoom ? " zoom" : ""}" id="vimg"><div class="muted">Открываю оригинал…</div></div>`;
+  viewer.hidden = false;
+  $("vClose").onclick = closeViewer;
+  if (n > 1) { $("vPrev").onclick = () => step(-1); $("vNext").onclick = () => step(1); }
+  if ($("vKeep")) $("vKeep").onclick = () => { P.keepDup(s.rows, ri); renderPlan(); showViewer(); };
+  const want = vw;
+  let url;
+  try { url = await fullUrl(it); } catch (e) { $("vimg").innerHTML = `<div class="bad">Не открывается: ${failText(e)}</div>`; return; }
+  if (vw !== want || !$("vimg")) return;                     // пока раскладывали HEIC, перешли к другому снимку
+  const box = $("vimg"), img = new Image();
+  img.onload = () => { if ($("vSize")) $("vSize").textContent = `${img.naturalWidth}×${img.naturalHeight}`; };
+  img.src = url;
+  img.onclick = e => {                                      // во весь экран ↔ 100% в точке клика
+    const r0 = img.getBoundingClientRect(), fx = (e.clientX - r0.left) / r0.width, fy = (e.clientY - r0.top) / r0.height;
+    vw.zoom = !vw.zoom; box.classList.toggle("zoom", vw.zoom);
+    if (vw.zoom) { box.scrollLeft = fx * img.naturalWidth - box.clientWidth / 2; box.scrollTop = fy * img.naturalHeight - box.clientHeight / 2; }
+  };
+  box.innerHTML = ""; box.appendChild(img);
+}
+function step(d) { if (!vw) return; vw.pos = (vw.pos + d + vw.group.length) % vw.group.length; showViewer(); }
+document.addEventListener("keydown", e => {
+  if (!vw) return;
+  if (e.key === "Escape") { e.preventDefault(); closeViewer(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); step(-1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); step(1); }
+});
+
+/** Подсказка над серией: какие позы сняты несколько раз и что с лишними. */
+function dupNote(s) {
+  const g = {};
+  for (const r of s.rows) if (r.dup) (g[r.dup] = g[r.dup] || []).push(r);
+  const lines = Object.entries(g).map(([p, rows]) =>
+    `«${P.POSE_NAMES[p]}» — ${rows.length} ${plural(rows.length, "снимок", "снимка", "снимков")}`);
+  if (!lines.length) return "";
+  return `<div class="dups"><b>Похоже на дубли:</b> ${lines.join(", ")}. Оставлен последний снимок, остальные не сохранятся
+    (в «Фото» на телефоне они останутся). Если лучше другой — «Оставить этот» под ним.
+    <b>Клик по снимку</b> — открыть оригинал и сравнить качество (← → — между дублями).</div>`;
+}
+
+function renderPlan() {
+  const have = existing();
+  for (const s of job.series) for (const r of s.rows) r.exists = !!r.pose && r.pose !== "skip" && have.has(`${s.date}_${r.pose}`);
+  const errs = P.validatePlan(job.series);
+  const opts = sel => `<option value=""${sel ? "" : " selected"}>— поза —</option>` +
+    POSES.map(([k, n]) => `<option value="${k}"${sel === k ? " selected" : ""}>${n}</option>`).join("") +
+    `<option value="skip"${sel === "skip" ? " selected" : ""}>Не сохранять</option>`;
+  const toSave = job.series.reduce((a, s) => a + s.rows.filter(r => r.pose && r.pose !== "skip" && (!r.exists || r.replace)).length, 0);
+  mbox.innerHTML = `<h2>Проверьте дату и позы</h2>
+    <div class="muted">Позы определены по фигуре на снимке. Поправьте, если не так.</div>
+    ${job.series.map((s, si) => `<div class="ser">
+      <div class="ser-head"><label><span class="lab">Дата серии</span><input type="date" data-si="${si}" value="${s.date}"></label>
+        <span class="muted">${s.rows.length} ${plural(s.rows.length, "снимок", "снимка", "снимков")}</span></div>
+      ${dupNote(s)}${alreadyNote(s)}
+      <div class="ups">${s.rows.map((r, ri) => { const it = job.items[r.id]; return `<div class="up${r.dup ? " dup" : ""}${(r.dup || r.already) && r.pose === "skip" ? " off" : ""}">
+        ${it.preview ? `<img src="${it.preview}" alt="" data-si="${si}" data-ri="${ri}" title="Клик — открыть оригинал">` : `<div class="noprev">${esc(it.error || "нет превью")}</div>`}
+        ${r.dup && r.pose === "skip" ? `<button class="btn keep" data-si="${si}" data-ri="${ri}" data-keep>Оставить этот</button>` : ""}
+        <select data-si="${si}" data-ri="${ri}"${it.error ? " disabled" : ""}>${opts(r.pose)}</select>
+        <div class="fn" title="${esc(it.name)}">${esc(it.name)}</div>
+        ${r.already ? `<div class="warn">уже загружен: ${esc(alreadyText(r.already))}</div>` : ""}
+        ${it.fromExif || r.already ? "" : `<div class="warn">дата не из снимка — проверьте</div>`}
+        ${r.exists ? `<label class="warn"><input type="checkbox" data-si="${si}" data-ri="${ri}" data-replace${r.replace ? " checked" : ""}> заменить существующее</label>` : ""}
+      </div>`; }).join("")}</div></div>`).join("")}
+    ${errs.length ? `<ul class="errs">${errs.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
+    <div class="mfoot"><span class="muted">Сохранится: ${toSave}</span><button class="btn" id="mCancel">Отмена</button>
+      <button class="btn main" id="mSave"${errs.length || !toSave ? " disabled" : ""}>Сохранить</button></div>`;
+  mbox.querySelectorAll("input[type=date]").forEach(el => el.onchange = () => { job.series[+el.dataset.si].date = el.value; renderPlan(); });
+  mbox.querySelectorAll("select[data-ri]").forEach(el => el.onchange = () => {
+    const r = job.series[+el.dataset.si].rows[+el.dataset.ri]; r.pose = el.value || null; r.replace = false; renderPlan(); });
+  mbox.querySelectorAll("input[data-replace]").forEach(el => el.onchange = () => { job.series[+el.dataset.si].rows[+el.dataset.ri].replace = el.checked; renderPlan(); });
+  mbox.querySelectorAll("button[data-keep]").forEach(el => el.onclick = () => {      // из дублей оставить этот, остальные — не сохранять
+    P.keepDup(job.series[+el.dataset.si].rows, +el.dataset.ri);
+    renderPlan(); });
+  mbox.querySelectorAll("img[data-ri]").forEach(el => el.onclick = () => openViewer(+el.dataset.si, +el.dataset.ri));
+  $("mCancel").onclick = closeModal;
+  $("mSave").onclick = save;
+}
+
+/** Первый раз — шаг «Где сохранять фото»: путь к папке проекта (копируется для ⌘⇧G) и кнопка, открывающая окно Chrome. */
+function askFolder(fn) {
+  const path = P.projectPath(location.pathname);
+  mbox.innerHTML = `<h2>Где сохранять фото</h2>
+    <p>Chrome один раз спросит папку: страница, открытая с диска, может писать только туда, куда вы разрешили.
+      Выберите <b>папку проекта</b> — в ней лежат portal и data. Фото лягут в data/photos, страница создаст её сама.</p>
+    ${path ? `<p><span class="path">${esc(path)}</span></p>
+      <p class="muted">По кнопке этот путь скопируется. В окне выбора нажмите <b>⌘⇧G</b>, затем <b>⌘V</b> и <b>Enter</b> — и «Выбрать».</p>` : ""}
+    <div class="mfoot"><button class="btn" id="mBack">${job && job.series ? "Назад" : "Отмена"}</button>
+      <button class="btn main" id="mPick">Выбрать папку проекта</button></div>`;
+  $("mBack").onclick = job && job.series ? renderPlan : closeModal;
+  $("mPick").onclick = async () => {
+    try { if (path) await navigator.clipboard.writeText(path); } catch (e) { /* не скопировалось — путь виден на экране */ }
+    withDir(fn, true);
+  };
+}
+
+async function withDir(fn, picking) {
+  if (!picking && !(await APP.hasDir())) return askFolder(fn);
+  let dir;
+  try { dir = await APP.getDir({interactive: true}); }
+  catch (e) { return message(job.title, `<p class="bad">${failText(e)}</p>`); }
+  if (!dir) return message(job.title, `<p>Без доступа к папке сохранить нельзя. Попробуйте ещё раз: выберите папку проекта <b>health</b> и разрешите доступ.</p>`);
+  busy = true;
+  try { await fn(dir); }
+  catch (e) { busy = false; message(job.title, `<p class="bad">Ошибка: ${failText(e)}</p>`); }
+  finally { busy = false; }
+}
+
+async function save() {
+  const rows = [];
+  for (const s of job.series) for (const r of s.rows)
+    if (r.pose && r.pose !== "skip" && (!r.exists || r.replace)) rows.push({file: job.items[r.id].file, date: s.date, pose: r.pose});
+  await withDir(async dir => {
+    progress("Сохраняю…", 0, rows.length);
+    const res = await APP.saveSeries(dir, rows, progress);
+    await afterWrite(res, `Сохранено снимков: ${res.saved}.`);
+  });
+}
+
+$("rebuildBtn").onclick = () => {
+  if (busy || !confirm("Перечитать все оригиналы из папки data/photos и заново выровнять их и пересобрать превью? Займёт несколько минут — страницу не закрывать.")) return;
+  job = {title: "Пересборка", items: []};
+  modal.hidden = false;
+  withDir(async dir => {
+    progress("Подключаю обработку снимков…", 0, 0);
+    await APP.loadVendor();
+    const res = await APP.rebuildAll(dir, progress);
+    const sk = res.skipped.length ? `<p class="warn">Не по шаблону ГГГГ-ММ-ДД_поза, пропущены: ${res.skipped.map(esc).join(", ")}</p>` : "";
+    await afterWrite(res, `Пересобрано снимков: ${res.saved}.` + sk);
+  });
+};
+
+/** Удалить снимок из папки (оригинал и все копии) — по кнопке под снимком в сравнении. */
+$("view").addEventListener("click", e => {
+  const b = e.target.closest("[data-del]");
+  if (!b || busy) return;
+  e.preventDefault();
+  const name = b.dataset.del, d = name.slice(0, 10), p = name.slice(11), what = `«${P.POSE_NAMES[p] || p}» за ${fmt(d)}`;
+  if (!confirm(`Удалить снимок ${what}?\n\nИз папки data/photos удалятся оригинал и все его копии — вернуть нельзя (в «Фото» на телефоне снимок останется).`)) return;
+  job = {title: "Удаление снимка", items: []};
+  modal.hidden = false;
+  withDir(async dir => {
+    progress("Удаляю…", 0, 0);
+    const index = await APP.removePhoto(dir, name);
+    await afterWrite({index, failed: [], noFigure: []}, `Удалён снимок ${what}`);
+  });
+});
+
+$("forgetBtn").onclick = async () => {
+  if (busy) return;
+  await APP.forgetDir();
+  alert("Готово: при следующем сохранении Chrome спросит папку — выберите папку проекта health, фото лягут в data/photos.");
+};
+
+/** Перечитать индекс по относительному пути — так видно, что выбрана папка рядом с проектом; перерисовать страницу. */
+function reloadIndex(folderId) {
+  return new Promise(ok => {
+    const s = document.createElement("script");
+    s.src = BASE + "photos.js?t=" + Date.now();
+    s.onload = () => ok(!!window.PHOTOS_INDEX && window.PHOTOS_INDEX.folder_id === folderId);
+    s.onerror = () => ok(false);
+    document.head.appendChild(s);
+  });
+}
+
+async function afterWrite(res, head) {
+  const near = await reloadIndex(res.index.folder_id);
+  setIndex(near ? window.PHOTOS_INDEX : res.index, true);
+  const parts = [`<p class="good">${head}</p>`];
+  if (res.noFigure.length) parts.push(`<p class="warn">Фигура не найдена — сохранены без выравнивания: ${res.noFigure.map(esc).join(", ")}</p>`);
+  if (res.failed.length) parts.push(`<p class="bad">Не получилось: ${res.failed.map(f => `${esc(f.name)} (${esc(f.error)})`).join("; ")}</p>`);
+  if (!near) parts.push(`<p class="bad">Страница не видит сохранённое в папке <b>data/photos</b> внутри папки проекта — похоже, выбрана другая папка. Нажмите внизу страницы «Выбрать другую папку», выберите папку проекта health и сохраните ещё раз.</p>`);
+  busy = false;
+  message(job.title, parts.join(""));
+}
+
+setIndex(window.PHOTOS_INDEX);
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+{
+  "name": "health-app",
+  "productName": "Здоровье",
+  "version": "1.0.0",
+  "description": "Здоровье — питание, вес, сон, восстановление и тренировки из FatSecret и Whoop",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/",
+    "release": "node scripts/release.js",
+    "dist:mac": "node scripts/prepare.js && electron-builder --mac -c.directories.output=\"$HOME/Library/Caches/health-app-build\" && node scripts/collect.js",
+    "app:mac": "npm run dist:mac && node scripts/install.js"
+  },
+  "devDependencies": {
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "local.health.app",
+    "productName": "Здоровье",
+    "directories": {
+      "output": "../dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "package.json",
+      "main.js",
+      "preload.js",
+      "store.js",
+      "protocol.js",
+      "oauthwin.js",
+      "fatsecret.js",
+      "whoop.js",
+      "updater.js",
+      "settings.js",
+      "photosfs.js",
+      "pyround.js",
+      "keys.js",
+      "datadir.js",
+      "alcohol.js",
+      "secrets.js",
+      "changelog.js",
+      "whatsnew.js",
+      "CHANGELOG.md",
+      "schema.json",
+      "fatsecret_app.json",
+      "whoop_app.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../portal",
+        "to": "portal",
+        "filter": [
+          "**/*",
+          "!data.js"
+        ]
+      }
+    ],
+    "asar": true,
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "identity": "-",
+      "category": "public.app-category.healthcare-fitness",
+      "artifactName": "Здоровье-${version}-mac-${arch}.${ext}",
+      "hardenedRuntime": false
+    },
+    "afterPack": "scripts/afterpack.js"
+  }
+}

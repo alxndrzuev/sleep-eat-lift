@@ -1,0 +1,65 @@
+{
+ "daily": {
+  "2026-11-20": {
+   "strain": 12.3,
+   "kcal": 2500,
+   "steps": 9123,
+   "recovery": 68,
+   "hrv": 81.2,
+   "rhr": 48,
+   "spo2": 96.2,
+   "skin_temp": 33.46,
+   "sleep_h": 6.75,
+   "deep_h": 1.5,
+   "rem_h": 1.75,
+   "light_h": 3.5,
+   "awake_h": 0.5,
+   "sleep_perf": 88,
+   "sleep_eff": 92,
+   "resp_rate": 15.2,
+   "bed": "23:30",
+   "wake": "07:45"
+  },
+  "2026-11-21": {
+   "steps": 2100
+  },
+  "2026-11-19": {
+   "strain": 8.1,
+   "kcal": 1912
+  }
+ },
+ "workouts": {
+  "w-1": {
+   "date": "2026-11-20",
+   "start": "2026-11-20 20:00",
+   "sport": "squash",
+   "duration_min": 62,
+   "strain": 14.1,
+   "avg_hr": 150,
+   "max_hr": 182,
+   "kcal": 598,
+   "z0_min": 0.0,
+   "z1_min": 5.0,
+   "z2_min": 20.5,
+   "z3_min": 25.0,
+   "z4_min": 10.0,
+   "z5_min": 2.0
+  },
+  "w-2": {
+   "date": "2026-11-19",
+   "start": "2026-11-19 20:00",
+   "sport": 45,
+   "duration_min": 60,
+   "strain": 9,
+   "avg_hr": 120,
+   "max_hr": 150,
+   "kcal": null,
+   "z0_min": null,
+   "z1_min": null,
+   "z2_min": null,
+   "z3_min": null,
+   "z4_min": null,
+   "z5_min": null
+  }
+ }
+}

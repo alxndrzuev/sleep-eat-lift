@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тренировки · здоровье</title>
+<link rel="stylesheet" href="common.css">
+<style>
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:16px 16px 12px}
+.sq{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+.hm{overflow-x:auto;padding-bottom:4px}
+.hm svg text{fill:var(--text-muted);font-size:11px}
+.hm rect.c{cursor:default}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--text-secondary);margin:6px 0 2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:16px;margin-top:16px}
+@media (max-width:600px){.grid{grid-template-columns:1fr}}
+.chart svg text{fill:var(--text-muted);font-size:11px}
+.tip{position:absolute;pointer-events:none;background:var(--surface-1);border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,.12);border-radius:8px;padding:7px 10px;font-size:12.5px;color:var(--text-primary);white-space:nowrap;opacity:0;transition:opacity .08s;z-index:5}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.tile .lab{color:var(--text-secondary);font-size:13px}
+.tile .val{font-size:26px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .val small{font-size:14px;font-weight:500;color:var(--text-secondary)}
+.tile .note{font-size:12.5px;color:var(--text-muted);margin-top:2px;display:flex;gap:6px;align-items:baseline}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none;transform:translateY(-1px)}
+#after table{width:100%;max-width:620px}
+</style>
+</head>
+<body data-needs="whoop_daily">
+<div class="viz-root">
+<div class="wrap">
+<nav class="nav" id="nav"></nav>
+<header>
+  <div>
+    <h1>Тренировки</h1>
+    <div class="sub" id="sub"></div>
+  </div>
+  <div class="controls">
+    <div class="seg" id="range">
+      <button data-p="14" class="on">2 нед</button><button data-p="28">4 нед</button><button data-p="91">3 мес</button><button data-p="all">Всё</button>
+    </div>
+    <button class="iconbtn" id="theme" title="Светлая / тёмная тема">Тема</button>
+  </div>
+</header>
+
+<div class="tiles" id="tiles"></div>
+
+<div class="card">
+  <div class="cardhead"><div><h2>Календарь тренировок</h2><div class="desc">Whoop. Прогулки не считаем. Рамкой выделен выбранный период</div></div></div>
+  <div class="legend" id="hmlegend"></div>
+  <div class="hm chart" id="hm"></div>
+</div>
+
+<div class="grid" id="charts"></div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Утро после тренировки</h2>
+  <div class="desc">Recovery Whoop на следующее утро в зависимости от времени тренировки — за всё время. Обычный слот — 20:00</div>
+  <div id="after" style="margin-top:8px"></div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h2>Тренировки за период</h2>
+  <div class="desc">Whoop. Силовые = weightlifting + functional fitness; прогулки не считаем. «Без вида» — тип activity: вид тренировки в Whoop не указан</div>
+  <div class="tablewrap" style="max-height:420px"><table id="wlist"></table></div>
+</div>
+
+<footer>Данные: Whoop через API. Файл автономный: все данные внутри, в интернет ничего не отправляется.</footer>
+</div>
+</div>
+
+<script src="../data/data.js"></script>
+<script src="dataset.js"></script>
+<script src="nav.js"></script>
+<script src="whatsnew.js"></script>
+<script src="common.js"></script>
+<script>
+if(!PAGE_EMPTY){
+// ---------- helpers ----------
+const today = P(DATA.updated);
+const END = (()=>{ const ds=DATA.whoop_daily.map(r=>r.date).sort(); const last=ds.length?P(ds[ds.length-1]):today; return last>today?today:last; })();
+const WD = {}; DATA.whoop_daily.forEach(r=>WD[r.date]=r);
+const DAYS = Object.keys(WD).sort();
+const FIRST = DAYS.length ? P(DAYS[0]) : today;
+// вторая категория: сквош (если он в плане) или кардио — решает dataset.js (DATA.k2)
+const K2 = (DATA.k2||{key:'squash'}).key, K2L = (DATA.k2||{lab:'Сквош'}).lab, K2M = (DATA.k2||{many:'сквоша'}).many;
+const PW = (DATA.plan||{}).workouts;   // план в неделю {strength, squash} или нет
+const KIND_LAB = {squash:'Сквош', cardio:'Кардио', strength:'Силовая', other:'Другое', walk:'Прогулка'};
+const WK = (DATA.whoop_workouts||[]).filter(w=>w.kind!=='walk');   // kind (с учётом меток workout_labels.csv) — считает dataset.js
+const KC = {strength:()=>css('--series-2'), [K2]:()=>css('--series-1'), other:()=>css('--series-3')};
+const wByDate = {}; WK.forEach(x=>(wByDate[x.date] ||= []).push(x));
+const zmin = (w,a,b) => { let s=0; for(let i=a;i<=b;i++) s+=w['z'+i+'_min']||0; return s; };
+const hour = w => +w.start.slice(11,13) + (+w.start.slice(14,16))/60;
+
+// ---------- period ----------
+let PER='14';
+const period = p => periodDays(p, FIRST, END), prevPeriod = cur => prevDays(cur, null);
+function summarize(days){
+  const set=new Set(days), w=WK.filter(x=>set.has(x.date));
+  const cnt=k=>w.filter(x=>x.kind===k).length;
+  return {n:days.length, w, all:w.length, [K2]:cnt(K2), strength:cnt('strength'), other:cnt('other'),
+    min:w.reduce((s,x)=>s+(x.duration_min||0),0), strain:mean(w.map(x=>x.strain).filter(x=>x!=null)),
+    hi:w.reduce((s,x)=>s+zmin(x,4,5),0), unl:w.filter(x=>x.sport==='activity'&&x.kind==='other').length,
+    late:w.filter(x=>hour(x)>=19).length};
+}
+
+// ---------- tiles ----------
+function tiles(){
+  const cur=period(PER), S=summarize(cur.days), PS=summarize(prevPeriod(cur).days);
+  $('#sub').textContent = `${fmtDY(cur.start)} — ${fmtDY(cur.end)} · ${dni(S.n)} · данные Whoop по ${fmtD(END)}`;
+  const weeks=Math.max(1,S.n/7), plan=k=>PW&&PW[k]?Math.round(weeks*PW[k]):null;
+  const st=(ok,warn)=> ok?css('--good'):warn?css('--warning'):css('--critical');
+  const vs=(a,b,dg=0)=>{ if(a==null||b==null) return ''; const d=a-b; if(Math.abs(d)<Math.pow(10,-dg)/2) return 'как в прошлый период'; return `${d>0?'↑':'↓'} ${nf(Math.abs(d),dg)} к прошлому`; };
+  const last=WK.slice().sort((a,b)=>a.start<b.start?1:-1)[0], ago=last?Math.round((END-P(last.date))/DAY):null;
+  const items=[
+    ...['strength',K2].map(k=>{ const pl=plan(k); return {lab:k==='strength'?'Силовые':K2L, val:S[k]+(pl!=null?'<small> / '+pl+'</small>':''),
+      note:pl!=null?'план '+PW[k]+' в неделю':'в неделю '+nf(S[k]/weeks,1), c:pl!=null?st(S[k]>=pl,S[k]>=pl*0.75):null}; }),
+    {lab:'Всего тренировок', val:S.all+'<small> · '+nf(S.all/weeks,1)+' в нед</small>', note:(S.other?`другое ${S.other} · `:'')+vs(S.all,PS.all), c:null},
+    {lab:'Время', val:nf(S.min/60,1)+'<small> ч</small>', note:'в неделю '+nf(S.min/60/weeks,1)+' ч', c:null},
+    {lab:'Strain тренировки', val:nf(S.strain,1), note:'среднее · '+vs(S.strain,PS.strain,1), c:null},
+    {lab:'Интенсив (зоны 4–5)', val:nf(S.hi)+'<small> мин</small>', note:'в неделю '+nf(S.hi/weeks), c:null},
+    {lab:'Поздние (с 19:00)', val:S.late+'<small> из '+S.all+'</small>', note:'утром после них recovery ниже', c:null},
+    {lab:'Последняя', val:last?(ago===0?'сегодня':ago===1?'вчера':dni(ago).replace(' ','<small> ')+' назад</small>'):'—', note:last?`${KIND_LAB[last.kind]} · ${fmtW(P(last.date))}, ${fmtD(P(last.date))}`:'', c:last?st(ago<=3,ago<=5):null},
+  ];
+  if(S.unl) items.push({lab:'Без вида', val:S.unl, note:'укажите вид в приложении Whoop', c:css('--warning')});
+  tileCards(items);
+}
+
+// ---------- calendar ----------
+function heatmap(){
+  const cur=period(PER);
+  const el=$('#hm'); const cs=13, gap=3, st=cs+gap, top=18, left=26;
+  const first=new Date(FIRST); const gridStart=addD(first,-((first.getDay()+6)%7));
+  const weeks=Math.ceil(((END-gridStart)/DAY+1)/7);
+  const W=left+weeks*st+4, H=top+7*st+16;
+  let s=`<svg width="${W}" height="${H}" role="img" aria-label="Календарь тренировок">`;
+  ['пн','','ср','','пт','','вс'].forEach((t,i)=>{ if(t) s+=`<text x="0" y="${top+i*st+cs-2}">${t}</text>`; });
+  const labs=[{w:0,d:new Date(first)}];
+  for(let w=0; w<weeks; w++){ for(let i=0;i<7;i++){ const d=addD(gridStart,w*7+i); if(d.getDate()===1&&d>first) labs.push({w,d}); } }
+  labs.filter((l,i)=>!labs[i+1]||labs[i+1].w-l.w>=3).forEach(({w,d})=>{ const m=d.toLocaleDateString('ru-RU',{month:'short'}).replace('.',''); s+=`<text x="${left+w*st}" y="11">${d.getMonth()===0||w===0?m+' '+d.getFullYear():m}</text>`; });
+  for(let w=0; w<weeks; w++){
+    let n=0, any=false;
+    for(let i=0;i<7;i++){
+      const d=addD(gridStart,w*7+i); if(d<first||d>END) continue;
+      const ds=iso(d), x=left+w*st, y=top+i*st, ws=wByDate[ds];
+      if(WD[ds]) any=true;
+      if(ws){ n+=ws.length; const ks=[...new Set(ws.map(z=>z.kind))];
+        if(ks.length===1) s+=`<rect class="c" data-d="${ds}" x="${x}" y="${y}" width="${cs}" height="${cs}" rx="3" fill="${KC[ks[0]]()}"/>`;
+        else { s+=`<rect class="c" data-d="${ds}" x="${x}" y="${y}" width="${cs}" height="${cs}" rx="3" fill="${KC[ks[0]]()}"/><path d="M${x+cs/2} ${y}H${x+cs-3}Q${x+cs} ${y} ${x+cs} ${y+3}V${y+cs-3}Q${x+cs} ${y+cs} ${x+cs-3} ${y+cs}H${x+cs/2}Z" fill="${KC[ks[1]]()}" pointer-events="none"/>`; } }
+      else if(WD[ds]) s+=`<rect class="c" data-d="${ds}" x="${x}" y="${y}" width="${cs}" height="${cs}" rx="3" fill="var(--grid)"/>`;
+      else s+=`<rect class="c" data-d="${ds}" x="${x+.75}" y="${y+.75}" width="${cs-1.5}" height="${cs-1.5}" rx="3" fill="var(--page)" stroke="var(--text-muted)" stroke-width="1" stroke-opacity=".35"/>`;
+    }
+    if(any) s+=`<text x="${left+w*st+cs/2}" y="${top+7*st+10}" text-anchor="middle" style="${n>=4?'fill:var(--good);font-weight:700':''}">${n}</text>`;
+  }
+  const wA=Math.floor((cur.start-gridStart)/DAY/7), wB=Math.floor((cur.end-gridStart)/DAY/7), pad=2.5;
+  s+=`<rect x="${left+wA*st-pad}" y="${top-pad}" width="${(wB-wA+1)*st-gap+pad*2}" height="${7*st-gap+pad*2}" rx="5" fill="none" stroke="var(--text-primary)" stroke-width="1.5" pointer-events="none"/>`;
+  s+='</svg>';
+  el.innerHTML=s;
+  calTips(el, ds=>{
+    const d=P(ds), nx=WD[iso(addD(d,1))];
+    let h=`<div class="t">${fmtW(d)}, ${fmtDY(d)}</div>`;
+    if(wByDate[ds]){ wByDate[ds].forEach(w=>h+=`<b>${KIND_LAB[w.kind]}</b>${w.kind==='other'?` <span class="muted">(${esc(w.sport)})</span>`:''} ${w.start.slice(11)} · ${w.duration_min} мин · strain ${nf(w.strain,1)}<br>`);
+      if(nx&&nx.recovery!=null) h+=`<span class="muted">recovery утром после — ${nx.recovery}%</span>`; }
+    else h+= WD[ds] ? '<span class="muted">без тренировки</span>' : '<span class="muted">нет данных Whoop</span>';
+    return h;
+  });
+  el.scrollLeft=el.scrollWidth;
+  $('#hmlegend').innerHTML = Lg.sq(KC.strength(),'Силовая')+Lg.sq(KC[K2](),K2L)+Lg.sq(KC.other(),'Другое')+Lg.sq(css('--grid'),'отдых')
+    + `<span class="muted">число под неделей — тренировок${PW?` (план ${(PW.strength||0)+(PW[K2]||0)})`:''}</span>`;
+}
+
+// ---------- charts ----------
+function charts(){
+  $('#charts').innerHTML=''; JOBS.length=0;
+  const cur=period(PER);
+  const from=Math.min(cur.start.getTime(), END.getTime()-27*DAY), to=END.getTime()+DAY;
+  const c1=css('--series-1'), c2=css('--series-2'), c3=css('--series-3');
+  const wk={}; WK.forEach(x=>{ const dt=P(x.date); const ws=iso(addD(dt,-((dt.getDay()+6)%7))); const o=(wk[ws] ||= {strength:0,[K2]:0,other:0,strain:0,min:0,z:[0,0,0,0,0,0]}); o[x.kind]++; o.strain+=x.strain||0; o.min+=x.duration_min||0; for(let i=0;i<6;i++) o.z[i]+=x['z'+i+'_min']||0; });
+  const allW=[]; for(let d=addD(FIRST,-((FIRST.getDay()+6)%7)); d<=END; d=addD(d,7)){ const k=iso(d); allW.push([k, wk[k]||{strength:0,[K2]:0,other:0,strain:0,min:0,z:[0,0,0,0,0,0]}]); }
+
+  let el=card('cwk','Тренировки по неделям','Whoop'+(PW?`. План — ${PW.strength||0} силовые + ${PW[K2]||0} ${K2M} (пунктир ${(PW.strength||0)+(PW[K2]||0)})`:''), Lg.sq(c2,'Силовые')+Lg.sq(c1,K2L)+Lg.sq(c3,'Другое')+(PW?Lg.ref('План'):''),
+    allW.map(([k,o])=>['с '+fmtD(P(k)), o.strength, o[K2], o.other, nf(o.min/60,1)]), ['Неделя','Силовые',K2L,'Другое','Часов']);
+  chart(el,{from,to,y:[0,6],yticks:[0,1,2,3,4,5,6],
+    layers:[{type:'stack',data:allW,keys:['strength',K2,'other'],colors:[c2,c1,c3]},...(PW?[{type:'hline',y:(PW.strength||0)+(PW[K2]||0)}]:[])],
+    hover:allW.map(([k,o])=>({t:P(k).getTime()+3.5*DAY, html:`<div class="t">неделя с ${fmtD(P(k))}</div>Силовые <b>${o.strength}</b> · ${K2L} <b>${o[K2]}</b>${o.other?` · Другое <b>${o.other}</b>`:''}<br><span class="muted">${nf(o.min/60,1)} ч · strain тренировок ${nf(o.strain,1)}</span>`}))});
+
+  const zc=['#cde2fb','#86b6ef','#3987e5','#1c5cab','#0d366b'];
+  const zD=allW.map(([k,o])=>[k,{z1:o.z[1],z2:o.z[2],z3:o.z[3],z4:o.z[4],z5:o.z[5]}]);
+  const zmax=Math.max(60,...zD.filter(([k])=>P(k)>=from-7*DAY).map(([,o])=>o.z1+o.z2+o.z3+o.z4+o.z5));
+  el=card('czn','Пульсовые зоны по неделям','Минуты в зонах 1–5 на тренировках. Зоны 2–3 — выносливость, 4–5 — интенсив', Lg.sq(zc[0],'Зона 1')+Lg.sq(zc[1],'2')+Lg.sq(zc[2],'3')+Lg.sq(zc[3],'4')+Lg.sq(zc[4],'5'));
+  chart(el,{from,to,y:[0,Math.ceil(zmax/30)*30],
+    layers:[{type:'stack',data:zD,keys:['z1','z2','z3','z4','z5'],colors:zc}],
+    hover:zD.map(([k,o])=>({t:P(k).getTime()+3.5*DAY, html:`<div class="t">неделя с ${fmtD(P(k))}</div>З1 ${nf(o.z1)} · З2 ${nf(o.z2)} · З3 ${nf(o.z3)} · З4 <b>${nf(o.z4)}</b> · З5 <b>${nf(o.z5)}</b> мин`}))});
+
+  // strain каждой тренировки по видам
+  const sv=k=>WK.filter(x=>x.kind===k&&x.strain!=null).map(x=>[x.date,x.strain]);
+  const smax=Math.max(15,...WK.filter(x=>P(x.date)>=from).map(x=>x.strain||0));
+  el=card('cst','Strain каждой тренировки','Нагрузка по Whoop (0–21). Точка — тренировка', Lg.sq(c2,'Силовая')+Lg.sq(c1,K2L)+Lg.sq(c3,'Другое'));
+  chart(el,{from,to,y:[0,Math.ceil(smax/3)*3],
+    layers:[{type:'dots',data:sv('other'),color:c3,r:4},{type:'dots',data:sv('strength'),color:c2,r:4.5},{type:'dots',data:sv(K2),color:c1,r:4.5}],
+    hover:Object.keys(wByDate).map(d=>({t:P(d).getTime(), html:`<div class="t">${fmtW(P(d))}, ${fmtD(P(d))}</div>`+wByDate[d].map(w=>`${KIND_LAB[w.kind]} ${w.start.slice(11)} · <b>${nf(w.strain,1)}</b> · ${w.duration_min} мин`).join('<br>')}))});
+
+  // длительность по неделям
+  el=card('cmin','Часы тренировок по неделям','Суммарная длительность за неделю', Lg.sq(c1,'Часы'));
+  const hD=allW.map(([k,o])=>[k,o.min/60]);
+  chart(el,{from,to,y:[0,Math.max(5,Math.ceil(Math.max(...hD.filter(([k])=>P(k)>=from-7*DAY).map(x=>x[1]))))],
+    layers:[{type:'bar',data:hD,color:c1,width:7}],
+    hover:hD.map(([k,v])=>({t:P(k).getTime()+3.5*DAY, html:`<div class="t">неделя с ${fmtD(P(k))}</div><b>${nf(v,1)} ч</b>`}))});
+  JOBS.forEach(f=>f());
+}
+
+// ---------- утро после ----------
+function after(){
+  const grp={early:[],late:[],none:[]};
+  DAYS.forEach(ds=>{ const nx=WD[iso(addD(P(ds),1))]; if(!nx||nx.recovery==null) return;
+    const ws=wByDate[ds]; if(!ws) grp.none.push(nx); else grp[ws.some(w=>hour(w)>=19)?'late':'early'].push(nx); });
+  const row=(lab,a)=>`<tr><td>${lab}</td><td>${a.length}</td><td><b>${nf(mean(a.map(r=>r.recovery)))}%</b></td><td>${nf(mean(a.map(r=>r.hrv).filter(x=>x!=null)))} мс</td><td>${nf(mean(a.map(r=>r.sleep_h).filter(x=>x!=null)),1)} ч</td></tr>`;
+  $('#after').innerHTML = grp.early.length+grp.late.length
+    ? `<table><thead><tr><th></th><th>Утр</th><th>Recovery</th><th>HRV</th><th>Сон</th></tr></thead><tbody>${row('Тренировка до 19:00',grp.early)}${row('Тренировка с 19:00',grp.late)}${row('Без тренировки',grp.none)}</tbody></table>`
+    : '<div class="muted">Пока мало данных</div>';
+}
+
+// ---------- list ----------
+function wlist(){
+  const cur=period(PER), set=new Set(cur.days);
+  const all=WK.slice().sort((a,b)=>a.start<b.start?1:-1);
+  const L=all.filter(x=>set.has(x.date));
+  const table=rows=>`<thead><tr><th>Когда</th><th>Что</th><th>Мин</th><th>Strain</th><th>Пульс ср/макс</th><th>Зоны 4–5, мин</th><th>Ккал</th><th>Recovery утром после</th></tr></thead><tbody>${rows.map(w=>{ const nx=WD[iso(addD(P(w.date),1))]; return `<tr><td>${fmtW(P(w.date))}, ${fmtD(P(w.date))} ${w.start.slice(11)}</td><td>${KIND_LAB[w.kind]}${w.kind==='other'?` <span class="muted">${w.sport==='activity'?'без вида':esc(w.sport)}</span>`:''}</td><td>${w.duration_min}</td><td>${nf(w.strain,1)}</td><td>${w.avg_hr??'—'} / ${w.max_hr??'—'}</td><td>${nf(zmin(w,4,5))}</td><td>${w.kcal??'—'}</td><td>${nx&&nx.recovery!=null?nx.recovery+'%':'—'}</td></tr>`; }).join('')}</tbody>`;
+  if(L.length){ $('#wlist').innerHTML=table(L); return; }
+  // за период пусто — не оставлять блок пустым: когда была последняя и 5 последних
+  const last=all[0];
+  $('#wlist').innerHTML = last
+    ? `<caption class="muted" style="caption-side:top;text-align:left;padding:0 0 6px">За период тренировок нет. Последняя — ${fmtW(P(last.date))}, ${fmtD(P(last.date))} (${dni(Math.round((END-P(last.date))/DAY))} назад). Последние 5:</caption>`+table(all.slice(0,5))
+    : '<tbody><tr><td class="muted">Тренировок в Whoop пока нет</td></tr></tbody>';
+}
+
+function render(){ tiles(); heatmap(); charts(); after(); wlist(); }
+boot(render, b=>{ PER=b.dataset.p; });
+}
+</script>
+</body>
+</html>
