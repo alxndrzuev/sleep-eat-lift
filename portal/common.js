@@ -11,7 +11,7 @@ const PAGE_EMPTY = (()=>{
   const w = document.querySelector('.wrap');
   [...w.children].forEach(c=>{ if(c.tagName!=='NAV' && c.tagName!=='SCRIPT') c.hidden = true; });
   const m = document.createElement('div'); m.className = 'card';
-  m.innerHTML = '<h2>Данных пока нет</h2><div class="desc">Подключите FatSecret или Whoop' +
+  m.innerHTML = (typeof Nav!=='undefined' ? '<div class="empty-logo">'+Nav.logo(48)+'</div>' : '') + '<h2>Данных пока нет</h2><div class="desc">Подключите FatSecret или Whoop' +
     (window.health ? ' — на странице <a href="settings.html">«Настройки»</a>' : '') + '.</div>';
   w.appendChild(m);
   return true;

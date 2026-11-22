@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Что нового · здоровье</title>
+<title>Что нового · SEL</title>
 <link rel="stylesheet" href="common.css">
 <style>
 header{max-width:760px;align-items:flex-start}
+#title{display:flex;align-items:center;gap:10px}
 .close{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;flex:none;
   color:var(--text-secondary);text-decoration:none;font-size:17px;line-height:1;border:1px solid var(--border);background:var(--surface-1)}
 .close:hover{color:var(--text-primary);border-color:var(--text-secondary)}
@@ -16,7 +17,7 @@ header{max-width:760px;align-items:flex-start}
 <body>
 <div class="viz-root">
 <div class="wrap">
-<header><div><h1>Что нового</h1><div class="sub" id="sub"></div></div>
+<header><div><h1 id="title">Что нового в SEL</h1><div class="sub" id="sub"></div></div>
 <a class="close" id="back" href="dashboard.html" title="Закрыть (Esc)" aria-label="Закрыть">✕</a></header>
 <div id="outside" class="card" hidden><h2>История версий есть только в приложении SEL</h2></div>
 <div id="list" class="card wn-page" hidden></div>
@@ -30,6 +31,7 @@ header{max-width:760px;align-items:flex-start}
 (function () {
   try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   const $ = s => document.querySelector(s);
+  $('#title').insertAdjacentHTML('afterbegin', Nav.mark(30));
   let last = null; try { last = sessionStorage.getItem('navLast'); } catch (e) {}
   const b = WhatsNew.back(last), a = $('#back');                    // крестик — назад, туда, откуда пришли
   a.href = b.href; a.title = 'Закрыть и вернуться в «' + b.title + '» (Esc)';

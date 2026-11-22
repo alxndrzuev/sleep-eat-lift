@@ -60,3 +60,10 @@ test('page JavaScript parses (data.js + dataset + common + inline code)', () => 
     assert.doesNotThrow(() => new vm.Script(code, {filename: p}), p);
   }
 });
+
+test('every page: window title «<section> · SEL» (Electron shows the page title in the window bar)', () => {
+  for (const p of fs.readdirSync(PORTAL).filter(f => f.endsWith('.html'))) {
+    const t = /<title>([^<]*)<\/title>/.exec(source(p));
+    assert.ok(t && / · SEL$/.test(t[1]), p + ': ' + (t && t[1]));
+  }
+});

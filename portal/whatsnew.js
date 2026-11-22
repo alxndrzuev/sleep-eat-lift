@@ -31,7 +31,7 @@ var WhatsNew = (function () {
   function open(r) {
     const d = document.createElement("dialog");
     d.className = "wn-dialog";
-    d.innerHTML = '<h2>Что нового в SEL</h2><div class="wn-body">' + html(r.releases) + "</div>" +
+    d.innerHTML = '<h2>' + (typeof Nav !== "undefined" ? Nav.mark(28) : "") + 'Что нового в SEL</h2><div class="wn-body">' + html(r.releases) + "</div>" +
       '<div class="wn-foot"><a href="whatsnew.html" class="wn-all">Вся история</a><button class="wn-ok" autofocus>Понятно</button></div>';
     (document.querySelector(".viz-root") || document.body).appendChild(d);   // внутри .viz-root — цвета темы
     d.addEventListener("close", () => { window.health.whatsNewSeen(); d.remove(); });

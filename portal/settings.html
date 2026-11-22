@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Настройки · здоровье</title>
+<title>Настройки · SEL</title>
 <link rel="stylesheet" href="common.css">
 <style>
 .card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;max-width:720px}
@@ -81,8 +81,8 @@ table.hist tr.now td{font-weight:600}
   </div>
 
   <div class="card">
-    <h2>О приложении</h2>
-    <div class="svc"><span id="version"></span><a href="whatsnew.html">Что нового</a></div>
+    <div id="about"></div>
+    <div class="svc" style="margin-top:12px"><a href="whatsnew.html">Что нового</a></div>
   </div>
 </div>
 </div>
@@ -117,7 +117,7 @@ table.hist tr.now td{font-weight:600}
     showService('fatsecret', s.services.fatsecret, s);
     showService('whoop', s.services.whoop, s);
     $('#fatsecret .code').hidden = !s.oob;
-    $('#version').textContent = 'Версия ' + s.version;
+    $('#about').innerHTML = Nav.logo(44, 'версия ' + String(s.version).replace(/[^\w.\-]/g, ''));
     $('#datadir').textContent = s.dataDir || '';
     $('#sub').textContent = s.updating ? 'Обновляю данные…' : '';
   }

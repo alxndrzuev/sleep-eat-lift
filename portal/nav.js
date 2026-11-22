@@ -11,12 +11,18 @@ var Nav = (function () {
     ["settings.html", "Настройки", (d, inApp) => inApp],
   ];
 
-  // знак SEL (sleep · eat · lift) слева в меню — три дуги, как на значке приложения (docs/logo/sel-icon.svg)
+  // знак SEL (sleep · eat · lift) — три дуги, как на значке приложения (docs/logo/sel-icon.svg); слева в меню — знак и слово SEL,
+  // он же — в окне «Что нового», на пустой странице и в «Настройках» → «О приложении»
   const ARCS = [["#7F77DD", -80], ["#1D9E75", 40], ["#D85A30", 160]];
-  const MARK = '<span class="brand" title="SEL — sleep · eat · lift" aria-label="SEL — sleep · eat · lift" role="img">' +
-    '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g fill="none" stroke-width="3.2" stroke-linecap="round">' +
+  const TAG = "SEL — sleep · eat · lift";
+  /** Знак (svg) размером px. */
+  const mark = px => `<svg class="selmark" viewBox="0 0 24 24" width="${px}" height="${px}" aria-hidden="true"><g fill="none" stroke-width="3.2" stroke-linecap="round">` +
     ARCS.map(([c, a]) => `<circle cx="12" cy="12" r="8.5" stroke="${c}" stroke-dasharray="13.9 39.5" transform="rotate(${a} 12 12)"/>`).join("") +
-    "</g></svg></span>";
+    "</g></svg>";
+  const MARK = `<span class="brand" title="${TAG}" aria-label="${TAG}" role="img">${mark(22)}<b class="wm">SEL</b></span>`;
+  /** Крупный логотип: знак, SEL и «sleep · eat · lift» под ним; extra — ещё строка (версия). */
+  const logo = (px, extra) => `<div class="sellogo" role="img" aria-label="${TAG}">${mark(px)}<div><b class="wm">SEL</b>` +
+    `<div class="tag">sleep · eat · lift${extra ? " · " + extra : ""}</div></div></div>`;
 
   /** Пункты меню: [href, название][]. */
   function items(data, inApp) {
@@ -104,5 +110,5 @@ var Nav = (function () {
     render();
     if (inApp()) { appBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, NAMES, MARK};
+  return {items, title, render, inApp, statusText, NAMES, MARK, mark, logo};
 })();

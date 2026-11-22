@@ -31,6 +31,15 @@ test('SEL mark: three arcs in sleep/eat/lift colours, title for hover and screen
   for (const color of ['#7F77DD', '#1D9E75', '#D85A30']) assert.ok(mark.includes(color), color);
   assert.ok(mark.includes('title="SEL — sleep · eat · lift"'));
   assert.ok(!mark.includes('<a'));
+  assert.ok(mark.includes('<b class="wm">SEL</b>'), 'word SEL next to the mark');
+});
+
+test('SEL logo: mark of the given size, SEL, tagline and optional extra line', () => {
+  assert.ok(js('Nav.mark(40)').includes('width="40" height="40"'));
+  const logo = js('Nav.logo(44, "версия 1.2.0")');
+  assert.ok(logo.includes('width="44"') && logo.includes('>SEL</b>'));
+  assert.ok(logo.includes('sleep · eat · lift · версия 1.2.0'));
+  assert.ok(js('Nav.logo(44)').includes('sleep · eat · lift</div>'));
 });
 
 test('page titles', () => {
