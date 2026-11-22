@@ -56,7 +56,7 @@ class PagesRenderTest(TempData):
         self.assertNotIn("Recovery", dom)
         self.assertNotIn('class="chip"', dom)     # приоритеты — только из meta.json, а его нет
         self.assertNotIn("/ 8", dom)
-        for card in ("supps", "events", "labs", "journal", "plan", "good"):       # пустые блоки скрыты
+        for card in ("supps", "events", "labs", "plan", "good"):       # пустые блоки скрыты
             self.assertRegex(dom, rf'id="card-{card}"[^>]*hidden', card)
         self.assertRegex(dom, r'id="prio"[^>]*hidden')
         self.assertIn("цель 80", dom)

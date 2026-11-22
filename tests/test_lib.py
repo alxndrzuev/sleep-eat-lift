@@ -1,7 +1,7 @@
-"""lib.py: чтение/запись CSV, upsert, цели, норма Whoop, форматирование."""
+"""lib.py: чтение/запись CSV, upsert, форматирование чисел, meta.json, папка данных."""
 import json, unittest
 from pathlib import Path
-from helpers import TempData, lib, day, whoop_rows
+from helpers import TempData, lib
 
 
 class CsvTest(TempData):
@@ -38,42 +38,10 @@ class CsvTest(TempData):
         self.assertEqual([r["id"] for r in lib.read("whoop_workouts.csv")], ["b", "a"])
 
 
-class DomainTest(TempData):
-    def test_target_on(self):
-        T = [{"start": "2026-01-01", "kcal": "2000", "protein": "120"}, {"start": "2026-03-01", "kcal": "2200", "protein": "130"}]
-        self.assertEqual(lib.target_on("2026-02-15", T)["kcal"], "2000")
-        self.assertEqual(lib.target_on("2026-03-01", T)["kcal"], "2200")
-        self.assertEqual(lib.target_on("2025-12-01", T)["kcal"], "2000")   # раньше первой цели — первая
-
-    def test_baseline_needs_ten_days(self):
-        W = {r["date"]: r for r in whoop_rows(n=9)}
-        self.assertIsNone(lib.baseline(W, day(1), "hrv"))
-        W = {r["date"]: r for r in whoop_rows(n=12, hrv=90)}
-        self.assertEqual(lib.baseline(W, day(1), "hrv"), 90)
-
-    def test_sport_kind(self):
-        self.assertEqual(lib.sport_kind("squash"), "squash")
-        self.assertEqual(lib.sport_kind("weightlifting_msk"), "strength")
-        self.assertEqual(lib.sport_kind("walking"), "walk")
-        self.assertEqual(lib.sport_kind("running"), "other")
-
-    def test_workout_kind_label_overrides_whoop(self):
-        L = {"w1": {"label": "squash"}, "w2": {"label": "none"}}
-        self.assertEqual(lib.workout_kind({"id": "w1", "sport": "activity"}, L), "squash")
-        self.assertEqual(lib.workout_kind({"id": "w2", "sport": "weightlifting_msk"}, L), "walk")   # «не тренировка»
-        self.assertEqual(lib.workout_kind({"id": "w3", "sport": "activity"}, L), "other")
-        self.assertTrue(lib.unlabeled({"id": "w3", "sport": "activity"}, L))
-        self.assertFalse(lib.unlabeled({"id": "w1", "sport": "activity"}, L))
-        self.assertFalse(lib.unlabeled({"id": "w4", "sport": "squash"}, L))
-
-    def test_formatting(self):
-        self.assertEqual(lib.ru(1833.4), "1 833")
-        self.assertEqual(lib.ru(7.14, 1, " ч"), "7,1 ч")
-        self.assertEqual(lib.ru(None), "—")
+class FormatTest(unittest.TestCase):
+    def test_fmt_num(self):
         self.assertEqual(lib.fmt_num(72.0), "72")
         self.assertEqual(lib.fmt_num(107.66), "107.66")
-        self.assertIsNone(lib.num(""))
-        self.assertIsNone(lib.num("abc"))
 
 
 class PersonalDataTest(TempData):

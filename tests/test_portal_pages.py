@@ -1,21 +1,7 @@
-"""weekly_review.py (черновик разбора) и страницы портала (общие с приложением desktop/). Ничего не пишет в данные."""
-import io, re, json, shutil, subprocess, contextlib, tempfile, unittest
-from datetime import date, timedelta
+"""Страницы портала (общие с приложением desktop/): порядок подключения, меню, синтаксис. Ничего не пишет в данные."""
+import re, json, shutil, subprocess, tempfile, unittest
 from pathlib import Path
-from unittest import mock
-from helpers import TempData, lib, day, whoop_rows, ROOT
-
-import weekly_review
-
-
-class WeeklyTest(unittest.TestCase):
-    def test_runs_on_real_data(self):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), mock.patch("sys.argv", ["weekly_review.py", "2026-11-14"]):
-            weekly_review.main()
-        t = out.getvalue()
-        self.assertIn("## Неделя 07.11–13.11", t)
-        self.assertIn("```json", t)
+from helpers import lib, ROOT
 
 
 from test_dataset_js import build as dataset_build, JSC  # noqa: E402
@@ -24,49 +10,6 @@ PAGES = ("dashboard.html", "nutrition.html", "training.html", "recovery.html", "
 # минимальный data.js для проверки синтаксиса страниц: пустые таблицы по схеме
 RAW_JS = "const RAW = " + json.dumps({"tables": {n: [] for n in lib.SCHEMA}, "meta": lib.meta(), "modules": [], "updated": "2026-11-21"}) + ";\n"
 
-
-class WeeklyUnlabeledTest(TempData):
-    """Субботний черновик: неразмеченные тренировки (тип activity) за 2 недели попадают в список."""
-    def run_review(self, review):
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), mock.patch("sys.argv", ["weekly_review.py", review]):
-            weekly_review.main()
-        return out.getvalue()
-
-    def test_lists_activity_in_two_weeks(self):
-        self.put("targets.csv", [{"start": "2025-01-01", "kcal": "2100", "protein": "120", "fat": "60", "carbs": "270"}])
-        self.put("whoop_workouts.csv", [
-            {"id": "a", "date": "2026-11-10", "start": "2026-11-10 20:05", "sport": "activity", "duration_min": "58"},
-            {"id": "b", "date": "2026-11-03", "start": "2026-11-03 20:00", "sport": "activity", "duration_min": "40"},
-            {"id": "c", "date": "2026-10-20", "start": "2026-10-20 20:00", "sport": "activity", "duration_min": "50"},   # раньше 2 недель
-            {"id": "d", "date": "2026-11-12", "start": "2026-11-12 20:00", "sport": "squash", "duration_min": "60"}])
-        t = self.run_review("2026-11-14")
-        self.assertIn("Неразмеченные тренировки за 2 недели: 2", t)
-        self.assertIn("вт 10.11 20:05 (58 мин)", t)
-        self.assertNotIn("20.10", t)
-
-    def test_labeled_not_listed_and_counted(self):
-        self.put("targets.csv", [{"start": "2025-01-01", "kcal": "2100", "protein": "120", "fat": "60", "carbs": "270"}])
-        self.put("whoop_workouts.csv", [{"id": "a", "date": "2026-11-10", "start": "2026-11-10 20:05", "sport": "activity", "duration_min": "58"}])
-        self.put("workout_labels.csv", [{"id": "a", "label": "strength"}])
-        t = self.run_review("2026-11-14")
-        self.assertIn("Неразмеченных тренировок за 2 недели нет", t)
-        self.assertIn("Силовые: **1/2**", t)
-
-    def test_none(self):
-        self.put("targets.csv", [{"start": "2025-01-01", "kcal": "2100", "protein": "120", "fat": "60", "carbs": "270"}])
-        self.assertIn("Неразмеченных тренировок за 2 недели нет", self.run_review("2026-11-14"))
-
-
-    def test_goal_hit_by_macros_within_15_percent(self):
-        """«Цель выполнена» — Б, Ж и У в пределах ±15 % от цели (как зелёный день на «Питании»), калории не влияют."""
-        self.put("targets.csv", [{"start": "2025-01-01", "kcal": "2000", "protein": "120", "fat": "60", "carbs": "270"}])
-        days = {"07": (2000, 120, 60, 270), "08": (3000, 138, 60, 270), "09": (1500, 120, 51, 230),     # выполнены
-                "10": (2000, 139, 60, 270), "11": (2000, 120, 60, 180), "12": (2000, 120, 70, 270),     # мимо
-                "13": (1000, 120, 60, 270)}                                                              # неполный
-        self.put("nutrition_daily.csv", [{"date": f"2026-11-{d}", "kcal": str(k), "protein": str(p), "fat": str(f),
-                                          "carbs": str(c)} for d, (k, p, f, c) in days.items()])
-        self.assertIn("цель выполнена: 3 дн.", self.run_review("2026-11-14"))
 
 class PortalTest(unittest.TestCase):
     def page(self, name):

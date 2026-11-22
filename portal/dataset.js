@@ -32,7 +32,7 @@ var Dataset = (function () {
 
   /** День питания ({k, p, f, c} против цели {kcal, protein, fat, carbs}): empty — не записал, partial — меньше 1200 ккал,
       full — сравнить не с чем; иначе по самому далёкому от цели из Б, Ж, У (калории не влияют): hit ≤ 15 %, near ≤ 30 %,
-      miss — больше (weekly_review.py: hit — так же). */
+      miss — больше. */
   function foodDay(day, goal) {
     if (!day || !day.k) return "empty";
     if (day.k < FULL_DAY_KCAL) return "partial";

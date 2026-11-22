@@ -3,7 +3,7 @@
 Приложение для Mac на Electron: данные FatSecret (питание, вес) и Whoop (сон, восстановление, тренировки, шаги) — в CSV
 папки данных пользователя, страницы с графиками и целями. Обзор для человека — README.md.
 
-**Личное — в `CLAUDE.local.md`** (не в git): чьи это данные, цели и приоритеты, как вести разборы, особенности данных.
+**Личное — в `CLAUDE.local.md`** (не в git): чьи это данные, цели и приоритеты, особенности данных.
 Если его нет — работаем только с кодом. Репозиторий публичный: в git — только программа и общие документы.
 
 ## Структура
@@ -18,12 +18,12 @@ docs/                    ← 06 фото: как снимать и разбир�
                            (~/Library/Application Support/SEL/config.json → dataDir; scripts/lib.py → find_data; HEALTH_DATA — подменить).
                            Ниже и в тексте «data/» = эта папка. Формат — docs/07_формат_данных.md
   *.csv                  ← вся история (только дописываем)
-  meta.json              ← план, «хорошая неделя», журнал, приоритеты, вывод по фото, alcohol_from
+  meta.json              ← план, «хорошая неделя», приоритеты, вывод по фото, alcohol_from
   data.js                ← сырые таблицы для страниц (const RAW), пишет приложение; расчёт — portal/dataset.js
   photos/                ← фото формы: originals/ · aligned/ · view/ · thumbs/ · photos.js (индекс) — docs/06
   secrets/               ← ключи приложений и токены FatSecret, Whoop — не показывать в чате
   docs/                  ← личные документы (профиль, план, журнал, решения, анализ)
-  inbox/                 ← черновики разборов и временные файлы
+  inbox/                 ← временные файлы
 desktop/                 ← ПРИЛОЖЕНИЕ SEL (Electron) — основной интерфейс, см. «Приложение»
 portal/                  ← страницы приложения: dashboard.html (сводка), nutrition.html, training.html, recovery.html, photos.html, settings.html,
                            whatsnew.html (вся история версий) + whatsnew.js (окно «Что нового» после обновления, на всех страницах)
@@ -36,13 +36,11 @@ portal/                  ← страницы приложения: dashboard.ht
                            dataset.js — расчёт DATA из RAW; nav.js — меню по данным, «Обновить данные», статус, подвалы fatsecret/Whoop
                            photos_core.js (логика, тесты через jsc) + photos_app.js (загрузка, HEIC, поиск фигуры, выравнивание)
                            photos_fs.js — папка фото в приложении · vendor/ — библиотеки «Фото» (MediaPipe, libheif, exifr; в git, ~35 МБ)
-scripts/                 ← только стандартная библиотека Python 3 — для разборов с Claude и служебного
+scripts/                 ← только стандартная библиотека Python 3 — служебное и тесты
   lib.py                 ← схема CSV (SCHEMA, KEY, SORT, TEXT — копия в desktop/schema.json), чтение/запись/upsert, папка данных
-  weekly_review.py       ← черновик субботнего разбора (печатает markdown)
-  alcohol_check.py       ← подсчёт вечеров с алкоголем для разбора (разметку ночей ведёт приложение)
   vendor_fetch.py        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
   public_check.py        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
-tests/                   ← Python unittest: lib, формат данных, страницы (jsc), черновик разбора; RENDER=1 — отрисовка в Chrome
+tests/                   ← Python unittest: lib, формат данных, страницы (jsc); RENDER=1 — отрисовка в Chrome
 dist/                    ← собранные приложения (не в git)
 ```
 

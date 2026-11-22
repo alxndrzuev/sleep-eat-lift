@@ -1,9 +1,8 @@
-"""Общее для тестов: временная папка данных вместо data/ и генераторы синтетических строк.
+"""Общее для тестов: временная папка данных вместо data/.
 
 Тесты не трогают настоящие данные: lib.DATA подменяется на временную папку.
 """
 import sys, shutil, tempfile, unittest
-from datetime import date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,20 +26,3 @@ class TempData(unittest.TestCase):
 
     def put(self, name, rows):
         lib.write(name, rows)
-
-
-def day(offset, base=None):
-    """Дата (ISO) со сдвигом от base (по умолчанию — сегодня)."""
-    return ((base or date.today()) + timedelta(days=offset)).isoformat()
-
-
-def whoop_rows(n=40, end=None, hrv=100, rhr=50, sleep=7.5, rec=70, override=None):
-    """n дней ровных данных Whoop до end включительно; override: {дата: {поле: значение}}."""
-    end = end or date.today()
-    out = []
-    for i in range(n - 1, -1, -1):
-        d = (end - timedelta(days=i)).isoformat()
-        r = {"date": d, "recovery": rec, "hrv": hrv, "rhr": rhr, "skin_temp": 34.0, "sleep_h": sleep, "bed": "23:30"}
-        r.update((override or {}).get(d, {}))
-        out.append({k: str(v) for k, v in r.items()})
-    return out

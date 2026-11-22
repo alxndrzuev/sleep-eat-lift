@@ -84,12 +84,6 @@ svg text{fill:var(--text-muted);font-size:11px}
   <div class="tablewrap"><table id="labs"></table></div>
 </div>
 
-<div class="card" id="card-journal" style="margin-top:16px">
-  <h2>Журнал недель</h2>
-  <div class="desc">Записи субботних разборов</div>
-  <div class="tablewrap" style="max-height:none"><table id="journal"></table></div>
-</div>
-
 <footer>Данные: FatSecret API (питание, вес), Whoop API (recovery, HRV, сон, пульс, шаги, тренировки); талия, силовые, БАДы, анализы, события — вручную (папка data/). Файл полностью автономный: все данные внутри него, в интернет ничего не отправляется.</footer>
 </div>
 </div>
@@ -129,7 +123,6 @@ const stepsWeekly = (()=>{ const m={}; DATA.steps.forEach(([d,v])=>{const k=iso(
 // ---------- tiles ----------
 function tiles(){
   const T = DATA.plan.targets;
-  const last = DATA.journal[0];
   const sl7 = mean(within(DATA.sleep,7).map(x=>x[1]));
   const rhr7 = mean(within(DATA.rhr,7).map(x=>x[1]));
   const rhr28 = mean(within(DATA.rhr,35,new Date(today-7*DAY)).map(x=>x[1]));
@@ -139,7 +132,7 @@ function tiles(){
   const wt = DATA.weight[DATA.weight.length-1];
   const lastM = Object.entries(DATA.macros_month).sort().pop();
   const ci = DATA.checkins[DATA.checkins.length-1];
-  const feel = ci&&ci.feel!=null ? {v:ci.feel, d:fmtD(P(ci.date))} : (last&&last.feel!=null ? {v:last.feel, d:'неделя '+last.week} : null);
+  const feel = ci&&ci.feel!=null ? {v:ci.feel, d:fmtD(P(ci.date))} : null;
   const wa = DATA.waist[DATA.waist.length-1], wa0 = DATA.waist.length>1 ? DATA.waist[DATA.waist.length-2] : null;
   const pr28 = within(DATA.nutrition.filter(x=>x[1]>=FULL_DAY).map(x=>[x[0],x[2]]),28);
   const prot = pr28.length>=5 ? {v:mean(pr28.map(x=>x[1])), lab:'Белок, 4 нед'} : {v:lastM?lastM[1][0]:null, lab:'Белок, '+(lastM?new Date(lastM[0]+'-01').toLocaleDateString('ru-RU',{month:'long'}):'')};
@@ -273,7 +266,7 @@ function staticParts(){
   const show = (id, on)=>{ const c=$(id); c.hidden=!on; const two=c.parentElement; if(two.classList.contains('two')) two.hidden=[...two.children].every(x=>x.hidden); };
   show('#card-good', (DATA.plan.goodWeek||[]).length); show('#card-plan', (DATA.plan.rows||[]).length);
   show('#card-supps', DATA.supplements.length); show('#card-events', DATA.events.length);
-  show('#card-labs', DATA.labs.length); show('#card-journal', DATA.journal.length);
+  show('#card-labs', DATA.labs.length);
   $('#checklist').innerHTML = (DATA.plan.goodWeek||[]).map(t=>`<li><span class="dot" style="background:var(--series-1)"></span><span>${t}</span></li>`).join('');
   $('#planver').textContent = DATA.plan.version;
   $('#plantable').innerHTML = (DATA.plan.rows||[]).map(r=>`<tr><td>${r[0]}</td><td><b>${r[1]}</b></td></tr>`).join('');
@@ -287,9 +280,6 @@ function staticParts(){
   const lb = DATA.labs.slice().reverse();
   $('#labs').innerHTML = lb.length ? `<thead><tr><th>Дата</th><th>Показатель</th><th>Значение</th><th>Норма</th></tr></thead><tbody>${lb.map(x=>{ const out = x.value!=null && ((x.ref_low!=null&&x.value<x.ref_low)||(x.ref_high!=null&&x.value>x.ref_high)); return `<tr><td>${fmtDY(P(x.date))}</td><td>${esc(x.marker)}</td><td>${out?'<b style="color:var(--critical)">':'<b>'}${x.value??'—'}</b> ${esc(x.unit)}</td><td class="muted">${x.ref_low??''}–${x.ref_high??''}</td></tr>`; }).join('')}</tbody>`
     : `<tbody><tr><td class="muted">Анализов пока нет.</td></tr></tbody>`;
-  const J = DATA.journal;
-  $('#journal').innerHTML = J.length ? `<thead><tr><th>Неделя</th><th>Самочувствие</th><th>Вес (ср.)</th><th>Талия</th><th>Сон</th><th>Ккал / белок</th><th>Трен.</th><th>Вывод</th></tr></thead><tbody>${J.map(j=>`<tr><td>${j.week}</td><td>${j.feel??'—'}</td><td>${j.weight??'—'}</td><td>${j.waist??'—'}</td><td>${j.sleep??'—'}</td><td>${j.kcal??'—'} / ${j.protein??'—'}</td><td>${j.training??'—'}</td><td>${j.note??''}</td></tr>`).join('')}</tbody>`
-    : `<tbody><tr><td class="muted">Пока пусто — первая запись появится после разбора в субботу.</td></tr></tbody>`;
 }
 
 boot(render, b=>{ RANGE=+b.dataset.d; }, ()=>{ staticParts(); tiles(); });

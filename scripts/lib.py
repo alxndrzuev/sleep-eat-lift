@@ -1,9 +1,8 @@
-"""Общее для всех скриптов: пути, схема CSV, чтение/запись, цели, нормы, типы тренировок.
+"""Общее для скриптов и тестов: папка данных, схема CSV, чтение/запись, meta.json.
 
 Только стандартная библиотека Python. Импорт из скрипта в scripts/:  `from lib import read, write, ...`
 """
-import csv, json, os, statistics as st
-from datetime import date, timedelta
+import csv, json, os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,7 +24,6 @@ def find_data(env=os.environ, config=APP_CONFIG):
 
 DATA = find_data()              # всё личное: CSV, meta.json, photos/, secrets/, logs/, inbox/ (docs/07_формат_данных.md)
 SECRETS = DATA / "secrets"
-WD = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 
 # Схема всех CSV в data/ — единственное место, где перечислены колонки (описание — docs/07_формат_данных.md)
 SCHEMA = {
@@ -53,8 +51,6 @@ SORT = {"whoop_workouts.csv": "start", "workout_labels.csv": "start"}
 TEXT = {"date", "start", "end", "note", "bed", "wake", "id", "sport", "strength", "kind", "status", "name",
         "dose", "timing", "purpose", "marker", "unit", "type", "description", "label", "level"}
 FULL_DAY_KCAL = 1200        # дни в FatSecret меньше — «не заполнен», в средние не идут
-STRENGTH = {"weightlifting_msk", "functional-fitness", "powerlifting", "weightlifting"}
-UNLABELED = {"activity"}   # общий тип Whoop «просто активность» — вид тренировки не указан, поправить в приложении Whoop
 
 
 # ---------- CSV ----------
@@ -120,62 +116,6 @@ def fmt_num(x, dg=2):
     """Число для CSV: без лишних нулей (72.0 → 72, 72.50 → 72.5)."""
     x = round(float(x), dg)
     return str(int(x)) if x.is_integer() else f"{x:g}"
-
-
-def num(v):
-    try:
-        return None if v in (None, "") else float(v)
-    except (TypeError, ValueError):
-        return None
-
-
-# ---------- предметное ----------
-
-def target_on(ds, targets=None):
-    """Цель по питанию, действующая на дату ds (targets.csv: строка действует до следующей)."""
-    t = sorted(targets if targets is not None else read("targets.csv"), key=lambda r: r["start"])
-    cur = t[0] if t else None
-    for r in t:
-        if r["start"] <= ds:
-            cur = r
-    return cur
-
-
-def sport_kind(s):
-    return "squash" if s == "squash" else "strength" if s in STRENGTH else "walk" if s == "walking" else "other"
-
-
-# метки тренировок от пользователя (workout_labels.csv) — главнее вида из Whoop; none = «не тренировка»
-LABELS = {"strength": "Силовая", "squash": "Сквош", "other": "Другое", "none": "Не тренировка"}
-
-
-def workout_kind(w, labels=None):
-    """Категория тренировки: squash / strength / other / walk (walk = прогулка или «не тренировка» — в счёт не идёт).
-    Метка пользователя (workout_labels.csv) главнее вида из Whoop. labels — {id: строка}, иначе читается с диска."""
-    lab = (labels if labels is not None else by("workout_labels.csv")).get(str(w.get("id")))
-    if lab and lab.get("label") in LABELS:
-        return "walk" if lab["label"] == "none" else lab["label"]
-    return sport_kind(w.get("sport"))
-
-
-def unlabeled(w, labels=None):
-    """Вид тренировки не указан ни в Whoop (тип activity), ни меткой пользователя."""
-    return w.get("sport") in UNLABELED and str(w.get("id")) not in (labels if labels is not None else by("workout_labels.csv"))
-
-
-def baseline(whoop, ds, field, days=30, min_n=10):
-    """Личная норма: медиана поля за `days` дней до ds (whoop = {date: row}); None, если данных < min_n."""
-    d0 = date.fromisoformat(ds)
-    a = [num(whoop[x][field]) for x in ((d0 - timedelta(days=i)).isoformat() for i in range(1, days + 1)) if x in whoop]
-    a = [x for x in a if x is not None]
-    return st.median(a) if len(a) >= min_n else None
-
-
-def ru(v, dg=0, unit=""):
-    """Число по-русски: 1 833, 7,1 ч; None → «—»."""
-    if v is None:
-        return "—"
-    return f"{v:,.{dg}f}".replace(",", " ").replace(".", ",") + unit
 
 
 META_EMPTY = {"plan": {"version": "", "targets": {}, "rows": [], "notes": [], "goodWeek": []},
