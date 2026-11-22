@@ -75,9 +75,14 @@ function fmtNum(x) {
   return String(r);
 }
 
+/** Файлы, где строки различаются не только ключом (schema.json → no_upsert), по ключу не пишем и не удаляем. */
+function keyedOk(name) {
+  if ((SCHEMA.no_upsert || []).includes(name)) throw new Error(name + ': запись только через приложение (строки различаются не только ключом)');
+}
+
 /** {ключ: {колонка: значение}} → обновить/добавить (null не затирает). → {added, updated, total}. */
 function upsert(dir, name, fresh) {
-  if ((SCHEMA.no_upsert || []).includes(name)) throw new Error(name + ': запись только через приложение (строки различаются не только ключом)');
+  keyedOk(name);
   const k = keyOf(name), cols = SCHEMA.schema[name];
   const cur = new Map(read(dir, name).map(r => [r[k], r]));
   let added = 0, updated = 0;
@@ -98,6 +103,7 @@ function upsert(dir, name, fresh) {
 
 /** Удалить строки по ключам. → сколько удалено. */
 function remove(dir, name, keys) {
+  keyedOk(name);
   const k = keyOf(name), drop = new Set(keys);
   const rows = read(dir, name), keep = rows.filter(r => !drop.has(r[k]));
   if (keep.length !== rows.length) write(dir, name, keep);

@@ -156,3 +156,9 @@ test('writeDataJs puts README.md (data folder description for LLM) from the temp
   store.writeDataJs(dir, '2026-11-21', []);
   assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), '# Мои заметки\n');
 });
+
+test('remove by key from supplements.csv is refused (one date — several supplements)', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  assert.throws(() => store.remove(dir, 'supplements.csv', ['2026-11-19']), /supplements\.csv/);
+});

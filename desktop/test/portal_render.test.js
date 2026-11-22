@@ -116,6 +116,15 @@ test('workout and sleep goals from «Цели»', {skip}, () => {
   has(d.page('training.html'), 'план 2 в неделю');
 });
 
+test('only one workout goal: the other shows no «/ 0»', {skip}, () => {
+  const d = workouts(data());
+  d.put('targets.csv', [{start: '2026-11-01', strength_wk: '2'}]);
+  const dom = d.page('dashboard.html');
+  has(dom, '/ 8</small>');
+  hasNot(dom, '/ 0</small>');
+  hasNot(d.page('training.html'), '+ 0 кардио');
+});
+
 test('plan text on the dashboard: escaped, line breaks kept', {skip}, () => {
   const d = data();
   d.put('body.csv', [{date: '2026-11-10', weight_kg: '75.5'}]);
@@ -203,7 +212,7 @@ test('escaped: sport name on «Тренировки»', {skip}, () => {
   has(dom, '&lt;img');
 });
 
-test('owner data folder: priorities, workout goal, all menu items', {skip}, t => {
+test('owner data folder: workout goal, plan, all menu items', {skip}, t => {
   const dir = dataDir();
   if (!dir || !fs.existsSync(path.join(dir, 'meta.json'))) return t.skip('нет папки данных с meta.json');
   const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8'));

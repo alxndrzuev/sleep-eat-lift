@@ -105,7 +105,9 @@ function removePlan(dir, date) {
 // ---------- БАДы: строка — дата начала + название; пустой end — принимает сейчас ----------
 const SUPP_FIELDS = ['name', 'dose', 'timing', 'purpose', 'note'];
 const SUPP_MAX = 200;
-const same = (a, b) => a.start === String(b.start) && a.name === String(b.name);
+// сравнение без пробелов по краям: страница получает значения из data.js обрезанными, пустое — null
+const norm = v => String(v == null ? '' : v).trim();
+const same = (a, b) => norm(a.start) === norm(b.start) && norm(a.name) === norm(b.name);
 
 /** {start?, name, dose, timing, purpose, note} → новая строка supplements.csv. */
 function addSupplement(dir, vals, today) {
@@ -126,7 +128,7 @@ function stopSupplement(dir, vals, today) {
   if (!validDate(end, today)) return {ok: false, error: DATE_ERR};
   const rows = store.read(dir, 'supplements.csv'), hit = rows.find(r => same(r, vals));
   if (!hit) return {ok: false, error: 'БАД не найден'};
-  if (end < hit.start) return {ok: false, error: 'Дата конца — не раньше начала'};
+  if (end < norm(hit.start)) return {ok: false, error: 'Дата конца — не раньше начала'};
   hit.end = end;
   store.write(dir, 'supplements.csv', rows);
   return {ok: true};

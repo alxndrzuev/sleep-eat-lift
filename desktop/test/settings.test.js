@@ -181,3 +181,13 @@ test('supplement validation', () => {
   assert.deepStrictEqual(settings.removeSupplement(dir, {start: '2026-11-10', name: 'Z'}), {ok: false, error: 'БАД не найден'});
   assert.strictEqual(store.read(dir, 'supplements.csv').length, 1);
 });
+
+test('supplement written by hand (spaces around the name, empty start) can be stopped and removed', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'supplements.csv'), 'start,end,name,dose,timing,purpose,note\n2026-11-10 ,, A ,,,,\n,,B,,,,\n');
+  // страница получает значения из data.js: обрезанные, пустое — null
+  assert.deepStrictEqual(settings.stopSupplement(dir, {start: '2026-11-10', name: 'A', end: '2026-11-20'}, '2026-11-21'), {ok: true});
+  assert.strictEqual(store.read(dir, 'supplements.csv').find(r => r.name.trim() === 'A').end, '2026-11-20');
+  assert.deepStrictEqual(settings.removeSupplement(dir, {start: null, name: 'B'}), {ok: true});
+  assert.deepStrictEqual(store.read(dir, 'supplements.csv').map(r => r.name.trim()), ['A']);
+});

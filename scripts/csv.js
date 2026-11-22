@@ -5,8 +5,9 @@
 //
 //   node scripts/csv.js dir                                        # папка данных
 //   node scripts/csv.js read body.csv [N]                          # последние N строк (по умолчанию 10), JSON
-//   node scripts/csv.js upsert body.csv '{"2026-11-22": {"weight_kg": 75.4, "waist_cm": 81}}'
+//   node scripts/csv.js upsert body.csv '{"2026-11-22": {"weight_kg": 75.4, "note": "утро"}}'
 //   node scripts/csv.js remove events.csv 2026-11-10 [ключ…]
+//   supplements.csv — только через «Настройки» (строки одной даты различаются названием)
 //
 // Папка данных: HEALTH_DATA → папка, выбранная в приложении SEL (~/Library/Application Support/SEL/config.json → dataDir).
 const path = require('node:path');

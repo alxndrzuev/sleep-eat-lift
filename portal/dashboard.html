@@ -87,7 +87,9 @@ function targetSeries(key, from){ const out=[]; if(!TG.length) return out; let d
 const FULL_DAY = 1200;
 const W = DATA.whoop_daily.length > 0;                         // есть Whoop
 const G = DATA.goals || {};                                    // цели на сегодня (targets.csv): сон, тренировки в неделю
-const PW = G.strength_wk!=null || G.cardio_wk!=null ? {strength:G.strength_wk||0, cardio:G.cardio_wk||0} : null;   // в неделю или нет
+const PW = G.strength_wk!=null || G.cardio_wk!=null ? {strength:G.strength_wk, cardio:G.cardio_wk} : null;   // в неделю (не задана — null) или нет
+const PWSUM = PW ? (PW.strength||0)+(PW.cardio||0) : 0, PWBOTH = !!PW && PW.strength!=null && PW.cardio!=null;   // линия цели — только если заданы обе
+const pwText = ()=>[PW.strength!=null?PW.strength+' силовые':'', PW.cardio!=null?PW.cardio+' кардио':''].filter(Boolean).join(' + ');
 const GOAL = (()=>{ let g=null; for(const r of DATA.goal_weight.slice().sort((a,b)=>a.date<b.date?-1:1)) if(r.date<=iso(today) && r.goal_weight_kg!=null) g=r.goal_weight_kg; return g; })();
 const TT = TG.length ? targetOn(iso(today)) : {};   // цели ккал/белка на сегодня (targets.csv)
 const kcalFull = DATA.kcal.filter(x=>x[1]>=FULL_DAY);
@@ -113,8 +115,8 @@ function tiles(){
   const st = (ok,warn)=> ok ? 'var(--good)' : (warn ? 'var(--warning)' : 'var(--critical)');
   const items = [
     ...(W ? [{lab:'Сон, 7 дней', val: nf(sl7,1)+'<small> ч</small>', note: T.sleep ? 'цель '+nf(T.sleep,1)+' ч' : '', c: sl7==null||!T.sleep?null:st(sl7>=T.sleep, sl7>=7)},
-             {lab:'Силовые, 4 нед', val: str4+(PW?'<small> / '+PW.strength*4+'</small>':''), note:'Whoop', c: PW&&PW.strength ? st(str4>=PW.strength*4, str4>=PW.strength*3) : null},
-             {lab:'Кардио, 4 нед', val: ca4+(PW?'<small> / '+PW.cardio*4+'</small>':''), note:'от 20 минут', c: PW&&PW.cardio ? st(ca4>=PW.cardio*4, ca4>=PW.cardio*3) : null},
+             {lab:'Силовые, 4 нед', val: str4+(PW&&PW.strength!=null?'<small> / '+PW.strength*4+'</small>':''), note:'Whoop', c: PW&&PW.strength ? st(str4>=PW.strength*4, str4>=PW.strength*3) : null},
+             {lab:'Кардио, 4 нед', val: ca4+(PW&&PW.cardio!=null?'<small> / '+PW.cardio*4+'</small>':''), note:'от 20 минут', c: PW&&PW.cardio ? st(ca4>=PW.cardio*4, ca4>=PW.cardio*3) : null},
              {lab:'Пульс покоя, 7 дней', val: nf(rhr7,0)+'<small> уд/мин</small>', note: rhr28? ('месяц до этого: '+nf(rhr28,0)) : '', c:null}] : []),
     ...(DATA.kcal.length ? [{lab:'Калории, 4 нед', val: nf(kc,0), note:(TT.kcal?'цель '+nf(TT.kcal)+' · ':'')+'полные дни', c: kc==null||!TT.kcal?null:st(Math.abs(kc-TT.kcal)<=150, Math.abs(kc-TT.kcal)<=300)}] : []),
     ...(DATA.nutrition.length ? [{lab:prot.lab, val: nf(prot.v,0)+'<small> г</small>', note: TT.protein?'цель '+TT.protein+' г':'', c: prot.v==null||!TT.protein?null:st(prot.v>=TT.protein-10, prot.v>=TT.protein-30)}] : []),
@@ -173,10 +175,10 @@ function render(){
 
   // workouts weekly
   const wk = weeksBetween(RANGE);
-  el = card('cwk','Тренировки по неделям','Whoop. Кардио — от 20 минут'+(PW?'. Цель — '+PW.strength+' силовые + '+PW.cardio+' кардио в неделю':''), L.sw(c2,'Силовые')+L.sw(c1,'Кардио')+(PW?L.ref('Цель'):''), wk.map(([k,o])=>['с '+fmtD(P(k)), o.strength, o.cardio]), ['Неделя','Силовые','Кардио']);
+  el = card('cwk','Тренировки по неделям','Whoop. Кардио — от 20 минут'+(PW?'. Цель — '+pwText()+' в неделю':''), L.sw(c2,'Силовые')+L.sw(c1,'Кардио')+(PWBOTH?L.ref('Цель'):''), wk.map(([k,o])=>['с '+fmtD(P(k)), o.strength, o.cardio]), ['Неделя','Силовые','Кардио']);
   chart(el,{from,to,y:[0,5], yticks:[0,1,2,3,4,5],
     layers:[{type:'stack',data:wk,keys:['strength','cardio'],colors:[c2,c1]}],
-    refs:PW?[{y:PW.strength+PW.cardio,label:'цель '+(PW.strength+PW.cardio)}]:[],
+    refs:PWBOTH?[{y:PWSUM,label:'цель '+PWSUM}]:[],
     hover:wk.map(([k,o])=>({t:P(k).getTime()+3.5*DAY,html:`<div class="t">неделя с ${fmtD(P(k))}</div>Силовые: <b>${o.strength}</b> · Кардио: <b>${o.cardio}</b>`}))});
 
   // RHR
