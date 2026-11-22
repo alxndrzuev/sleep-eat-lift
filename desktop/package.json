@@ -46,6 +46,7 @@
       "menu.js",
       "CHANGELOG.md",
       "schema.json",
+      "data_readme.md",
       "fatsecret_app.json",
       "whoop_app.json"
     ],

@@ -141,3 +141,15 @@ test('upsert into supplements.csv is refused', () => {
   store.init(dir);
   assert.throws(() => store.upsert(dir, 'supplements.csv', {'2026-11-19': {name: 'A'}}), /supplements\.csv/);
 });
+
+test('writeDataJs puts README.md (data folder description for LLM) from the template', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  store.writeDataJs(dir, '2026-11-21', []);
+  const want = fs.readFileSync(path.join(__dirname, '..', 'data_readme.md'), 'utf8');
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), want);
+  for (const name of Object.keys(store.SCHEMA.schema)) assert.ok(want.includes('`' + name + '`'), name);   // описан каждый CSV
+  fs.writeFileSync(path.join(dir, 'README.md'), 'старое');
+  store.writeDataJs(dir, '2026-11-21', []);
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), want);
+});

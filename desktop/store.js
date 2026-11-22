@@ -145,6 +145,15 @@ function writeDataJs(dir, today, mods) {
     JSON.stringify(raw(dir, today, mods)) + ';\n';
   fs.writeFileSync(path.join(dir, 'data.js.tmp'), js);
   fs.renameSync(path.join(dir, 'data.js.tmp'), path.join(dir, 'data.js'));
+  writeReadme(dir);
+}
+
+/** README.md в папке данных — описание файлов для того, кто читает папку (человек или LLM); шаблон — data_readme.md. */
+function writeReadme(dir) {
+  const want = fs.readFileSync(path.join(__dirname, 'data_readme.md'), 'utf8'), f = path.join(dir, 'README.md');
+  if (fs.existsSync(f) && fs.readFileSync(f, 'utf8') === want) return;
+  fs.writeFileSync(f + '.tmp', want);
+  fs.renameSync(f + '.tmp', f);
 }
 
 module.exports = {dataDir, init, read, write, upsert, remove, load, raw, writeDataJs, modules, fmtNum, readJson, SCHEMA};

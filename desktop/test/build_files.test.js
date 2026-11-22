@@ -17,4 +17,5 @@ test('every local require is packaged', () => {
     for (const m of src.matchAll(/require\('\.\/([^']+)'\)/g)) todo.push(m[1].endsWith('.json') ? m[1] : m[1] + '.js');
   }
   assert.ok(files.has('preload.js'), 'preload.js нет в build.files');
+  assert.ok(files.has('data_readme.md'), 'data_readme.md (README папки данных) нет в build.files');
 });
