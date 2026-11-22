@@ -16,7 +16,7 @@ const sortOf = name => SCHEMA.sort[name] || keyOf(name);
 
 /** Папки и CSV с заголовками; существующее не трогает. → имена созданных CSV. */
 function init(dir) {
-  for (const sub of ['', 'secrets', 'photos', 'logs']) fs.mkdirSync(path.join(dir, sub), {recursive: true});
+  for (const sub of ['', 'secrets', 'photos']) fs.mkdirSync(path.join(dir, sub), {recursive: true});
   const created = [];
   for (const [name, cols] of Object.entries(SCHEMA.schema)) {
     const f = path.join(dir, name);

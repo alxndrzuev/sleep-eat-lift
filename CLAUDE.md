@@ -26,7 +26,6 @@ docs/                    ← 06 фото: как снимать и разбир�
   photos/                ← фото формы: originals/ · aligned/ · view/ · thumbs/ · photos.js (индекс) — docs/06
   secrets/               ← ключи приложений и токены FatSecret, Whoop — не показывать в чате
   docs/                  ← личные документы (профиль, план, журнал, решения, анализ)
-  inbox/                 ← временные файлы
 desktop/                 ← ПРИЛОЖЕНИЕ SEL (Electron) — основной интерфейс, см. «Приложение»
 portal/                  ← страницы приложения: dashboard.html (сводка), nutrition.html, training.html, recovery.html, photos.html, settings.html,
                            whatsnew.html (вся история версий) + whatsnew.js (окно «Что нового» после обновления, на всех страницах)

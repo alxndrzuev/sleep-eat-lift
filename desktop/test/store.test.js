@@ -25,6 +25,7 @@ test('init creates folders and CSV headers once', () => {
   assert.ok(created.includes('plans.csv'));
   for (const gone of ['checkins.csv', 'labs.csv', 'photo_notes.csv', 'workout_labels.csv']) assert.ok(!fs.existsSync(path.join(dir, gone)), gone);
   for (const sub of ['secrets', 'photos']) assert.ok(fs.statSync(path.join(dir, sub)).isDirectory());
+  assert.ok(!fs.existsSync(path.join(dir, 'logs')), 'logs/ не создаём — логов приложение не пишет');
   assert.deepStrictEqual(store.init(dir), []);
 });
 
