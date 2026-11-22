@@ -157,8 +157,8 @@ const FULL = 1200;
 const ROWS = {}; DATA.nutrition.forEach(([d,k,p,f,c])=>ROWS[d]={k,p,f,c});
 DATA.kcal.forEach(([d,k])=>{ if(!ROWS[d]) ROWS[d]={k,p:null,f:null,c:null}; });
 // начало истории — самое раннее из первой записи дневника и первой цели (цель могли задать позже, чем начали вести дневник)
-const FIRST = P([Object.keys(ROWS).sort()[0], DATA.targets.length ? DATA.targets.slice().sort((a,b)=>a.start<b.start?-1:1)[0].start : null].filter(Boolean).sort()[0]);
-const TG = DATA.targets.slice().sort((a,b)=>a.start<b.start?-1:1);
+const TG = DATA.food_targets || [];   // цели по питанию (только строки с КБЖУ, по дате) — считает dataset.js
+const FIRST = P([Object.keys(ROWS).sort()[0], TG.length ? TG[0].start : null].filter(Boolean).sort()[0]);
 const NO_T = {kcal:null, protein:null, fat:null, carbs:null};   // целей ещё нет (новый пользователь их пока не задал)
 function target(d){ const s=typeof d==='string'?d:iso(d); let t=null; for(const x of TG){ if(x.start<=s) t=x; } return t||NO_T; }   // до первой цели — цели нет
 

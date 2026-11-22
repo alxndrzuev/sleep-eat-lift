@@ -149,7 +149,10 @@ test('writeDataJs puts README.md (data folder description for LLM) from the temp
   const want = fs.readFileSync(path.join(__dirname, '..', 'data_readme.md'), 'utf8');
   assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), want);
   for (const name of Object.keys(store.SCHEMA.schema)) assert.ok(want.includes('`' + name + '`'), name);   // описан каждый CSV
-  fs.writeFileSync(path.join(dir, 'README.md'), 'старое');
+  fs.writeFileSync(path.join(dir, 'README.md'), '# Папка данных SEL (прошлая версия)\n');   // свой прежний — обновляется
   store.writeDataJs(dir, '2026-11-21', []);
   assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), want);
+  fs.writeFileSync(path.join(dir, 'README.md'), '# Мои заметки\n');                           // чужой — не трогаем
+  store.writeDataJs(dir, '2026-11-21', []);
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), '# Мои заметки\n');
 });

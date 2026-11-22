@@ -45,6 +45,24 @@ var Dataset = (function () {
     return Number(w.duration_min) < SHORT_CARDIO_MIN ? "walk" : "cardio";
   }
 
+  const GOAL_COLS = ["kcal", "protein", "fat", "carbs", "sleep_h", "strength_wk", "cardio_wk"];
+  const FOOD_COLS = ["kcal", "protein", "fat", "carbs"];
+
+  /** Цели на день ds — по каждой колонке своя: последняя строка targets.csv с start ≤ ds, где значение есть
+      (строка, где поле пустое, цель не отменяет — «пустое — как в действовавшей цели»). */
+  function goalsOn(rows, ds) {
+    const sorted = rows.filter(r => r.start && r.start <= ds).sort((a, b) => (a.start < b.start ? -1 : 1)), g = {};
+    for (const c of GOAL_COLS) { g[c] = null; for (const r of sorted) if (r[c] != null) g[c] = r[c]; }
+    return g;
+  }
+
+  /** Строки целей по питанию: только с КБЖУ, по дате; повтор тех же КБЖУ (поменяли сон или тренировки) — не новая цель. */
+  function foodTargets(rows) {
+    const same = (a, b) => FOOD_COLS.every(c => a[c] === b[c]);
+    return rows.filter(r => r.start && FOOD_COLS.some(c => r[c] != null)).sort((a, b) => (a.start < b.start ? -1 : 1))
+      .reduce((out, r) => { if (!out.length || !same(out[out.length - 1], r)) out.push(r); return out; }, []);
+  }
+
   /** Строка таблицы с колонкой start, действующая на день ds (последняя с start ≤ ds), или null. */
   function inEffect(rows, ds) {
     return rows.filter(r => r.start && r.start <= ds).sort((a, b) => (a.start < b.start ? -1 : 1)).pop() || null;
@@ -88,7 +106,8 @@ var Dataset = (function () {
     for (const name of ["supplements", "events", "targets", "goal_weight", "alcohol_check", "plans"])
       d[name] = T(name);
     d.plans = d.plans.slice().sort((x, y) => (x.start < y.start ? -1 : 1));
-    d.goals = inEffect(d.targets, raw.updated) || {};      // цели на сегодня: КБЖУ, сон, тренировки в неделю
+    d.goals = goalsOn(d.targets, raw.updated);             // цели на сегодня: КБЖУ, сон, тренировки в неделю
+    d.food_targets = foodTargets(d.targets);               // цели по питанию — для «Питания» и сводки
     const p = inEffect(d.plans, raw.updated);
     d.plan_now = p ? {start: p.start, text: p.text} : null;
     d.updated = raw.updated;

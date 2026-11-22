@@ -184,7 +184,7 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
   calc();
   $('#goalWeight').placeholder = g.goal_weight_kg != null ? g.goal_weight_kg : '—';
   for (const [id, col] of [['sleep', 'sleep_h'], ['strength', 'strength_wk'], ['cardio', 'cardio_wk']])
-    $('#' + id).placeholder = t[col] != null ? String(t[col]).replace('.', ',') : '—';
+    $('#' + id).placeholder = (DATA.goals || {})[col] != null ? String(DATA.goals[col]).replace('.', ',') : '—';   // действующая цель
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   $('#date').value = $('#date').max = iso(new Date());
   $('#date').min = '2000-01-01';

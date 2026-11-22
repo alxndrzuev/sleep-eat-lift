@@ -6,6 +6,7 @@ const SCHEMA = require('./schema.json');
 const {pyRound} = require('./pyround');
 
 const TEXT = new Set(SCHEMA.text);
+const README_MARK = '# Папка данных SEL';   // первая строка desktop/data_readme.md — так узнаём свой README
 const META_EMPTY = {};   // meta.json — только alcohol_from (с какого утра размечать алкоголь)
 
 function dataDir(documents) { return path.join(documents, 'SEL', 'data'); }
@@ -148,10 +149,14 @@ function writeDataJs(dir, today, mods) {
   writeReadme(dir);
 }
 
-/** README.md в папке данных — описание файлов для того, кто читает папку (человек или LLM); шаблон — data_readme.md. */
+/** README.md в папке данных — описание файлов для того, кто читает папку (человек или LLM); шаблон — data_readme.md.
+ *  Чужой README.md (не начинается с заголовка шаблона) не трогаем: папку могли выбрать вместе с ним. */
 function writeReadme(dir) {
   const want = fs.readFileSync(path.join(__dirname, 'data_readme.md'), 'utf8'), f = path.join(dir, 'README.md');
-  if (fs.existsSync(f) && fs.readFileSync(f, 'utf8') === want) return;
+  if (fs.existsSync(f)) {
+    const cur = fs.readFileSync(f, 'utf8');
+    if (cur === want || !cur.startsWith(README_MARK)) return;
+  }
   fs.writeFileSync(f + '.tmp', want);
   fs.renameSync(f + '.tmp', f);
 }

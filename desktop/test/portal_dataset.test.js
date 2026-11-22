@@ -83,7 +83,7 @@ test('goals and plan in effect on the update day', () => {
   assert.deepStrictEqual(d.plan_now, {start: '2026-11-16', text: 'a'});
   assert.deepStrictEqual(d.plans.map(p => p.start), ['2026-11-01', '2026-11-16', '2026-12-01']);
   const e = build(raw());
-  assert.deepStrictEqual(e.goals, {});
+  assert.ok(Object.values(e.goals).every(v => v === null));                // целей нет — все пустые
   assert.strictEqual(e.plan_now, null);
 });
 
@@ -102,4 +102,19 @@ test('food day by worst of P/F/C: ±15 % hit, ±30 % near, else miss; kcal does 
     ['цели нет', day(), {kcal: null, protein: null, fat: null, carbs: null}, 'full']];
   const got = js('[' + cases.map(([, d, t]) => `Dataset.foodDay(${J(d)}, ${J(t)})`).join(',') + ']');
   assert.deepStrictEqual(Object.fromEntries(cases.map(([n], i) => [n, got[i]])), Object.fromEntries(cases.map(([n, , , w]) => [n, w])));
+});
+
+const tg = (start, o) => Object.assign({start, kcal: null, protein: null, fat: null, carbs: null, note: null, sleep_h: null, strength_wk: null, cardio_wk: null}, o);
+
+test('goals per column: a later row without the value does not switch it off', () => {
+  const d = build(raw({targets: [tg('2026-05-01', {sleep_h: 8, strength_wk: 2}), tg('2026-06-01', {kcal: 2100, protein: 120, fat: 60, carbs: 270})]}));
+  assert.deepStrictEqual([d.goals.sleep_h, d.goals.strength_wk, d.goals.kcal, d.goals.cardio_wk], [8, 2, 2100, null]);
+});
+
+test('food targets: only rows with macros, repeated macros collapsed', () => {
+  const m = {kcal: 2100, protein: 120, fat: 60, carbs: 270};
+  const d = build(raw({targets: [tg('2026-01-01', m), tg('2026-06-01', Object.assign({sleep_h: 7.5}, m)),
+                                 tg('2026-07-01', {sleep_h: 8}), tg('2026-08-01', Object.assign({}, m, {protein: 140}))]}));
+  assert.deepStrictEqual(d.food_targets.map(t => [t.start, t.protein]), [['2026-01-01', 120], ['2026-08-01', 140]]);
+  assert.deepStrictEqual(build(raw({targets: [tg('2026-07-01', {sleep_h: 8})]})).food_targets, []);
 });

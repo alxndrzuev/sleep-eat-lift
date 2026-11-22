@@ -81,7 +81,7 @@ function rolling(arr, n){ // arr sorted [[date,val]] daily; trailing n-day mean 
 function weekStart(d){ const x=new Date(d); const wd=(x.getDay()+6)%7; x.setDate(x.getDate()-wd); return x; }
 
 // ---------- derived ----------
-const TG = (DATA.targets||[]).slice().sort((a,b)=>a.start<b.start?-1:1);
+const TG = DATA.food_targets || [];   // цели по питанию (только с КБЖУ) — dataset.js
 function targetOn(ds){ let t=TG[0]; for(const x of TG) if(x.start<=ds) t=x; return t; }
 function targetSeries(key, from){ const out=[]; if(!TG.length) return out; let d=new Date(Math.max(from, P(TG[0].start).getTime())); while(d<=today){ out.push([iso(d), targetOn(iso(d))[key]]); d=new Date(d.getTime()+DAY); } return out; }
 const FULL_DAY = 1200;

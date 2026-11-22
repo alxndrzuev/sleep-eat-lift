@@ -141,6 +141,15 @@ test('nutrition without targets (new user) renders', {skip}, () => {
   for (const lab of ['Выполнил', 'Рядом с целью', 'Мимо цели', 'смена цели']) hasNot(dom, lab);   // без целей не с чем сравнивать
 });
 
+test('only sleep and workout goals: «Питание» has no nutrition goal', {skip}, () => {
+  const d = fatsecret(data());
+  d.put('targets.csv', [{start: '2026-11-01', sleep_h: '8', strength_wk: '2'}]);
+  const dom = d.page('nutrition.html');
+  hasNot(dom, 'null');
+  for (const lab of ['Выполнил', 'Мимо цели', 'смена цели']) hasNot(dom, lab);
+  has(dom, 'Не задана');
+});
+
 test('target set today, diary kept long ago — history not cut', {skip}, () => {
   const d = fatsecret(data());
   d.put('targets.csv', [{start: '2026-11-21', kcal: '2100', protein: '120', fat: '60', carbs: '270'}]);
