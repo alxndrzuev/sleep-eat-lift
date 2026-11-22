@@ -87,7 +87,7 @@ def test_matches_python_collect_on_real_data(self):
 - [ ] **Step 1: Тесты** `tests/test_nav_js.py`:
 
 ```python
-def test_alexander(self):  self.assertEqual(hrefs({"nutrition": [1], "weight": [], "whoop_daily": [1]}, False),
+def test_all_services_in_browser(self):  self.assertEqual(hrefs({"nutrition": [1], "weight": [], "whoop_daily": [1]}, False),
                                             ["dashboard.html", "nutrition.html", "training.html", "recovery.html", "photos.html"])
 def test_fatsecret_only_in_app(self): self.assertEqual(hrefs({"nutrition": [], "weight": [1], "whoop_daily": []}, True),
                                             ["dashboard.html", "nutrition.html", "photos.html", "settings.html"])
@@ -100,7 +100,7 @@ def test_fatsecret_only_dashboard(self):   # питание + вес + goal_weig
     # нет 'href="training.html"', "Recovery", "82", "/ 8"; нет <h2>БАДы/События/Анализы/Журнал недель/Текущий план/Хорошая неделя; есть "цель 80"
 def test_empty_dashboard(self):           # есть "Подключите FatSecret или Whoop"
 def test_whoop_only_dashboard(self):      # только whoop_daily и тренировки: есть 'href="training.html"', нет 'href="nutrition.html"', нет "Калории"
-def test_alexander_unchanged(self):        # настоящие data/: "<целевой вес>", "/ 8", 'href="training.html"'
+def test_owner_unchanged(self):        # настоящие data/: "<целевой вес>", "/ 8", 'href="training.html"'
 ```
 - [ ] **Step 2: Падают.**
 - [ ] **Step 3: Реализовать.** Сводка: приоритеты из `DATA.priorities` (пусто — блок скрыт); цели ккал/белка в плитках — `targets.csv` на сегодня, сон — `plan.targets.sleep`; плитки и карточки Whoop — при `whoop_daily.length`; «/ N» и линия цели тренировок — из `plan.workouts`; «Вес» — при данных, «цель X кг» — последняя строка `goal_weight` не позже сегодня; «Талия», «Самочувствие» — при данных; блоки «Хорошая неделя», «Текущий план», «БАДы», «События», «Анализы», «Журнал недель» — только непустые; ни питания, ни веса, ни Whoop → «Данных пока нет. Подключите FatSecret или Whoop» (в приложении — ссылка на «Настройки»). «Питание» без данных — тот же текст. В `data/meta.json`: `"priorities": [["Самочувствие", "главное"], ["Спортивность", "сила растёт"], ["<целевой вес>", "без срока, медленно и чисто"]]`, `"plan": {…, "workouts": {"strength": 2, "squash": 2}}`.

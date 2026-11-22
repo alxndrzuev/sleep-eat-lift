@@ -19,7 +19,7 @@ def hrefs(data, in_app):
 
 @unittest.skipUnless(JSC.exists(), "нет jsc (JavaScriptCore)")
 class NavTest(unittest.TestCase):
-    def test_alexander(self):
+    def test_all_services_in_browser(self):
         self.assertEqual(hrefs({"nutrition": [1], "weight": [], "whoop_daily": [1]}, False),
                          ["dashboard.html", "nutrition.html", "training.html", "recovery.html", "photos.html"])
 
@@ -34,6 +34,19 @@ class NavTest(unittest.TestCase):
     def test_empty_in_app(self):
         self.assertEqual(hrefs({"nutrition": [], "weight": [], "whoop_daily": []}, True),
                          ["dashboard.html", "photos.html", "settings.html"])
+
+    def test_brand_mark(self):
+        """Знак SEL в меню: три дуги цветов сна, еды и тренировок, подпись для наведения и экранного диктора."""
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+            f.write("print(Nav.MARK);\n")
+        r = subprocess.run([str(JSC), str(NAV), f.name], capture_output=True, text=True, timeout=20)
+        Path(f.name).unlink()
+        mark = r.stdout.strip().splitlines()[-1]
+        self.assertEqual(mark.count("<circle"), 3)
+        for color in ("#7F77DD", "#1D9E75", "#D85A30"):
+            self.assertIn(color, mark)
+        self.assertIn('title="SEL — sleep · eat · lift"', mark)
+        self.assertNotIn("<a", mark)                  # не пункт меню: в списке страниц его нет
 
 
 if __name__ == "__main__":

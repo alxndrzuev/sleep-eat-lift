@@ -37,6 +37,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.01em}
 .nav a{color:var(--text-secondary);text-decoration:none;padding:3px 10px;border-radius:6px;border:1px solid transparent}
 .nav a.on{color:var(--text-primary);font-weight:600;background:var(--surface-1);border-color:var(--border)}
 .nav a:hover{color:var(--text-primary)}
+.nav .brand{display:flex;align-items:center;margin-right:6px}
 .seg{display:inline-flex;background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:2px}
 .seg button{border:0;background:none;color:var(--text-secondary);font:inherit;padding:5px 12px;border-radius:6px;cursor:pointer}
 .seg button.on{background:var(--page);color:var(--text-primary);font-weight:600}

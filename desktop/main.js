@@ -282,7 +282,12 @@ function createWindow() {
   });
 }
 
+// «О программе» (меню приложения): значок, версия, бренд проекта и где код
+const ABOUT = {applicationName: 'Здоровье', credits: 'SEL — sleep · eat · lift\nПитание, сон и тренировки из FatSecret и Whoop\n' +
+  'github.com/alxndrzuev/sleep-eat-lift', copyright: '© 2026 alxndrzuev · лицензия MIT'};
+
 app.whenReady().then(async () => {
+  app.setAboutPanelOptions(Object.assign({applicationVersion: app.getVersion()}, ABOUT));
   setMenu();
   createWindow();                              // окно сразу — вопрос о папке данных показывается поверх него
   if (!process.env.HEALTH_SMOKE) app.focus({steal: true});

@@ -11,6 +11,13 @@ var Nav = (function () {
     ["settings.html", "Настройки", (d, inApp) => inApp],
   ];
 
+  // знак SEL (sleep · eat · lift) слева в меню — три дуги, как на значке приложения (docs/logo/sel-icon.svg)
+  const ARCS = [["#7F77DD", -80], ["#1D9E75", 40], ["#D85A30", 160]];
+  const MARK = '<span class="brand" title="SEL — sleep · eat · lift" aria-label="SEL — sleep · eat · lift" role="img">' +
+    '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g fill="none" stroke-width="3.2" stroke-linecap="round">' +
+    ARCS.map(([c, a]) => `<circle cx="12" cy="12" r="8.5" stroke="${c}" stroke-dasharray="13.9 39.5" transform="rotate(${a} 12 12)"/>`).join("") +
+    "</g></svg></span>";
+
   /** Пункты меню: [href, название][]. */
   function items(data, inApp) {
     return ALL.filter(([, , show]) => show(data, inApp)).map(([href, title]) => [href, title]);
@@ -30,7 +37,7 @@ var Nav = (function () {
     const cur = location.pathname.split("/").pop() || "dashboard.html";
     const data = typeof DATA !== "undefined" ? DATA : {};
     try { if (title(cur)) sessionStorage.setItem("navLast", cur); } catch (e) {}   // для «← …» на странице «Что нового»
-    el.innerHTML = items(data, inApp()).map(([h, t]) => `<a href="${h}"${h === cur ? ' class="on"' : ""}>${t}</a>`).join("");
+    el.innerHTML = MARK + items(data, inApp()).map(([h, t]) => `<a href="${h}"${h === cur ? ' class="on"' : ""}>${t}</a>`).join("");
   }
 
   // ---------- только в приложении: «Обновить», статус, подвалы с указанием источника ----------
@@ -97,5 +104,5 @@ var Nav = (function () {
     render();
     if (inApp()) { appBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, NAMES};
+  return {items, title, render, inApp, statusText, NAMES, MARK};
 })();
