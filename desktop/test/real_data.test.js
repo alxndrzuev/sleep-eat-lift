@@ -12,7 +12,9 @@ const DIR = dataDir();
 const skip = !(DIR && fs.existsSync(DIR)) && 'нет папки данных на этом компьютере';
 const SCHEMA = store.SCHEMA;
 const TEXT = new Set(SCHEMA.text);
-const csvFiles = () => fs.readdirSync(DIR).filter(f => f.endsWith('.csv'));
+// файлы, убранные из схемы в 1.2: у старых папок могут остаться — приложение их не читает
+const REMOVED = ['checkins.csv', 'labs.csv', 'photo_notes.csv'];
+const csvFiles = () => fs.readdirSync(DIR).filter(f => f.endsWith('.csv') && !REMOVED.includes(f));
 
 test('every CSV has a schema and the right header', {skip}, () => {
   for (const name of csvFiles()) {
@@ -38,7 +40,7 @@ test('numeric columns are numbers (otherwise data.js will not build)', {skip}, (
 });
 
 test('unique keys', {skip}, () => {
-  for (const name of ['nutrition_daily.csv', 'whoop_daily.csv', 'body.csv', 'alcohol_check.csv', 'checkins.csv', 'whoop_workouts.csv']) {
+  for (const name of ['nutrition_daily.csv', 'whoop_daily.csv', 'body.csv', 'alcohol_check.csv', 'whoop_workouts.csv', 'plans.csv']) {
     const k = SCHEMA.key[name] || 'date', keys = store.read(DIR, name).map(r => r[k]);
     assert.strictEqual(new Set(keys).size, keys.length, name);
   }

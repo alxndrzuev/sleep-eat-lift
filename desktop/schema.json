@@ -12,8 +12,6 @@
   "body.csv": [
    "date",
    "weight_kg",
-   "waist_cm",
-   "bodyfat_pct",
    "note"
   ],
   "whoop_daily.csv": [
@@ -71,19 +69,14 @@
    "protein",
    "fat",
    "carbs",
-   "note"
+   "note",
+   "sleep_h",
+   "strength_wk",
+   "cardio_wk"
   ],
   "goal_weight.csv": [
    "date",
    "goal_weight_kg",
-   "note"
-  ],
-  "checkins.csv": [
-   "date",
-   "feel",
-   "energy",
-   "stress",
-   "sleep_quality",
    "note"
   ],
   "events.csv": [
@@ -102,25 +95,16 @@
    "purpose",
    "note"
   ],
-  "labs.csv": [
-   "date",
-   "marker",
-   "value",
-   "unit",
-   "ref_low",
-   "ref_high",
-   "note"
-  ],
-  "photo_notes.csv": [
-   "date",
-   "note"
-  ],
   "workout_labels.csv": [
    "id",
    "date",
    "start",
    "label",
    "note"
+  ],
+  "plans.csv": [
+   "start",
+   "text"
   ]
  },
  "key": {
@@ -128,7 +112,8 @@
   "workout_labels.csv": "id",
   "targets.csv": "start",
   "events.csv": "start",
-  "supplements.csv": "start"
+  "supplements.csv": "start",
+  "plans.csv": "start"
  },
  "sort": {
   "whoop_workouts.csv": "start",
@@ -152,10 +137,21 @@
   "start",
   "status",
   "strength",
+  "text",
   "timing",
   "type",
   "unit",
   "wake"
+ ],
+ "dropped": {
+  "_": "колонки, убранные из схемы: в старых файлах читаются без них и исчезают при записи",
+  "body.csv": [
+   "waist_cm",
+   "bodyfat_pct"
+  ]
+ },
+ "no_upsert": [
+  "supplements.csv"
  ],
  "full_day_kcal": 1200
 }

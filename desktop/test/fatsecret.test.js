@@ -49,15 +49,15 @@ test('month parsing: single day object and rounding', async () => {
 
 test('update writes nutrition and weight', async () => {
   const dir = tmp();
-  store.upsert(dir, 'body.csv', {'2026-10-05': {waist_cm: 80, note: 'талия'}});
+  store.upsert(dir, 'body.csv', {'2026-10-05': {note: 'после отпуска'}});
   const fetch = fakeApi({food: {'2026-11': [['2026-11-01', 2000, 100, 60, 250]]},
                          weight: {'2026-10': [['2026-10-05', 72.5]], '2026-11': [['2026-11-02', 73]]}});
   const r = await fs_.update({dir, app: APP, user: USER, months: ['2026-10', '2026-11'], fetch});
   assert.deepStrictEqual(r, {ok: true, days: 1, weights: 2});
   assert.deepStrictEqual(store.read(dir, 'nutrition_daily.csv')[0], {date: '2026-11-01', kcal: '2000', protein: '100', fat: '60', carbs: '250', fiber: ''});
   const body = store.read(dir, 'body.csv');
-  assert.deepStrictEqual(body.map(b => [b.date, b.weight_kg, b.waist_cm, b.note]),
-    [['2026-10-05', '72.5', '80', 'талия'], ['2026-11-02', '73', '', 'FatSecret']]);
+  assert.deepStrictEqual(body.map(b => [b.date, b.weight_kg, b.note]),
+    [['2026-10-05', '72.5', 'после отпуска'], ['2026-11-02', '73', 'FatSecret']]);
 });
 
 test('failed update leaves files byte for byte', async () => {

@@ -22,13 +22,13 @@ test('data folder: HEALTH_DATA → folder chosen in SEL → none', () => {
 test('upsert writes CSV and rebuilds data.js; read shows last rows; remove', () => {
   const dir = tmp('health-cli-');
   store.init(dir);
-  assert.strictEqual(csv.run(['upsert', 'body.csv', '{"2026-11-21": {"weight_kg": 75.40}, "2026-11-22": {"weight_kg": 75.2, "waist_cm": 81}}'], dir),
+  assert.strictEqual(csv.run(['upsert', 'body.csv', '{"2026-11-21": {"weight_kg": 75.40}, "2026-11-22": {"weight_kg": 75.2, "note": "утро"}}'], dir),
     'body.csv: добавлено 2, обновлено 0, всего 2');
   assert.strictEqual(fs.readFileSync(path.join(dir, 'body.csv'), 'utf8'),
-    'date,weight_kg,waist_cm,bodyfat_pct,note\n2026-11-21,75.4,,,\n2026-11-22,75.2,81,,\n');
+    'date,weight_kg,note\n2026-11-21,75.4,\n2026-11-22,75.2,утро\n');
   assert.match(fs.readFileSync(path.join(dir, 'data.js'), 'utf8'), /"weight_kg":75\.2/);
   assert.deepStrictEqual(csv.run(['read', 'body.csv', '1'], dir).split('\n').map(JSON.parse),
-    [{date: '2026-11-22', weight_kg: '75.2', waist_cm: '81', bodyfat_pct: '', note: ''}]);
+    [{date: '2026-11-22', weight_kg: '75.2', note: 'утро'}]);
   assert.strictEqual(csv.run(['remove', 'body.csv', '2026-11-21'], dir), 'body.csv: удалено 1');
   assert.doesNotMatch(fs.readFileSync(path.join(dir, 'data.js'), 'utf8'), /75\.4/);
 });

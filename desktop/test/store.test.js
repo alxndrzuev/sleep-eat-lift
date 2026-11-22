@@ -21,7 +21,9 @@ test('init creates folders and CSV headers once', () => {
   const {dir} = tmpDocs();
   const created = store.init(dir);
   assert.ok(created.includes('body.csv'));
-  assert.strictEqual(fs.readFileSync(path.join(dir, 'body.csv'), 'utf8'), 'date,weight_kg,waist_cm,bodyfat_pct,note\n');
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'body.csv'), 'utf8'), 'date,weight_kg,note\n');
+  assert.ok(created.includes('plans.csv'));
+  for (const gone of ['checkins.csv', 'labs.csv', 'photo_notes.csv']) assert.ok(!fs.existsSync(path.join(dir, gone)), gone);
   for (const sub of ['secrets', 'photos']) assert.ok(fs.statSync(path.join(dir, sub)).isDirectory());
   assert.deepStrictEqual(store.init(dir), []);
 });
@@ -29,13 +31,13 @@ test('init creates folders and CSV headers once', () => {
 test('upsert: null does not overwrite, numbers trimmed, sorted, LF', () => {
   const {dir} = tmpDocs();
   store.init(dir);
-  store.upsert(dir, 'body.csv', {'2026-01-02': {weight_kg: 71.0}, '2026-01-01': {weight_kg: 70, waist_cm: 80, note: 'x'}});
-  const r = store.upsert(dir, 'body.csv', {'2026-01-01': {weight_kg: 70.5, waist_cm: null}, '2026-01-03': {weight_kg: 72.25}});
+  store.upsert(dir, 'body.csv', {'2026-01-02': {weight_kg: 71.0}, '2026-01-01': {weight_kg: 70, note: 'x'}});
+  const r = store.upsert(dir, 'body.csv', {'2026-01-01': {weight_kg: 70.5, note: null}, '2026-01-03': {weight_kg: 72.25}});
   assert.deepStrictEqual(r, {added: 1, updated: 1, total: 3});
   const raw = fs.readFileSync(path.join(dir, 'body.csv'), 'utf8');
   assert.ok(!raw.includes('\r'));
   assert.deepStrictEqual(raw.trim().split('\n'), [
-    'date,weight_kg,waist_cm,bodyfat_pct,note', '2026-01-01,70.5,80,,x', '2026-01-02,71,,,', '2026-01-03,72.25,,,']);
+    'date,weight_kg,note', '2026-01-01,70.5,x', '2026-01-02,71,', '2026-01-03,72.25,']);
 });
 
 test('csv quoting of commas and quotes', () => {
@@ -56,7 +58,7 @@ test('data.js is RAW with numbers', () => {
   assert.strictEqual(raw.tables['body.csv'][0].weight_kg, 70.5);
   assert.strictEqual(raw.tables['body.csv'][0].note, null);
   assert.deepStrictEqual(raw.modules, ['photos']);
-  assert.deepStrictEqual(raw.meta.journal, []);
+  assert.deepStrictEqual(raw.meta, {});
 });
 
 test('modules from secrets', () => {
@@ -108,10 +110,34 @@ test('read: wrong header is an error', () => {
   assert.throws(() => store.read(dir, 'body.csv'), /заголовок/);
 });
 
-test('meta.json: from data folder, missing → empty plan', () => {
+test('meta.json: from data folder, missing → empty', () => {
   const {dir} = tmpDocs();
   store.init(dir);
-  assert.deepStrictEqual(store.raw(dir, '2026-11-21', []).meta.plan.rows, []);
-  fs.writeFileSync(path.join(dir, 'meta.json'), '{"plan": {"targets": {"sleep": 8}}}');
-  assert.strictEqual(store.raw(dir, '2026-11-21', []).meta.plan.targets.sleep, 8);
+  assert.deepStrictEqual(store.raw(dir, '2026-11-21', []).meta, {});
+  fs.writeFileSync(path.join(dir, 'meta.json'), '{"alcohol_from": "2026-11-14"}');
+  assert.strictEqual(store.raw(dir, '2026-11-21', []).meta.alcohol_from, '2026-11-14');
+});
+
+test('old body.csv with waist columns is read; write drops them', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  fs.writeFileSync(path.join(dir, 'body.csv'), 'date,weight_kg,waist_cm,bodyfat_pct,note\n2026-01-01,70,80,,x\n');
+  assert.deepStrictEqual(store.read(dir, 'body.csv'), [{date: '2026-01-01', weight_kg: '70', note: 'x'}]);
+  store.upsert(dir, 'body.csv', {'2026-01-02': {weight_kg: 71}});
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'body.csv'), 'utf8'), 'date,weight_kg,note\n2026-01-01,70,x\n2026-01-02,71,\n');
+});
+
+test('plans.csv keeps multiline text with quotes and commas', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  const text = 'a, "b"\nстрока 2\n<b>x</b>\n';
+  store.upsert(dir, 'plans.csv', {'2026-11-16': {text}});
+  assert.strictEqual(store.read(dir, 'plans.csv')[0].text, text);
+  assert.strictEqual(store.load(dir, 'plans.csv')[0].text, text.trim());
+});
+
+test('upsert into supplements.csv is refused', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  assert.throws(() => store.upsert(dir, 'supplements.csv', {'2026-11-19': {name: 'A'}}), /supplements\.csv/);
 });

@@ -6,7 +6,7 @@ const SCHEMA = require('./schema.json');
 const {pyRound} = require('./pyround');
 
 const TEXT = new Set(SCHEMA.text);
-const META_EMPTY = {plan: {version: '', targets: {}, rows: [], notes: [], goodWeek: []}, journal: [], photos_summary: '', priorities: []};
+const META_EMPTY = {};   // meta.json — только alcohol_from (с какого утра размечать алкоголь)
 
 function dataDir(documents) { return path.join(documents, 'SEL', 'data'); }
 
@@ -50,9 +50,11 @@ function read(dir, name) {
   const f = path.join(dir, name);
   if (!fs.existsSync(f)) return [];
   const [head, ...rows] = parseCsv(fs.readFileSync(f, 'utf8'));
-  const cols = SCHEMA.schema[name];
-  // новые колонки добавляются только в конец: старый файл без них читается (пустыми), при записи они появятся
-  if (cols && head.join(',') !== cols.slice(0, head.length).join(',')) throw new Error(`${name}: заголовок ${head}, ожидался ${cols}`);
+  const cols = SCHEMA.schema[name], dropped = (SCHEMA.dropped || {})[name] || [];
+  // новые колонки добавляются только в конец: старый файл без них читается (пустыми), при записи они появятся;
+  // убранные из схемы (schema.json → dropped) в старом файле пропускаются и исчезают при записи
+  const kept = head.filter(c => !dropped.includes(c));
+  if (cols && kept.join(',') !== cols.slice(0, kept.length).join(',')) throw new Error(`${name}: заголовок ${head}, ожидался ${cols}`);
   const all = cols || head;
   return rows.filter(r => r.length > 1 || r[0] !== '').map(r => Object.fromEntries(all.map(c => [c, r[head.indexOf(c)] ?? ''])));
 }
@@ -74,6 +76,7 @@ function fmtNum(x) {
 
 /** {ключ: {колонка: значение}} → обновить/добавить (null не затирает). → {added, updated, total}. */
 function upsert(dir, name, fresh) {
+  if ((SCHEMA.no_upsert || []).includes(name)) throw new Error(name + ': запись только через приложение (строки различаются не только ключом)');
   const k = keyOf(name), cols = SCHEMA.schema[name];
   const cur = new Map(read(dir, name).map(r => [r[k], r]));
   let added = 0, updated = 0;
