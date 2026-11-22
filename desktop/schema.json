@@ -1,5 +1,5 @@
 {
- "_": "Копия схемы CSV из scripts/lib.py (SCHEMA, KEY, SORT, TEXT) — не править руками; тест tests/test_desktop_schema.py",
+ "_": "Схема CSV папки данных — единственное место (описание — docs/07_формат_данных.md); новые колонки — только в конец",
  "schema": {
   "nutrition_daily.csv": [
    "date",

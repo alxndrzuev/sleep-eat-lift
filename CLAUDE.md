@@ -15,7 +15,7 @@ docs/                    ← 06 фото: как снимать и разбир�
                            · logo/ — логотип SEL (sleep · eat · lift): sel-mark.svg, sel-logo-light/dark.svg (плитки — README);
                              sel-icon.svg — значок приложения (три дуги) → desktop/build/icon.png, 1024×1024, прозрачные углы
 ~/Documents/SEL/data      ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — путь берётся из настроек приложения
-                           (~/Library/Application Support/SEL/config.json → dataDir; scripts/lib.py → find_data; HEALTH_DATA — подменить).
+                           (~/Library/Application Support/SEL/config.json → dataDir; scripts/csv.js → dataDir; HEALTH_DATA — подменить).
                            Ниже и в тексте «data/» = эта папка. Формат — docs/07_формат_данных.md
   *.csv                  ← вся история (только дописываем)
   meta.json              ← план, «хорошая неделя», приоритеты, вывод по фото, alcohol_from
@@ -34,13 +34,13 @@ portal/                  ← страницы приложения: dashboard.ht
                            **Текст из CSV и от сервисов (заметки, вид спорта, описания) — в innerHTML только через esc()** (тест RENDER=1);
                            meta.json пишем мы сами, в нём бывает разметка — его не экранируем
                            dataset.js — расчёт DATA из RAW; nav.js — меню по данным, «Обновить данные», статус, подвалы fatsecret/Whoop
-                           photos_core.js (логика, тесты через jsc) + photos_app.js (загрузка, HEIC, поиск фигуры, выравнивание)
+                           photos_core.js (логика, тесты в Node) + photos_app.js (загрузка, HEIC, поиск фигуры, выравнивание)
                            photos_fs.js — папка фото в приложении · vendor/ — библиотеки «Фото» (MediaPipe, libheif, exifr; в git, ~35 МБ)
-scripts/                 ← только стандартная библиотека Python 3 — служебное и тесты
-  lib.py                 ← схема CSV (SCHEMA, KEY, SORT, TEXT — копия в desktop/schema.json), чтение/запись/upsert, папка данных
+scripts/                 ← Node без зависимостей (берёт модули из desktop/) — служебное
+  csv.js                 ← данные из чата: `node scripts/csv.js upsert body.csv '{"2026-11-22": {"weight_kg": 75.4}}'`
+                           (тот же store.js, что в приложении; пересобирает data.js) · read <файл> [N] · remove · dir
   vendor_fetch.py        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
-  public_check.py        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
-tests/                   ← Python unittest: lib, формат данных, страницы (jsc); RENDER=1 — отрисовка в Chrome
+  public_check.js        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
 dist/                    ← собранные приложения (не в git)
 ```
 
@@ -56,7 +56,9 @@ dist/                    ← собранные приложения (не в gi
 - Код: `main.js` (окно, протокол app://h/, IPC), `protocol.js` (что отдаёт app://h/ + CSP: страницы ничего не грузят и не шлют наружу), `store.js` (CSV как lib.py), `fatsecret.js`, `whoop.js`, `alcohol.js`, `updater.js`,
   `settings.js`, `photosfs.js`, `secrets.js` (токены дописываются, ключи приложений не трогаются), `keys.js`, `datadir.js`, `preload.js`,
   `changelog.js` (разбор CHANGELOG.md, версии, выпуск), `whatsnew.js` (что показать после обновления)
-- Тесты: `cd desktop && npm test` (эталоны прежних Python-скриптов — `desktop/test/fixtures`); окно без клика —
+- Тесты: `cd desktop && npm test` — приложение, страницы portal/ (их скрипты выполняются в Node: test/_portal.js),
+  настоящая папка данных (формат, если есть), scripts/; `RENDER=1 npm test` — ещё и отрисовка страниц в Chrome.
+  Эталоны прежних Python-скриптов — `desktop/test/fixtures`; окно без клика —
   `HEALTH_DOCUMENTS=<папка> HEALTH_SMOKE=1 [HEALTH_PAGE=… HEALTH_SMOKE_JS=… HEALTH_SMOKE_SHOT=…] npx electron .`
 - Сборка: `cd desktop && npm run dist:mac` → `dist/SEL-<версия>-mac-arm64.zip` и `…-x64.zip` (ad-hoc подпись; собирается в
   ~/Library/Caches/health-app-build — в «Документах» codesign падает). Ключи приложений берёт из `<папка данных>/secrets`:
@@ -75,17 +77,17 @@ dist/                    ← собранные приложения (не в gi
   (дата, версия в package.json и lock, коммит «Выпуск X.Y.Z», тег vX.Y.Z), потом `npm run dist:mac`; без заметок к версии
   сборка не идёт. Окно — один раз после обновления (`lastSeenVersion` в `~/Library/Application Support/SEL/config.json`;
   новичку — нет); проверка — `HEALTH_WHATSNEW=0.0.0` к запуску без клика (из папки проекта видно и «Не выпущено»)
-- Electron пересобирать раз в полгода; при правке CSV-схемы — `desktop/schema.json` (тест сверяет с lib.py)
+- Electron пересобирать раз в полгода; схема CSV — только `desktop/schema.json`
 
 ## Хранение данных
 - **Всё личное — только в папке данных** (CSV, `meta.json`, фото, ключи, черновики). В проекте — только программа и документы
-- Вся история — в `data/*.csv`, только дописываем; формат — `docs/07_формат_данных.md`, колонки — `SCHEMA` в `scripts/lib.py`
-  (+ `desktop/schema.json`, тест). Новые колонки — только в конец (старые файлы читаются)
-- Писать в CSV: в Python — только `lib.write` / `lib.upsert`; в приложении — `store.write` / `store.upsert` (порядок колонок, сортировка, LF)
-- **После любых правок кода — тесты:** `python3 -m unittest discover -s tests` и `cd desktop && npm test`. Новая логика — новый тест
+- Вся история — в `data/*.csv`, только дописываем; формат — `docs/07_формат_данных.md`, колонки — `desktop/schema.json`
+  (единственное место). Новые колонки — только в конец (старые файлы читаются)
+- Писать в CSV — только через `desktop/store.js` (`store.write` / `store.upsert`; из чата — `node scripts/csv.js`): порядок колонок, сортировка, LF
+- **После любых правок кода — тесты:** `cd desktop && npm test` (страницы трогали — `RENDER=1 npm test`). Новая логика — новый тест
 - **Цели (КБЖУ, целевой вес) задаёт только пользователь** — в «Настройках» приложения или в чате → новая строка в `targets.csv` /
   `goal_weight.csv` с даты вступления; старые не трогать; из FatSecret цели не берём
-- **Перед каждым коммитом — `python3 scripts/public_check.py`**: в репозитории нет строк из CSV папки данных и значений из secrets/
+- **Перед каждым коммитом — `node scripts/public_check.js`**: в репозитории нет строк из CSV папки данных и значений из secrets/
   (тест делает то же, если папка данных есть). Почта автора — noreply GitHub (git config в репозитории)
 - Git: после изменений кода — коммит; push в GitHub (`origin` — github.com/alxndrzuev/sleep-eat-lift, публичный;
   HTTPS через `gh auth git-credential`, настройка в репозитории) — только по просьбе пользователя. Данные вне git — резервные копии на совести Time Machine
