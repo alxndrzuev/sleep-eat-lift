@@ -1,9 +1,12 @@
-// «Настройки» приложения: цели (новая строка с сегодняшней даты; старые не трогаем — как правило проекта) и внешние ссылки.
+// «Настройки» приложения: цели, план, БАДы (новая строка с даты; старые не трогаем — как правило проекта) и внешние ссылки.
 const store = require('./store');
 
 const LIMITS = {kcal: [1000, 6000, 'Калории — от 1000 до 6000'], protein: [0, 600, 'Белки — от 0 до 600 г'],
                 fat: [0, 600, 'Жиры — от 0 до 600 г'], carbs: [0, 600, 'Углеводы — от 0 до 600 г'],
-                goalWeight: [30, 250, 'Целевой вес — от 30 до 250 кг']};
+                goalWeight: [30, 250, 'Целевой вес — от 30 до 250 кг'], sleep: [4, 12, 'Сон — от 4 до 12 ч'],
+                strength: [0, 14, 'Силовые — от 0 до 14 в неделю'], cardio: [0, 14, 'Кардио — от 0 до 14 в неделю']};
+// поле формы → колонка targets.csv (вес — в goal_weight.csv)
+const TARGET_COL = {kcal: 'kcal', protein: 'protein', fat: 'fat', carbs: 'carbs', sleep: 'sleep_h', strength: 'strength_wk', cardio: 'cardio_wk'};
 const EXTERNAL = ['www.fatsecret.com', 'platform.fatsecret.com', 'www.whoop.com'];
 
 /** Калории по БЖУ: 4 ккал/г белка и углеводов, 9 ккал/г жира (Этуотер); нет хотя бы одного — null. */
@@ -35,11 +38,11 @@ function saveTargets(dir, vals, today) {
     if (!Number.isFinite(x) || x < lo || x > hi) return {ok: false, error: msg};
     nums[k] = x;
   }
-  const t = ['kcal', 'protein', 'fat', 'carbs'].filter(k => k in nums);
+  const t = Object.keys(TARGET_COL).filter(k => k in nums);
   if (t.length) {
     const prev = store.read(dir, 'targets.csv').filter(r => r.start <= from).sort((a, b) => (a.start < b.start ? -1 : 1)).pop() || {};
     const row = {note: 'из настроек'};
-    for (const k of ['kcal', 'protein', 'fat', 'carbs']) row[k] = k in nums ? nums[k] : (prev[k] || null);
+    for (const [k, col] of Object.entries(TARGET_COL)) row[col] = k in nums ? nums[k] : (prev[col] || null);
     const k = kcalOf(row.protein, row.fat, row.carbs);      // калории — из БЖУ, если все три известны
     if (k !== null) {
       if (k < LIMITS.kcal[0] || k > LIMITS.kcal[1]) return {ok: false, error: `Калории по БЖУ — ${k}, а должно быть от 1000 до 6000`};
@@ -58,8 +61,65 @@ function removeTarget(dir, kind, date) {
   return {ok: true, removed: store.remove(dir, file, [String(date)])};
 }
 
+// ---------- план: свободный текст, действует с даты до следующей версии ----------
+const PLAN_MAX = 20000;
+
+/** {date?, text} → строка plans.csv с даты (та же дата — заменить). */
+function savePlan(dir, vals, today) {
+  const from = given(vals.date) ? String(vals.date).trim() : today;
+  if (!validDate(from, today)) return {ok: false, error: DATE_ERR};
+  const text = String(vals.text == null ? '' : vals.text).replace(/\r\n?/g, '\n').trim();
+  if (!text) return {ok: false, error: 'Пустой план'};
+  if (text.length > PLAN_MAX) return {ok: false, error: 'План — не длиннее 20 000 символов'};
+  store.upsert(dir, 'plans.csv', {[from]: {text}});
+  return {ok: true};
+}
+
+function removePlan(dir, date) {
+  return {ok: true, removed: store.remove(dir, 'plans.csv', [String(date)])};
+}
+
+// ---------- БАДы: строка — дата начала + название; пустой end — принимает сейчас ----------
+const SUPP_FIELDS = ['name', 'dose', 'timing', 'purpose', 'note'];
+const SUPP_MAX = 200;
+const same = (a, b) => a.start === String(b.start) && a.name === String(b.name);
+
+/** {start?, name, dose, timing, purpose, note} → новая строка supplements.csv. */
+function addSupplement(dir, vals, today) {
+  const row = {start: given(vals.start) ? String(vals.start).trim() : today, end: ''};
+  if (!validDate(row.start, today)) return {ok: false, error: DATE_ERR};
+  for (const k of SUPP_FIELDS) row[k] = String(vals[k] == null ? '' : vals[k]).replace(/\s+/g, ' ').trim();
+  if (!row.name) return {ok: false, error: 'Название БАДа — обязательно'};
+  if (SUPP_FIELDS.some(k => row[k].length > SUPP_MAX)) return {ok: false, error: 'Поля БАДа — не длиннее 200 символов'};
+  const rows = store.read(dir, 'supplements.csv');
+  if (rows.some(r => same(r, row))) return {ok: false, error: 'Этот БАД с этой даты уже есть'};
+  store.write(dir, 'supplements.csv', rows.concat([row]));
+  return {ok: true};
+}
+
+/** {start, name, end?} → дата конца (по умолчанию today). */
+function stopSupplement(dir, vals, today) {
+  const end = given(vals.end) ? String(vals.end).trim() : today;
+  if (!validDate(end, today)) return {ok: false, error: DATE_ERR};
+  const rows = store.read(dir, 'supplements.csv'), hit = rows.find(r => same(r, vals));
+  if (!hit) return {ok: false, error: 'БАД не найден'};
+  if (end < hit.start) return {ok: false, error: 'Дата конца — не раньше начала'};
+  hit.end = end;
+  store.write(dir, 'supplements.csv', rows);
+  return {ok: true};
+}
+
+/** {start, name} → удалить ошибочную строку. */
+function removeSupplement(dir, vals) {
+  const rows = store.read(dir, 'supplements.csv'), keep = rows.filter(r => !same(r, vals));
+  if (keep.length === rows.length) return {ok: false, error: 'БАД не найден'};
+  store.write(dir, 'supplements.csv', keep);
+  return {ok: true};
+}
+
 function externalAllowed(url) {
   try { const u = new URL(url); return u.protocol === 'https:' && EXTERNAL.includes(u.hostname); } catch (e) { return false; }
 }
 
-module.exports = {saveTargets, removeTarget, kcalOf, externalAllowed, validDate, LIMITS};
+module.exports = {saveTargets, removeTarget, savePlan, removePlan, addSupplement, stopSupplement, removeSupplement,
+                  kcalOf, externalAllowed, validDate, LIMITS};

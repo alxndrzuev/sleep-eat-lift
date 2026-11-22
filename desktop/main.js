@@ -192,6 +192,13 @@ function setupIpc() {
   ipc('health:disconnect', s => { if (s in services) saveUserKey(s, null); store.writeDataJs(DATA, today()); pushStatus(); reload(); return {ok: true}; });
   ipc('health:targets', v => { const r = settings.saveTargets(DATA, v || {}, today()); if (r.ok) { store.writeDataJs(DATA, today()); } return r; });
   ipc('health:removeTarget', (kind, date) => { const r = settings.removeTarget(DATA, String(kind), String(date)); if (r.ok) store.writeDataJs(DATA, today()); return r; });
+  // план и БАДы из «Настроек»: после записи — пересобрать data.js
+  const saved = r => { if (r.ok) store.writeDataJs(DATA, today()); return r; };
+  ipc('health:plan', v => saved(settings.savePlan(DATA, v || {}, today())));
+  ipc('health:removePlan', date => saved(settings.removePlan(DATA, String(date))));
+  ipc('health:supplementAdd', v => saved(settings.addSupplement(DATA, v || {}, today())));
+  ipc('health:supplementStop', v => saved(settings.stopSupplement(DATA, v || {}, today())));
+  ipc('health:supplementRemove', v => saved(settings.removeSupplement(DATA, v || {})));
   const alcoholDone = r => { if (r.ok) store.writeDataJs(DATA, today()); return r; };
   ipc('health:alcohol', (morning, value) => alcoholDone(alcohol.answer(DATA, String(morning), typeof value === 'boolean' ? value : String(value))));
   ipc('health:alcoholAdd', (evening, lvl, note) => alcoholDone(alcohol.add(DATA, String(evening), String(lvl), String(note || '').slice(0, 80), today())));
