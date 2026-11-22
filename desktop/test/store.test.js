@@ -1,4 +1,4 @@
-// Хранилище CSV приложения: те же правила, что scripts/lib.py (порядок колонок, сортировка, LF, числа без лишних нулей).
+// Хранилище CSV приложения (и scripts/csv.js): порядок колонок по схеме, сортировка, LF, числа без лишних нулей.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -26,7 +26,7 @@ test('init creates folders and CSV headers once', () => {
   assert.deepStrictEqual(store.init(dir), []);
 });
 
-test('upsert like lib.upsert: null does not overwrite, numbers trimmed, sorted, LF', () => {
+test('upsert: null does not overwrite, numbers trimmed, sorted, LF', () => {
   const {dir} = tmpDocs();
   store.init(dir);
   store.upsert(dir, 'body.csv', {'2026-01-02': {weight_kg: 71.0}, '2026-01-01': {weight_kg: 70, waist_cm: 80, note: 'x'}});
@@ -68,7 +68,7 @@ test('modules from secrets', () => {
   assert.deepStrictEqual(store.modules(dir), ['fatsecret', 'photos', 'whoop']);
 });
 
-test('fmtNum like lib.fmt_num (Python round, half to even)', () => {
+test('fmtNum: rounding half to even, as before in Python', () => {
   assert.strictEqual(store.fmtNum(72.125), '72.12');
   assert.strictEqual(store.fmtNum(0.125), '0.12');
   assert.strictEqual(store.fmtNum(70.0), '70');
@@ -85,4 +85,33 @@ test('old events.csv without level column is read and upgraded on write', () => 
   assert.ok(fs.readFileSync(path.join(dir, 'events.csv'), 'utf8').startsWith('start,end,type,description,level\n'));
   fs.writeFileSync(path.join(dir, 'events.csv'), 'start,type\n2026-11-10,x\n');
   assert.throws(() => store.read(dir, 'events.csv'), /заголовок/);
+});
+
+test('upsert: unchanged value is not counted as updated', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  store.upsert(dir, 'nutrition_daily.csv', {'2026-01-01': {kcal: 2000}});
+  assert.deepStrictEqual(store.upsert(dir, 'nutrition_daily.csv', {'2026-01-01': {kcal: 2000.0}}), {added: 0, updated: 0, total: 1});
+});
+
+test('workouts keyed by id, sorted by start', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  store.upsert(dir, 'whoop_workouts.csv', {b: {start: '2026-01-02 20:00'}, a: {start: '2026-01-03 20:00'}});
+  assert.deepStrictEqual(store.read(dir, 'whoop_workouts.csv').map(r => r.id), ['b', 'a']);
+});
+
+test('read: wrong header is an error', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  fs.writeFileSync(path.join(dir, 'body.csv'), 'date,weight\n2026-01-01,70\n');
+  assert.throws(() => store.read(dir, 'body.csv'), /заголовок/);
+});
+
+test('meta.json: from data folder, missing → empty plan', () => {
+  const {dir} = tmpDocs();
+  store.init(dir);
+  assert.deepStrictEqual(store.raw(dir, '2026-11-21', []).meta.plan.rows, []);
+  fs.writeFileSync(path.join(dir, 'meta.json'), '{"plan": {"targets": {"sleep": 8}}}');
+  assert.strictEqual(store.raw(dir, '2026-11-21', []).meta.plan.targets.sleep, 8);
 });
