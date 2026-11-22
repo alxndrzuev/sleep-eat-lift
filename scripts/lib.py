@@ -7,11 +7,11 @@ from datetime import date, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-APP_CONFIG = Path.home() / "Library" / "Application Support" / "Здоровье" / "config.json"   # настройки приложения desktop/
+APP_CONFIG = Path.home() / "Library" / "Application Support" / "SEL" / "config.json"   # настройки приложения desktop/
 
 
 def find_data(env=os.environ, config=APP_CONFIG):
-    """Папка данных: HEALTH_DATA → папка, выбранная в приложении «Здоровье» (config.json → dataDir) → data/ проекта."""
+    """Папка данных: HEALTH_DATA → папка, выбранная в приложении SEL (config.json → dataDir) → data/ проекта."""
     if env.get("HEALTH_DATA"):
         return Path(env["HEALTH_DATA"])
     try:

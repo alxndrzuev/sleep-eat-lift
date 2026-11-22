@@ -11,7 +11,7 @@ const item = (t, menu, label) => t.find(m => m.label === menu).submenu.find(x =>
 
 test('Mac: меню программы, «Окно», ⌘[ / ⌘]', () => {
   const t = make('darwin');
-  assert.deepStrictEqual(labels(t), ['Здоровье', 'Файл', 'Правка', 'Вид', 'Окно', 'Справка']);
+  assert.deepStrictEqual(labels(t), ['SEL', 'Файл', 'Правка', 'Вид', 'Окно', 'Справка']);
   for (const r of ['about', 'services', 'hide', 'quit', 'front', 'pasteAndMatchStyle']) assert.ok(roles(t).includes(r), r);
   assert.strictEqual(item(t, 'Вид', 'Назад').accelerator, 'Cmd+[');
   assert.strictEqual(item(t, 'Правка', 'Скопировать').role, 'copy');
@@ -23,7 +23,7 @@ test('Windows: без пунктов Mac, «Выход» в «Файле», «О
   for (const r of ['services', 'hide', 'hideOthers', 'unhide', 'front', 'zoom', 'pasteAndMatchStyle'])
     assert.ok(!roles(t).includes(r), r);
   assert.strictEqual(item(t, 'Файл', 'Выход').role, 'quit');
-  assert.strictEqual(item(t, 'Справка', 'О программе «Здоровье»').role, 'about');
+  assert.strictEqual(item(t, 'Справка', 'О программе SEL').role, 'about');
   assert.strictEqual(item(t, 'Вид', 'Назад').accelerator, 'Alt+Left');
   assert.strictEqual(item(t, 'Вид', 'Вперёд').accelerator, 'Alt+Right');
   assert.strictEqual(item(t, 'Правка', 'Копировать').role, 'copy');
@@ -32,7 +32,7 @@ test('Windows: без пунктов Mac, «Выход» в «Файле», «О
 test('пункты вызывают назад/вперёд и «Что нового»; инструменты разработчика — только не в сборке', () => {
   for (const p of ['darwin', 'win32']) {
     const calls = [], t = make(p, true, calls);
-    item(t, 'Вид', 'Назад').click(); item(t, 'Вид', 'Вперёд').click(); item(t, 'Справка', 'Что нового в «Здоровье»').click();
+    item(t, 'Вид', 'Назад').click(); item(t, 'Вид', 'Вперёд').click(); item(t, 'Справка', 'Что нового в SEL').click();
     assert.deepStrictEqual(calls, ['goBack', 'goForward', 'whatsnew']);
     assert.ok(!roles(t).includes('toggleDevTools'));
     assert.ok(roles(make(p, false)).includes('toggleDevTools'));

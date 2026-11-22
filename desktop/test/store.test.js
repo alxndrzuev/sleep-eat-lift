@@ -13,8 +13,8 @@ function tmpDocs() {
   return {base, dir: store.dataDir(docs)};
 }
 
-test('dataDir — Документы/Здоровье/data', () => {
-  assert.strictEqual(store.dataDir('/x/Documents'), path.join('/x/Documents', 'Здоровье', 'data'));
+test('dataDir — Документы/SEL/data', () => {
+  assert.strictEqual(store.dataDir('/x/Documents'), path.join('/x/Documents', 'SEL', 'data'));
 });
 
 test('init creates folders and CSV headers once', () => {

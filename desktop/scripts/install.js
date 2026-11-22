@@ -1,12 +1,13 @@
 // Свежую сборку — в /Applications и открыть для проверки: npm run app:mac (= dist:mac + этот скрипт).
-// Запущенное «Здоровье» (любая копия, по bundle id) закрывается, старое приложение заменяется сборкой из dist/ под этот Mac.
+// Запущенное SEL (любая копия, по bundle id — и прежнее «Здоровье») закрывается, старое приложение заменяется сборкой из dist/
+// под этот Mac; прежнее «Здоровье.app» (так приложение называлось до SEL) удаляется.
 // HEALTH_INSTALL_DIR / HEALTH_DIST_DIR — другие папки, HEALTH_NO_LAUNCH=1 — не закрывать и не открывать (тесты).
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {execFileSync, spawnSync} = require('node:child_process');
 
-const NAME = 'Здоровье', ID = 'local.health.app';
+const NAME = 'SEL', OLD = 'Здоровье', ID = 'local.health.app';
 const DEST = process.env.HEALTH_INSTALL_DIR || '/Applications';
 const DIST = process.env.HEALTH_DIST_DIR || path.join(__dirname, '..', '..', 'dist');
 const LAUNCH = process.env.HEALTH_NO_LAUNCH !== '1';
@@ -22,7 +23,7 @@ if (!fs.existsSync(ZIP)) fail(`Нет сборки ${ZIP} — сначала npm
 if (LAUNCH && running()) {                                   // закрыть старое: вежливо, через 10 с — принудительно
   osa(`tell application id "${ID}" to quit`);
   for (let i = 0; i < 40 && running(); i++) spawnSync('sleep', ['0.25']);
-  if (running()) spawnSync('pkill', ['-f', `${NAME}.app/Contents/MacOS/`]);
+  if (running()) for (const n of [NAME, OLD]) spawnSync('pkill', ['-f', `${n}.app/Contents/MacOS/`]);
   console.log('Старое окно закрыто');
 }
 
@@ -34,5 +35,9 @@ try {
   execFileSync('ditto', [path.join(tmp, NAME + '.app'), APP]);
 } finally { fs.rmSync(tmp, {recursive: true, force: true}); }
 console.log(`Установлено: ${APP} (${VERSION})`);
+if (fs.existsSync(path.join(DEST, OLD + '.app'))) {
+  fs.rmSync(path.join(DEST, OLD + '.app'), {recursive: true, force: true});
+  console.log(`Удалено прежнее ${OLD}.app`);
+}
 
 if (LAUNCH) { execFileSync('open', [APP]); console.log('Открыто — проверяйте'); }

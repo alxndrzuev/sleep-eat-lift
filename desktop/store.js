@@ -1,4 +1,4 @@
-// Данные пользователя приложения: CSV в «Документы/Здоровье/data» — те же правила, что scripts/lib.py
+// Данные пользователя приложения: CSV в «Документы/SEL/data» — те же правила, что scripts/lib.py
 // (колонки по схеме, сортировка по ключу, LF, числа без лишних нулей) и data.js (const RAW) для страниц портала.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -8,7 +8,7 @@ const {pyRound} = require('./pyround');
 const TEXT = new Set(SCHEMA.text);
 const META_EMPTY = {plan: {version: '', targets: {}, rows: [], notes: [], goodWeek: []}, journal: [], photos_summary: '', priorities: []};
 
-function dataDir(documents) { return path.join(documents, 'Здоровье', 'data'); }
+function dataDir(documents) { return path.join(documents, 'SEL', 'data'); }
 
 const keyOf = name => SCHEMA.key[name] || 'date';
 const sortOf = name => SCHEMA.sort[name] || keyOf(name);
@@ -138,7 +138,7 @@ function raw(dir, today, mods) {
 }
 
 function writeDataJs(dir, today, mods) {
-  const js = '// Собрано приложением «Здоровье» из CSV — не править руками; расчёт — portal/dataset.js\nconst RAW = ' +
+  const js = '// Собрано приложением SEL из CSV — не править руками; расчёт — portal/dataset.js\nconst RAW = ' +
     JSON.stringify(raw(dir, today, mods)) + ';\n';
   fs.writeFileSync(path.join(dir, 'data.js.tmp'), js);
   fs.renameSync(path.join(dir, 'data.js.tmp'), path.join(dir, 'data.js'));

@@ -1,6 +1,6 @@
 /* Общий код всех страниц портала: даты/числа, тема, движок графиков (SVG), карточки, запуск страницы.
    Подключается страницами после ../data/data.js (RAW — сырые таблицы) и dataset.js (расчёт → DATA). */
-if(typeof DATA==='undefined') document.body.innerHTML='<p style="font:16px sans-serif;padding:24px">Нет данных — откройте приложение «Здоровье»</p>';
+if(typeof DATA==='undefined') document.body.innerHTML='<p style="font:16px sans-serif;padding:24px">Нет данных — откройте приложение SEL</p>';
 
 // Страница без своих данных (<body data-needs="weight kcal …"> — нужен хотя бы один непустой ряд) → вместо содержимого
 // приглашение подключить сервис; код страницы обёрнут в if(!PAGE_EMPTY).

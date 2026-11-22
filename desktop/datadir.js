@@ -28,19 +28,32 @@ function saveCfg(userData, patch) {
 
 const save = (userData, dir) => saveCfg(userData, {dataDir: dir});
 
-/** Выбранная папка → папка данных: её data/ с CSV, она сама (если в ней CSV), иначе новая <папка>/Здоровье/data. */
+/** Выбранная папка → папка данных: её data/ с CSV, она сама (если в ней CSV), иначе новая <папка>/SEL/data. */
 function fromPicked(picked) {
   if (hasCsv(path.join(picked, 'data'))) return {dir: path.join(picked, 'data'), existing: true};
   if (hasCsv(picked)) return {dir: picked, existing: true};
-  return {dir: path.join(picked, 'Здоровье', 'data'), existing: false};
+  return {dir: path.join(picked, 'SEL', 'data'), existing: false};
 }
 
-const defaultDir = documents => path.join(documents, 'Здоровье', 'data');
+/** Приложение раньше называлось «Здоровье»: его настройки (config.json — папка данных, просмотренная версия) и тема
+ * страниц (Local Storage) переносятся в папку настроек SEL, если в ней ещё нет config.json. → перенесено ли. */
+const OLD_NAME = 'Здоровье';
+function migrate(oldUserData, userData) {
+  if (fs.existsSync(cfgFile(userData)) || !fs.existsSync(cfgFile(oldUserData))) return false;
+  fs.mkdirSync(userData, {recursive: true});
+  const ls = path.join(oldUserData, 'Local Storage');
+  if (fs.existsSync(ls) && !fs.existsSync(path.join(userData, 'Local Storage')))
+    fs.cpSync(ls, path.join(userData, 'Local Storage'), {recursive: true});
+  fs.copyFileSync(cfgFile(oldUserData), cfgFile(userData));          // последним: есть config.json — перенос сделан
+  return true;
+}
+
+const defaultDir = documents => path.join(documents, 'SEL', 'data');
 
 /** Папка настроек приложения (как app.getPath('userData')) — для скриптов сборки и разработки вне Electron. */
-const appUserData = () => path.join(os.homedir(), 'Library', 'Application Support', 'Здоровье');
+const appUserData = () => path.join(os.homedir(), 'Library', 'Application Support', 'SEL');
 
 /** Папка данных из настроек приложения или null. */
 const configured = () => current(appUserData()).dir;
 
-module.exports = {current, save, saveCfg, readCfg, fromPicked, defaultDir, hasCsv, appUserData, configured};
+module.exports = {current, save, saveCfg, readCfg, fromPicked, defaultDir, hasCsv, appUserData, configured, migrate, OLD_NAME};

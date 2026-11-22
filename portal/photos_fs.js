@@ -1,4 +1,4 @@
-/* Папка фото в приложении «Здоровье» (desktop/): то же подмножество FileSystemDirectoryHandle, которым пользуется
+/* Папка фото в приложении SEL (desktop/): то же подмножество FileSystemDirectoryHandle, которым пользуется
    photos_app.js, но поверх window.health.photos (файлы только внутри data/photos). В Chrome не используется. */
 var PhotosFs = (function () {
   const notFound = p => (typeof DOMException !== "undefined" ? new DOMException("Нет: " + p, "NotFoundError")

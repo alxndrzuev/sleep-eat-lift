@@ -5,10 +5,10 @@
 
 /** {platform, packaged, go(dir), whatsNew()} → шаблон меню. */
 function template({platform, packaged, go, whatsNew}) {
-  const mac = platform === 'darwin', sep = {type: 'separator'}, name = '«Здоровье»';
+  const mac = platform === 'darwin', sep = {type: 'separator'}, name = 'SEL';
   const about = {role: 'about', label: `О программе ${name}`};
   return [
-    ...(mac ? [{label: 'Здоровье', submenu: [about, sep, {role: 'services', label: 'Службы'}, sep,
+    ...(mac ? [{label: 'SEL', submenu: [about, sep, {role: 'services', label: 'Службы'}, sep,
       {role: 'hide', label: `Скрыть ${name}`}, {role: 'hideOthers', label: 'Скрыть остальные'}, {role: 'unhide', label: 'Показать все'}, sep,
       {role: 'quit', label: `Завершить ${name}`}]}] : []),
     {label: 'Файл', submenu: mac ? [{role: 'close', label: 'Закрыть окно'}] : [{role: 'quit', label: 'Выход'}]},

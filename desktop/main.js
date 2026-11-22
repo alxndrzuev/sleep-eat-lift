@@ -1,5 +1,5 @@
-// Приложение «Здоровье»: одно окно с порталом. Страницы — из приложения (portal/), данные пользователя —
-// «Документы/Здоровье/data» (CSV, ключи доступа, фото, data.js). Протокол app://h/ отдаёт только разрешённое (protocol.js).
+// Приложение SEL (sleep · eat · lift; раньше — «Здоровье»): одно окно с порталом. Страницы — из приложения (portal/), данные пользователя —
+// «Документы/SEL/data» (CSV, ключи доступа, фото, data.js). Протокол app://h/ отдаёт только разрешённое (protocol.js).
 // HEALTH_DOCUMENTS — другая папка «Документы» (проверки); HEALTH_SMOKE=1 — загрузить страницу, вывести меню и выйти;
 // HEALTH_CONNECT=fatsecret|whoop — сразу открыть вход сервиса (проверка до появления «Настроек»);
 // HEALTH_WHATSNEW=<версия> — показать окно «Что нового», как будто последней была эта версия (настройки не трогаются).
@@ -25,6 +25,8 @@ const menu = require('./menu');
 protocol.registerSchemesAsPrivileged([{scheme: 'app', privileges: {standard: true, secure: true, supportFetchAPI: true}}]);
 
 const PORTAL = app.isPackaged ? path.join(process.resourcesPath, 'portal') : path.join(__dirname, '..', 'portal');
+// раньше приложение называлось «Здоровье» — перенести его настройки (проверочный запуск настройки не трогает)
+if (!process.env.HEALTH_DOCUMENTS) datadir.migrate(path.join(app.getPath('appData'), datadir.OLD_NAME), app.getPath('userData'));
 // папка данных: HEALTH_DOCUMENTS (проверки) или выбор пользователя, запомненный в userData/config.json
 let DATA = process.env.HEALTH_DOCUMENTS ? store.dataDir(process.env.HEALTH_DOCUMENTS) : null;
 const secretsDir = () => path.join(DATA, 'secrets');
@@ -122,22 +124,22 @@ async function askDataDir({missing = null, change = false} = {}) {
   const defHas = datadir.hasCsv(def);
   for (;;) {
     const {response} = await dialog.showMessageBox(win && !win.isDestroyed() ? win : undefined, {
-      type: 'question', title: 'Здоровье',
-      message: missing ? 'Папка с данными «Здоровья» не найдена' : change ? 'Где брать данные «Здоровья»?' : 'Где хранить данные «Здоровья»?',
+      type: 'question', title: 'SEL',
+      message: missing ? 'Папка с данными SEL не найдена' : change ? 'Где брать данные SEL?' : 'Где хранить данные SEL?',
       detail: (missing ? `Раньше данные лежали здесь:\n${missing}\nЕё переместили или удалили. ` : '') +
         'В папке данных — питание, вес, сон, тренировки, фото и ключи доступа к FatSecret и Whoop. ' +
         'Они остаются только на этом компьютере. Если данные уже есть (например, после переустановки) — выберите их папку.',
-      buttons: [defHas ? 'Документы/Здоровье (там уже есть данные)' : 'Новая папка: Документы/Здоровье', 'Выбрать папку…', change ? 'Отмена' : 'Выйти'],
+      buttons: [defHas ? 'Документы/SEL (там уже есть данные)' : 'Новая папка: Документы/SEL', 'Выбрать папку…', change ? 'Отмена' : 'Выйти'],
       defaultId: 0, cancelId: 2});
     if (response === 2) return null;
     if (response === 0) return def;
-    const r = await dialog.showOpenDialog({title: 'Папка с данными «Здоровья»', buttonLabel: 'Выбрать',
-      message: 'Папка, где уже лежат данные «Здоровья», или где создать новую', properties: ['openDirectory', 'createDirectory'],
+    const r = await dialog.showOpenDialog({title: 'Папка с данными SEL', buttonLabel: 'Выбрать',
+      message: 'Папка, где уже лежат данные SEL, или где создать новую', properties: ['openDirectory', 'createDirectory'],
       defaultPath: app.getPath('documents')});
     if (r.canceled || !r.filePaths.length) continue;
     const p = datadir.fromPicked(r.filePaths[0]);
     if (p.existing) return p.dir;
-    const {response: ok} = await dialog.showMessageBox({type: 'question', title: 'Здоровье', message: 'Данных «Здоровья» в этой папке нет',
+    const {response: ok} = await dialog.showMessageBox({type: 'question', title: 'SEL', message: 'Данных SEL в этой папке нет',
       detail: `Создать новые здесь?\n${p.dir}`, buttons: ['Создать', 'Выбрать другую'], defaultId: 0, cancelId: 1});
     if (ok === 0) return p.dir;
   }
@@ -253,7 +255,7 @@ function setMenu() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1280, height: 900, title: 'Здоровье', show: !process.env.HEALTH_SMOKE,
+    width: 1280, height: 900, title: 'SEL', show: !process.env.HEALTH_SMOKE,
     webPreferences: {contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.js')},
   });
   win.webContents.on('will-navigate', (e, url) => { if (!url.startsWith('app://h/')) e.preventDefault(); });
@@ -264,7 +266,7 @@ function createWindow() {
 }
 
 // «О программе» (меню приложения): значок, версия, бренд проекта и где код
-const ABOUT = {applicationName: 'Здоровье', credits: 'SEL — sleep · eat · lift\nПитание, сон и тренировки из FatSecret и Whoop\n' +
+const ABOUT = {applicationName: 'SEL', credits: 'SEL — sleep · eat · lift\nПитание, сон и тренировки из FatSecret и Whoop\n' +
   'github.com/alxndrzuev/sleep-eat-lift', copyright: '© 2026 alxndrzuev · лицензия MIT'};
 
 app.whenReady().then(async () => {

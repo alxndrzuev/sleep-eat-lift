@@ -38,5 +38,5 @@ lock.version = v;
 if (lock.packages && lock.packages['']) lock.packages[''].version = v;
 writeJson('package-lock.json', lock);
 git('commit', '-q', '-m', `Выпуск ${v}`, '--', ...FILES);
-git('tag', '-a', 'v' + v, '-m', `Здоровье ${v}\n\n${notes(cl.entry(md, v))}`);
+git('tag', '-a', 'v' + v, '-m', `SEL ${v}\n\n${notes(cl.entry(md, v))}`);
 console.log(`Выпущена ${v}: коммит «Выпуск ${v}», тег v${v}. Дальше — npm run dist:mac`);

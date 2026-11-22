@@ -1,4 +1,4 @@
-# SEL (sleep · eat · lift) — приложение «Здоровье»: питание, сон и тренировки (FatSecret + Whoop)
+# SEL (sleep · eat · lift) — приложение (до 1.1.0 — «Здоровье»): питание, сон и тренировки (FatSecret + Whoop)
 
 Приложение для Mac на Electron: данные FatSecret (питание, вес) и Whoop (сон, восстановление, тренировки, шаги) — в CSV
 папки данных пользователя, страницы с графиками и целями. Обзор для человека — README.md.
@@ -14,8 +14,8 @@ docs/                    ← 06 фото: как снимать и разбир�
                            · superpowers/ — дизайн и планы приложения
                            · logo/ — логотип SEL (sleep · eat · lift): sel-mark.svg, sel-logo-light/dark.svg (плитки — README);
                              sel-icon.svg — значок приложения (три дуги) → desktop/build/icon.png, 1024×1024, прозрачные углы
-~/Documents/Здоровье/data ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — путь берётся из настроек приложения
-                           (~/Library/Application Support/Здоровье/config.json → dataDir; scripts/lib.py → find_data; HEALTH_DATA — подменить).
+~/Documents/SEL/data      ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — путь берётся из настроек приложения
+                           (~/Library/Application Support/SEL/config.json → dataDir; scripts/lib.py → find_data; HEALTH_DATA — подменить).
                            Ниже и в тексте «data/» = эта папка. Формат — docs/07_формат_данных.md
   *.csv                  ← вся история (только дописываем)
   meta.json              ← план, «хорошая неделя», журнал, приоритеты, вывод по фото, alcohol_from
@@ -24,7 +24,7 @@ docs/                    ← 06 фото: как снимать и разбир�
   secrets/               ← ключи приложений и токены FatSecret, Whoop — не показывать в чате
   docs/                  ← личные документы (профиль, план, журнал, решения, анализ)
   inbox/                 ← черновики разборов и временные файлы
-desktop/                 ← ПРИЛОЖЕНИЕ «Здоровье» (Electron) — основной интерфейс, см. «Приложение»
+desktop/                 ← ПРИЛОЖЕНИЕ SEL (Electron) — основной интерфейс, см. «Приложение»
 portal/                  ← страницы приложения: dashboard.html (сводка), nutrition.html, training.html, recovery.html, photos.html, settings.html,
                            whatsnew.html (вся история версий) + whatsnew.js (окно «Что нового» после обновления, на всех страницах)
                            common.css + common.js — тема, каркас, движок графиков; пустая страница (data-needs) → «Подключите…»
@@ -48,7 +48,9 @@ dist/                    ← собранные приложения (не в gi
 
 ## Приложение (desktop/, Electron, Mac и Windows) — на Mac установлено в /Applications, данные смотрим в нём
 - Дизайн и план — `docs/superpowers/specs/2026-11-21-electron-app-design.md`, `docs/superpowers/plans/2026-11-21-electron-app.md`
-- Папку данных спрашивает при первом запуске (по умолчанию `Документы/Здоровье/data`); «Сменить папку…» — в «Настройках».
+- Папку данных спрашивает при первом запуске (по умолчанию `Документы/SEL/data`); «Сменить папку…» — в «Настройках».
+  Прежнее имя «Здоровье»: настройки из `Application Support/Здоровье` SEL переносит сам при первом запуске (datadir.migrate),
+  установщик удаляет `/Applications/Здоровье.app`
   FatSecret и Whoop — кнопками в «Настройках»; обновление — при запуске и кнопкой «Обновить данные» (Whoop → разметка ночей
   алкоголя за 30 дней, не раньше `meta.alcohol_from`). Цели КБЖУ и веса — в «Настройках», с любой даты, ккал = 4·Б + 9·Ж + 4·У.
   Алкоголь — на «Восстановлении»: ответы «Мало / Умеренно / Много / Не было», ручное добавление, удаление (events.csv → level)
@@ -58,14 +60,14 @@ dist/                    ← собранные приложения (не в gi
   `changelog.js` (разбор CHANGELOG.md, версии, выпуск), `whatsnew.js` (что показать после обновления)
 - Тесты: `cd desktop && npm test` (эталоны прежних Python-скриптов — `desktop/test/fixtures`); окно без клика —
   `HEALTH_DOCUMENTS=<папка> HEALTH_SMOKE=1 [HEALTH_PAGE=… HEALTH_SMOKE_JS=… HEALTH_SMOKE_SHOT=…] npx electron .`
-- Сборка: `cd desktop && npm run dist:mac` → `dist/Здоровье-<версия>-mac-arm64.zip` и `…-x64.zip` (ad-hoc подпись; собирается в
+- Сборка: `cd desktop && npm run dist:mac` → `dist/SEL-<версия>-mac-arm64.zip` и `…-x64.zip` (ad-hoc подпись; собирается в
   ~/Library/Caches/health-app-build — в «Документах» codesign падает). Ключи приложений берёт из `<папка данных>/secrets`:
   FatSecret — `fatsecret_app.json`, пока нет — consumer-поля из `fatsecret.json` (временно); Whoop — `whoop_app.json`.
-  Windows — `npm run dist:win` (с этого Mac, без Wine) → `dist/Здоровье-<версия>-win-x64.exe` (portable, без подписи — SmartScreen
+  Windows — `npm run dist:win` (с этого Mac, без Wine) → `dist/SEL-<версия>-win-x64.exe` (portable, без подписи — SmartScreen
   предупредит; запуск exe здесь не проверить — нужна Windows). Меню обеих систем — `menu.js` (тест).
   Проверка приватности после сборки встроена. Каждый модуль, который подключает main.js, — в `build.files` (тест)
 - **Правило: функционал готов (тесты прошли, коммит) — сразу `cd desktop && npm run app:mac`**, не спрашивая: сборка →
-  открытое «Здоровье» закрывается → новое ставится в /Applications (вместо старого) → открывается для проверки. Сказать
+  открытое SEL закрывается → новое ставится в /Applications (вместо старого) → открывается для проверки. Сказать
   пользователю, что именно проверить. Не собирать, если упала сборка/тесты или в рабочей папке чужие незакоммиченные правки
 - **Версии и «Что нового»** (дизайн — `docs/superpowers/specs/2026-11-22-release-notes-design.md`): SemVer X.Y.Z —
   X: нужен шаг пользователя / нельзя откатиться (папка данных, переподключение, системные требования), Y: новые
@@ -73,7 +75,7 @@ dist/                    ← собранные приложения (не в gi
   Исправлено / Удалено / Безопасность). **Каждое заметное для пользователя изменение приложения — пункт в «Не выпущено»**
   в том же коммите: для знакомых, «что изменилось для вас», без имён файлов. Выпуск — `cd desktop && npm run release X.Y.Z`
   (дата, версия в package.json и lock, коммит «Выпуск X.Y.Z», тег vX.Y.Z), потом `npm run dist:mac`; без заметок к версии
-  сборка не идёт. Окно — один раз после обновления (`lastSeenVersion` в `~/Library/Application Support/Здоровье/config.json`;
+  сборка не идёт. Окно — один раз после обновления (`lastSeenVersion` в `~/Library/Application Support/SEL/config.json`;
   новичку — нет); проверка — `HEALTH_WHATSNEW=0.0.0` к запуску без клика (из папки проекта видно и «Не выпущено»)
 - Electron пересобирать раз в полгода; при правке CSV-схемы — `desktop/schema.json` (тест сверяет с lib.py)
 

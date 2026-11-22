@@ -117,7 +117,7 @@ class SchemaEvolutionTest(TempData):
 
 
 class DataLocationTest(unittest.TestCase):
-    """Папка данных: HEALTH_DATA → папка из настроек приложения «Здоровье» → data/ проекта."""
+    """Папка данных: HEALTH_DATA → папка из настроек приложения SEL → data/ проекта."""
 
     def test_env_first(self):
         self.assertEqual(lib.find_data(env={"HEALTH_DATA": "/x/data"}, config=Path("/nope.json")), Path("/x/data"))

@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const path = require('node:path');
 const {resolve} = require('../protocol');
 
-const PORTAL = '/app/portal', DATA = '/Users/u/Documents тест/Здоровье/data';
+const PORTAL = '/app/portal', DATA = '/Users/u/Documents тест/SEL/data';
 
 test('allowed', () => {
   assert.strictEqual(resolve('app://h/portal/dashboard.html', PORTAL, DATA), path.join(PORTAL, 'dashboard.html'));

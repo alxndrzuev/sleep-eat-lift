@@ -1,8 +1,8 @@
 {
   "name": "health-app",
-  "productName": "Здоровье",
+  "productName": "SEL",
   "version": "1.0.0",
-  "description": "Здоровье — питание, вес, сон, восстановление и тренировки из FatSecret и Whoop",
+  "description": "SEL (sleep · eat · lift) — питание, вес, сон, восстановление и тренировки из FatSecret и Whoop",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "local.health.app",
-    "productName": "Здоровье",
+    "productName": "SEL",
     "directories": {
       "output": "../dist",
       "buildResources": "build"
@@ -72,7 +72,7 @@
       ],
       "identity": "-",
       "category": "public.app-category.healthcare-fitness",
-      "artifactName": "Здоровье-${version}-mac-${arch}.${ext}",
+      "artifactName": "SEL-${version}-mac-${arch}.${ext}",
       "hardenedRuntime": false
     },
     "win": {
@@ -84,7 +84,7 @@
           ]
         }
       ],
-      "artifactName": "Здоровье-${version}-win-${arch}.${ext}"
+      "artifactName": "SEL-${version}-win-${arch}.${ext}"
     },
     "afterPack": "scripts/afterpack.js"
   }
