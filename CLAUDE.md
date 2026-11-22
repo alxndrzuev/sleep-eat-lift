@@ -66,7 +66,7 @@ dist/                    ← собранные приложения (не в gi
   Эталоны прежних Python-скриптов — `desktop/test/fixtures`; окно без клика —
   `HEALTH_DOCUMENTS=<папка> HEALTH_SMOKE=1 [HEALTH_PAGE=… HEALTH_SMOKE_JS=… HEALTH_SMOKE_SHOT=…] npx electron .`
 - Сборка: `cd desktop && npm run dist:mac` → `dist/SEL-<версия>-mac-arm64.zip` и `…-x64.zip` (ad-hoc подпись; собирается в
-  ~/Library/Caches/health-app-build — в «Документах» codesign падает). Ключи приложений берёт из `<папка данных>/secrets`:
+  ~/Library/Caches/sleep-eat-lift-build — в «Документах» codesign падает). Ключи приложений берёт из `<папка данных>/secrets`:
   FatSecret — `fatsecret_app.json`, пока нет — consumer-поля из `fatsecret.json` (временно); Whoop — `whoop_app.json`.
   Windows — `npm run dist:win` (с этого Mac, без Wine) → `dist/SEL-<версия>-win-x64.exe` (portable, без подписи — SmartScreen
   предупредит; запуск exe здесь не проверить — нужна Windows). Меню обеих систем — `menu.js` (тест).

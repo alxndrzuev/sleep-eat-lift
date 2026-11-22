@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const OUT = path.join(os.homedir(), 'Library', 'Caches', 'health-app-build');
+const OUT = path.join(os.homedir(), 'Library', 'Caches', 'sleep-eat-lift-build');
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const VERSION = require('../package.json').version;         // только текущая версия, старые сборки в папке не трогаем
 fs.mkdirSync(DIST, {recursive: true});

@@ -129,7 +129,7 @@
     if (has("portal") && has("data")) return {path: ["data", "photos"], warn: null};
     if (name === "data") return {path: [FOLDER], warn: null};
     if (name === FOLDER) return {path: [], warn: null};
-    return {path: null, warn: `Выбрана папка «${name}». Выберите папку проекта health (в ней лежат portal и data) — ` +
+    return {path: null, warn: `Выбрана папка «${name}». Выберите папку проекта sleep-eat-lift (в ней лежат portal и data) — ` +
                               `фото сохранятся в data/photos, иначе страница их не увидит.`};
   }
 

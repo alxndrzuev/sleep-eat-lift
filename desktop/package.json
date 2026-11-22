@@ -1,5 +1,5 @@
 {
-  "name": "health-app",
+  "name": "sleep-eat-lift",
   "productName": "SEL",
   "version": "1.1.0",
   "description": "SEL (sleep · eat · lift) — питание, вес, сон, восстановление и тренировки из FatSecret и Whoop",
@@ -9,9 +9,9 @@
     "start": "electron .",
     "test": "node --test test/",
     "release": "node scripts/release.js",
-    "dist:mac": "node scripts/prepare.js && electron-builder --mac -c.directories.output=\"$HOME/Library/Caches/health-app-build\" && node scripts/collect.js",
+    "dist:mac": "node scripts/prepare.js && electron-builder --mac -c.directories.output=\"$HOME/Library/Caches/sleep-eat-lift-build\" && node scripts/collect.js",
     "app:mac": "npm run dist:mac && node scripts/install.js",
-    "dist:win": "node scripts/prepare.js && electron-builder --win -c.directories.output=\"$HOME/Library/Caches/health-app-build\" && node scripts/collect.js"
+    "dist:win": "node scripts/prepare.js && electron-builder --win -c.directories.output=\"$HOME/Library/Caches/sleep-eat-lift-build\" && node scripts/collect.js"
   },
   "devDependencies": {
     "electron": "^45.4.1",

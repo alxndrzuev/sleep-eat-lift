@@ -153,7 +153,7 @@ test('validate plan', () => {
 });
 
 test('project path from the page address', () => {
-  assert.strictEqual(js('PhotosCore.projectPath("/Users/u/Documents/claude/health/portal/photos.html")'), '/Users/u/Documents/claude/health');
+  assert.strictEqual(js('PhotosCore.projectPath("/Users/u/Documents/claude/sleep-eat-lift/portal/photos.html")'), '/Users/u/Documents/claude/sleep-eat-lift');
   assert.strictEqual(js('PhotosCore.projectPath("/Users/a/My%20Docs/%D0%B7%D0%B4%D0%BE%D1%80%D0%BE%D0%B2%D1%8C%D0%B5/portal/photos.html")'),
     '/Users/a/My Docs/здоровье');
   assert.strictEqual(js('PhotosCore.projectPath("/x/photos.html")'), null);
@@ -161,13 +161,13 @@ test('project path from the page address', () => {
 
 test('chosen folder → where to write photos', () => {
   const r = (name, kids) => js(`PhotosCore.resolveFolder(${J(name)}, ${J(kids)})`);
-  assert.deepStrictEqual(r('health', ['portal', 'data', 'scripts']), {path: ['data', 'photos'], warn: null});   // папка проекта
+  assert.deepStrictEqual(r('sleep-eat-lift', ['portal', 'data', 'scripts']), {path: ['data', 'photos'], warn: null});   // папка проекта
   assert.deepStrictEqual(r('мой-проект', ['data', 'portal']), {path: ['data', 'photos'], warn: null});         // как бы ни называлась
   assert.deepStrictEqual(r('data', ['body.csv', 'photos_2']), {path: ['photos'], warn: null});
   assert.deepStrictEqual(r('photos', ['originals']), {path: [], warn: null});
   const bad = r('Downloads', ['a.jpg']);
   assert.strictEqual(bad.path, null);
-  assert.match(bad.warn, /health/);
+  assert.match(bad.warn, /sleep-eat-lift/);
 });
 
 const kp = pts => js(`PhotosCore.keypointsFromLandmarks(${lm(pts)}, 1000, 2000)`);
