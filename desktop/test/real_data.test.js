@@ -13,7 +13,7 @@ const skip = !(DIR && fs.existsSync(DIR)) && 'нет папки данных н�
 const SCHEMA = store.SCHEMA;
 const TEXT = new Set(SCHEMA.text);
 // файлы, убранные из схемы в 1.2: у старых папок могут остаться — приложение их не читает
-const REMOVED = ['checkins.csv', 'labs.csv', 'photo_notes.csv'];
+const REMOVED = ['checkins.csv', 'labs.csv', 'photo_notes.csv', 'workout_labels.csv'];
 const csvFiles = () => fs.readdirSync(DIR).filter(f => f.endsWith('.csv') && !REMOVED.includes(f));
 
 test('every CSV has a schema and the right header', {skip}, () => {

@@ -62,7 +62,9 @@
 
 <div class="card" style="margin-top:16px">
   <h2>Тренировки за период</h2>
-  <div class="desc">Whoop. Силовые = weightlifting + functional fitness; прогулки не считаем. «Без вида» — тип activity: вид тренировки в Whoop не указан</div>
+  <div class="desc">Whoop. Силовые = weightlifting + functional fitness, кардио — всё остальное от 20 минут; прогулки не считаем.
+    «Без вида» — вид тренировки не указан. Вид тренировки меняется в приложении, где она записана: исправления за последние
+    2 недели подтянутся при обновлении данных</div>
   <div class="tablewrap" style="max-height:420px"><table id="wlist"></table></div>
 </div>
 
@@ -88,7 +90,7 @@ const K2 = 'cardio', K2L = 'Кардио', K2M = 'кардио';
 const G = DATA.goals || {};            // цели на сегодня (targets.csv)
 const PW = G.strength_wk!=null || G.cardio_wk!=null ? {strength:G.strength_wk||0, cardio:G.cardio_wk||0} : null;   // в неделю или нет
 const KIND_LAB = {cardio:'Кардио', strength:'Силовая'};
-const WK = (DATA.whoop_workouts||[]).filter(w=>w.kind!=='walk');   // kind (с учётом меток workout_labels.csv) — считает dataset.js
+const WK = (DATA.whoop_workouts||[]).filter(w=>w.kind!=='walk');   // kind — считает dataset.js
 const KC = {strength:()=>css('--series-2'), [K2]:()=>css('--series-1')};
 const wByDate = {}; WK.forEach(x=>(wByDate[x.date] ||= []).push(x));
 const zmin = (w,a,b) => { let s=0; for(let i=a;i<=b;i++) s+=w['z'+i+'_min']||0; return s; };
@@ -124,7 +126,7 @@ function tiles(){
     {lab:'Поздние (с 19:00)', val:S.late+'<small> из '+S.all+'</small>', note:'утром после них recovery ниже', c:null},
     {lab:'Последняя', val:last?(ago===0?'сегодня':ago===1?'вчера':dni(ago).replace(' ','<small> ')+' назад</small>'):'—', note:last?`${KIND_LAB[last.kind]} · ${fmtW(P(last.date))}, ${fmtD(P(last.date))}`:'', c:last?st(ago<=3,ago<=5):null},
   ];
-  if(S.unl) items.push({lab:'Без вида', val:S.unl, note:'укажите вид в приложении Whoop', c:css('--warning')});
+  if(S.unl) items.push({lab:'Без вида', val:S.unl, note:'укажите вид в приложении, где записана тренировка', c:css('--warning')});
   tileCards(items);
 }
 

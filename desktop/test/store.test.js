@@ -23,7 +23,7 @@ test('init creates folders and CSV headers once', () => {
   assert.ok(created.includes('body.csv'));
   assert.strictEqual(fs.readFileSync(path.join(dir, 'body.csv'), 'utf8'), 'date,weight_kg,note\n');
   assert.ok(created.includes('plans.csv'));
-  for (const gone of ['checkins.csv', 'labs.csv', 'photo_notes.csv']) assert.ok(!fs.existsSync(path.join(dir, gone)), gone);
+  for (const gone of ['checkins.csv', 'labs.csv', 'photo_notes.csv', 'workout_labels.csv']) assert.ok(!fs.existsSync(path.join(dir, gone)), gone);
   for (const sub of ['secrets', 'photos']) assert.ok(fs.statSync(path.join(dir, sub)).isDirectory());
   assert.deepStrictEqual(store.init(dir), []);
 });

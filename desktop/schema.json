@@ -95,13 +95,6 @@
    "purpose",
    "note"
   ],
-  "workout_labels.csv": [
-   "id",
-   "date",
-   "start",
-   "label",
-   "note"
-  ],
   "plans.csv": [
    "start",
    "text"
@@ -109,15 +102,13 @@
  },
  "key": {
   "whoop_workouts.csv": "id",
-  "workout_labels.csv": "id",
   "targets.csv": "start",
   "events.csv": "start",
   "supplements.csv": "start",
   "plans.csv": "start"
  },
  "sort": {
-  "whoop_workouts.csv": "start",
-  "workout_labels.csv": "start"
+  "whoop_workouts.csv": "start"
  },
  "text": [
   "bed",
@@ -127,7 +118,6 @@
   "end",
   "id",
   "kind",
-  "label",
   "level",
   "marker",
   "name",

@@ -28,7 +28,7 @@ test('macros by month — full days only', () => {
   assert.deepStrictEqual(d.nutrition[1], ['2026-11-02', 900, 10, 5, 100]);
 });
 
-test('workouts: user label overrides Whoop, walks dropped', () => {
+test('workouts: kind from the sport only (old labels file is ignored), walks dropped', () => {
   const w = (id, sport, start) => ({id, date: start.slice(0, 10), start, sport, duration_min: 60, strain: null, avg_hr: null,
     max_hr: null, kcal: 400, z0_min: null, z1_min: null, z2_min: null, z3_min: null, z4_min: null, z5_min: null});
   const r = raw({whoop_workouts: [w('1', 'activity', '2026-11-10 20:00'), w('2', 'squash', '2026-11-11 20:00'),
@@ -37,9 +37,9 @@ test('workouts: user label overrides Whoop, walks dropped', () => {
                  workout_labels: [{id: '1', date: '2026-11-10', start: '2026-11-10 20:00', label: 'strength', note: null},
                                   {id: '3', date: '2026-11-12', start: '2026-11-12 20:00', label: 'none', note: null}]});
   const d = build(r);
-  assert.deepStrictEqual(d.workouts, [['2026-11-08 20:00', 'strength', 60, 400], ['2026-11-10 20:00', 'strength', 60, 400],
-                                      ['2026-11-11 20:00', 'cardio', 60, 400]]);
-  assert.deepStrictEqual(d.whoop_workouts.map(x => x.kind), ['strength', 'cardio', 'walk', 'walk', 'strength']);
+  assert.deepStrictEqual(d.workouts, [['2026-11-08 20:00', 'strength', 60, 400], ['2026-11-10 20:00', 'cardio', 60, 400],
+                                      ['2026-11-11 20:00', 'cardio', 60, 400], ['2026-11-12 20:00', 'cardio', 60, 400]]);
+  assert.deepStrictEqual(d.whoop_workouts.map(x => x.kind), ['cardio', 'cardio', 'cardio', 'walk', 'strength']);
 });
 
 test('series skip empty values', () => {
@@ -68,10 +68,9 @@ test('strength and cardio for everyone: walks and cardio under 20 min are not wo
     wo('4', 'activity', null, '2026-11-10 20:00', 40), wo('5', 'dance', null, '2026-11-10 20:00', 118),
     wo('6', 'cycling', null, '2026-11-10 21:00', 15), wo('7', 'walking'), wo('8', 'functional-fitness', null, '2026-11-10 20:00', 15),
     wo('9', 'cycling', null, '2026-11-10 21:00', 15), wo('10', 'squash'), wo('11', 'activity', null, '2026-11-10 20:00', 20)];
-  const labels = [{id: '9', date: null, start: null, label: 'squash', note: null}, {id: '10', date: null, start: null, label: 'none', note: null}];
-  const d = build(raw({whoop_workouts: ws, workout_labels: labels}));
+  const d = build(raw({whoop_workouts: ws}));
   assert.deepStrictEqual(Object.fromEntries(d.whoop_workouts.map(w => [w.id, w.kind])),
-    {1: 'strength', 2: 'cardio', 3: 'cardio', 4: 'cardio', 5: 'cardio', 6: 'walk', 7: 'walk', 8: 'strength', 9: 'cardio', 10: 'walk', 11: 'cardio'});
+    {1: 'strength', 2: 'cardio', 3: 'cardio', 4: 'cardio', 5: 'cardio', 6: 'walk', 7: 'walk', 8: 'strength', 9: 'walk', 10: 'cardio', 11: 'cardio'});
 });
 
 test('goals and plan in effect on the update day', () => {

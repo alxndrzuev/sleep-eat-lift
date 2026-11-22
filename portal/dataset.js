@@ -3,7 +3,6 @@
 var Dataset = (function () {
   const FULL_DAY_KCAL = 1200;   // дни в FatSecret меньше — «не заполнен», в средние не идут (lib.FULL_DAY_KCAL)
   const STRENGTH = ["weightlifting_msk", "functional-fitness", "powerlifting", "weightlifting"];
-  const LABELS = ["strength", "squash", "cardio", "other", "none"];   // метки пользователя (workout_labels.csv)
   const SHORT_CARDIO_MIN = 20;  // кардио короче — не тренировка (разминка или заминка на велосипеде после силовой)
   const GOAL_HIT = 0.15, GOAL_NEAR = 0.30;   // день питания: Б, Ж, У в пределах ±15 % от цели — выполнил, до ±30 % — рядом, дальше — мимо
   const MACROS = [["p", "protein", "белок"], ["f", "fat", "жиры"], ["c", "carbs", "углеводы"]];   // [поле дня, поле цели, подпись]
@@ -35,10 +34,8 @@ var Dataset = (function () {
   }
 
   /** Вид тренировки — одинаково у всех: strength (силовые виды Whoop) / cardio (всё остальное, в т. ч. сквош и вид
-      «не указан») / walk (не тренировка: прогулка, кардио короче 20 минут, метка none). Метка пользователя главнее вида. */
-  function workoutKind(w, labels) {
-    const lab = labels && labels[String(w.id)];
-    if (lab && LABELS.includes(lab.label)) return lab.label === "none" ? "walk" : lab.label === "strength" ? "strength" : "cardio";
+      «не указан») / walk (не тренировка: прогулка, кардио короче 20 минут). Вид меняют в приложении, где записана тренировка. */
+  function workoutKind(w) {
     const s = String(w.sport || "").toLowerCase();
     if (STRENGTH.includes(s)) return "strength";
     if (s === "walking") return "walk";
@@ -97,9 +94,7 @@ var Dataset = (function () {
     const wd = T("whoop_daily");
     for (const [key, col] of [["sleep", "sleep_h"], ["rhr", "rhr"], ["steps", "steps"]])
       d[key] = wd.filter(r => r[col] != null).map(r => [r.date, r[col]]);
-    const labels = {};
-    for (const l of T("workout_labels")) labels[String(l.id)] = l;
-    const ww = T("whoop_workouts").map(w => Object.assign({}, w, {kind: workoutKind(w, labels)}));
+    const ww = T("whoop_workouts").map(w => Object.assign({}, w, {kind: workoutKind(w)}));
     d.workouts = ww.filter(w => w.kind !== "walk").map(w => [w.start, w.kind, w.duration_min, w.kcal]).sort(cmp);
     d.whoop_daily = wd;
     d.whoop_workouts = ww;

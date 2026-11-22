@@ -91,6 +91,7 @@ test('«Кардио» on «Тренировки» for everyone, no goals — no
   hasNot(dom, 'Сквош');
   hasNot(dom, 'Другое');
   hasNot(dom, 'план 2');
+  has(dom, 'Вид тренировки меняется в приложении, где она записана');           // меток в SEL нет
 });
 
 test('no goals: dashboard and «Восстановление» render', {skip}, () => {
