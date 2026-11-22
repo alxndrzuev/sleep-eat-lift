@@ -81,7 +81,7 @@ cd desktop && HEALTH_DOCUMENTS=/tmp/health-docs HEALTH_SMOKE=1 HEALTH_PAGE=train
 cd desktop && npm run app:mac
 ```
 
-Версия для Windows собирается на том же Mac — один файл `dist/SEL-<версия>-win-x64.exe`, работает без установки
+Версия для Windows собирается на том же Mac — один файл `dist/<версия>/SEL-<версия>-win-x64.exe`, работает без установки
 (без подписи: при первом запуске «Подробнее» → «Выполнить в любом случае»):
 
 ```bash
@@ -89,7 +89,9 @@ cd desktop && npm run dist:win
 ```
 
 Выпуск версии: пункты копятся в разделе «Не выпущено» файла `desktop/CHANGELOG.md`, затем
-`cd desktop && npm run release X.Y.Z` и `npm run dist:mac`. Правила версий — в `CLAUDE.md`.
+`cd desktop && npm run release X.Y.Z`, `npm run app:mac` и `npm run dist:win`. У каждой версии — папка `dist/<версия>/`:
+заметки `release-notes.md` и сборки для Mac и Windows; сборка до выпуска (есть «Не выпущено») — в `dist/dev/`.
+Правила версий — в `CLAUDE.md`.
 
 ## Безопасность и приватность
 

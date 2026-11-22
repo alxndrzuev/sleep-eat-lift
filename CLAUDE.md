@@ -44,7 +44,8 @@ scripts/                 ← Node без зависимостей (берёт м
                            (тот же store.js, что в приложении; пересобирает data.js) · read <файл> [N] · remove · dir
   vendor_fetch.js        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
   public_check.js        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
-dist/                    ← собранные приложения (не в git)
+dist/                    ← собранные приложения (не в git): dist/<версия>/ — release-notes.md + zip Mac + exe Windows;
+                           dist/dev/ — проверочная сборка, пока есть «Не выпущено» (scripts/dist.js, тест)
 ```
 
 ## Приложение (desktop/, Electron, Mac и Windows) — на Mac установлено в /Applications, данные смотрим в нём
@@ -65,10 +66,10 @@ dist/                    ← собранные приложения (не в gi
   настоящая папка данных (формат, если есть), scripts/; `RENDER=1 npm test` — ещё и отрисовка страниц в Chrome.
   Эталоны прежних Python-скриптов — `desktop/test/fixtures`; окно без клика —
   `HEALTH_DOCUMENTS=<папка> HEALTH_SMOKE=1 [HEALTH_PAGE=… HEALTH_SMOKE_JS=… HEALTH_SMOKE_SHOT=…] npx electron .`
-- Сборка: `cd desktop && npm run dist:mac` → `dist/SEL-<версия>-mac-arm64.zip` и `…-x64.zip` (ad-hoc подпись; собирается в
+- Сборка: `cd desktop && npm run dist:mac` → `dist/<версия>/SEL-<версия>-mac-arm64.zip` и `…-x64.zip` + `release-notes.md` (ad-hoc подпись; собирается в
   ~/Library/Caches/sleep-eat-lift-build — в «Документах» codesign падает). Ключи приложений берёт из `<папка данных>/secrets`:
   FatSecret — `fatsecret_app.json`, пока нет — consumer-поля из `fatsecret.json` (временно); Whoop — `whoop_app.json`.
-  Windows — `npm run dist:win` (с этого Mac, без Wine) → `dist/SEL-<версия>-win-x64.exe` (portable, без подписи — SmartScreen
+  Windows — `npm run dist:win` (с этого Mac, без Wine) → `dist/<версия>/SEL-<версия>-win-x64.exe` (portable, без подписи — SmartScreen
   предупредит; запуск exe здесь не проверить — нужна Windows). Меню обеих систем — `menu.js` (тест).
   Проверка приватности после сборки встроена. Каждый модуль, который подключает main.js, — в `build.files` (тест)
 - **Правило: функционал готов (тесты прошли, коммит) — сразу `cd desktop && npm run app:mac`**, не спрашивая: сборка →
@@ -79,7 +80,7 @@ dist/                    ← собранные приложения (не в gi
   возможности, Z: исправления. Заметки — `desktop/CHANGELOG.md` (Keep a Changelog по-русски: Новое / Изменено /
   Исправлено / Удалено / Безопасность). **Каждое заметное для пользователя изменение приложения — пункт в «Не выпущено»**
   в том же коммите: для знакомых, «что изменилось для вас», без имён файлов. Выпуск — `cd desktop && npm run release X.Y.Z`
-  (дата, версия в package.json и lock, коммит «Выпуск X.Y.Z», тег vX.Y.Z), потом `npm run dist:mac`; без заметок к версии
+  (дата, версия в package.json и lock, коммит «Выпуск X.Y.Z», тег vX.Y.Z), потом `npm run app:mac` и `npm run dist:win` → всё в `dist/X.Y.Z/`; push коммитов и тега — по просьбе; без заметок к версии
   сборка не идёт. Окно — один раз после обновления (`lastSeenVersion` в `~/Library/Application Support/SEL/config.json`;
   новичку — нет); проверка — `HEALTH_WHATSNEW=0.0.0` к запуску без клика (из папки проекта видно и «Не выпущено»)
 - Electron пересобирать раз в полгода; схема CSV — только `desktop/schema.json`

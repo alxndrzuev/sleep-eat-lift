@@ -1,4 +1,4 @@
-// Установка сборки (scripts/install.js) во временные папки: старое приложение заменяется целиком сборкой из dist/
+// Установка сборки (scripts/install.js) во временные папки: старое приложение заменяется целиком сборкой из dist/<версия>/ (dist/dev/)
 // под этот Mac, прежнее «Здоровье.app» удаляется; нет сборки — ошибка, установленное не трогается. Закрытие и запуск окна здесь выключены.
 const test = require('node:test');
 const assert = require('node:assert');
@@ -9,6 +9,7 @@ const {execFileSync, spawnSync} = require('node:child_process');
 
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'install.js');
 const VERSION = require('../package.json').version;
+const FOLDER = require('../scripts/dist').target(fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8'), VERSION).folder;
 const ARCH = os.arch() === 'arm64' ? 'arm64' : 'x64';
 
 function dirs() {
@@ -28,8 +29,9 @@ function zipApp(dist, arch, file) {
   const src = fs.mkdtempSync(path.join(os.tmpdir(), 'health-src-'));
   fs.mkdirSync(path.join(src, 'SEL.app', 'Contents'), {recursive: true});
   fs.writeFileSync(path.join(src, 'SEL.app', 'Contents', file), file);
+  fs.mkdirSync(path.join(dist, FOLDER), {recursive: true});
   execFileSync('ditto', ['-c', '-k', '--keepParent', path.join(src, 'SEL.app'),
-    path.join(dist, `SEL-${VERSION}-mac-${arch}.zip`)]);
+    path.join(dist, FOLDER, `SEL-${VERSION}-mac-${arch}.zip`)]);
 }
 
 test('replaces installed app with the build for this Mac', {skip: process.platform !== 'darwin'}, () => {

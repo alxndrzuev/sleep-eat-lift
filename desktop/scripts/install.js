@@ -1,5 +1,5 @@
 // Свежую сборку — в /Applications и открыть для проверки: npm run app:mac (= dist:mac + этот скрипт).
-// Запущенное SEL (любая копия, по bundle id — и прежнее «Здоровье») закрывается, старое приложение заменяется сборкой из dist/
+// Запущенное SEL (любая копия, по bundle id — и прежнее «Здоровье») закрывается, старое приложение заменяется сборкой из dist/<версия>/ (или dist/dev/)
 // под этот Mac; прежнее «Здоровье.app» (так приложение называлось до SEL) удаляется.
 // HEALTH_INSTALL_DIR / HEALTH_DIST_DIR — другие папки, HEALTH_NO_LAUNCH=1 — не закрывать и не открывать (тесты).
 const fs = require('node:fs');
@@ -12,7 +12,8 @@ const DEST = process.env.HEALTH_INSTALL_DIR || '/Applications';
 const DIST = process.env.HEALTH_DIST_DIR || path.join(__dirname, '..', '..', 'dist');
 const LAUNCH = process.env.HEALTH_NO_LAUNCH !== '1';
 const VERSION = require('../package.json').version;
-const ZIP = path.join(DIST, `${NAME}-${VERSION}-mac-${os.arch() === 'arm64' ? 'arm64' : 'x64'}.zip`);
+const FOLDER = require('./dist').target(fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8'), VERSION).folder;
+const ZIP = path.join(DIST, FOLDER, `${NAME}-${VERSION}-mac-${os.arch() === 'arm64' ? 'arm64' : 'x64'}.zip`);
 const APP = path.join(DEST, NAME + '.app');
 const fail = msg => { console.error(msg); process.exit(1); };
 const osa = s => spawnSync('osascript', ['-e', s], {encoding: 'utf8'}).stdout.trim();

@@ -1,6 +1,6 @@
 // Выпуск версии: npm run release X.Y.Z — заметки из «Не выпущено» (CHANGELOG.md) → под номер с сегодняшней датой,
 // версия в package.json и package-lock.json, коммит «Выпуск X.Y.Z» (только эти три файла) и тег vX.Y.Z в локальном git
-// (никуда не пушим). Потом — npm run dist:mac. HEALTH_RELEASE_DIR / HEALTH_TODAY — другая папка и дата (тесты).
+// (никуда не пушим). Потом — npm run app:mac и dist:win (→ dist/X.Y.Z/). HEALTH_RELEASE_DIR / HEALTH_TODAY — другая папка и дата (тесты).
 const fs = require('node:fs');
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
@@ -39,4 +39,4 @@ if (lock.packages && lock.packages['']) lock.packages[''].version = v;
 writeJson('package-lock.json', lock);
 git('commit', '-q', '-m', `Выпуск ${v}`, '--', ...FILES);
 git('tag', '-a', 'v' + v, '-m', `SEL ${v}\n\n${notes(cl.entry(md, v))}`);
-console.log(`Выпущена ${v}: коммит «Выпуск ${v}», тег v${v}. Дальше — npm run dist:mac`);
+console.log(`Выпущена ${v}: коммит «Выпуск ${v}», тег v${v}. Дальше — npm run app:mac и npm run dist:win (→ dist/${v}/)`);
