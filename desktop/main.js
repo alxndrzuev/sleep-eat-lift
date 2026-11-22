@@ -265,9 +265,10 @@ function createWindow() {
   });
 }
 
-// «О программе» (меню приложения): значок, версия, бренд проекта и где код
-const ABOUT = {applicationName: 'SEL', credits: 'SEL — sleep · eat · lift\nПитание, сон и тренировки из FatSecret и Whoop\n' +
-  'github.com/alxndrzuev/sleep-eat-lift', copyright: '© 2026 alxndrzuev · лицензия MIT'};
+// «О программе» (меню приложения): значок, имя, версия и весь текст — в нижней строке, её macOS ставит по центру (поле
+// credits — слева и другим шрифтом, его нет); version: '' — без «(1.1.0)» после версии
+const ABOUT = {applicationName: 'SEL', version: '', copyright: 'sleep · eat · lift\n' +
+  'Питание, сон и тренировки из FatSecret и Whoop\ngithub.com/alxndrzuev/sleep-eat-lift\n© 2026 alxndrzuev · лицензия MIT'};
 
 app.whenReady().then(async () => {
   app.setAboutPanelOptions(Object.assign({applicationVersion: app.getVersion()}, ABOUT));
