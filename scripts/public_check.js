@@ -2,7 +2,7 @@
 // Проверка перед коммитом в публичный репозиторий: в файлах проекта нет личного из папки данных.
 //
 // Ищет в каждом файле, который попадёт в git (отслеживаемые и новые, не игнорируемые; кроме portal/vendor — сторонние
-// библиотеки с хэшами) — и в рабочей копии, и в версии из индекса git (её заберёт коммит), строки CSV, id тренировок Whoop, значения из secrets/*.json, текст из meta.json и строки личных
+// библиотеки с хэшами) — и в рабочей копии, и в версии из индекса git (её заберёт коммит), строки CSV, id тренировок Whoop, значения из secrets/*.json и строки личных
 // документов data/docs/*.md. Почта автора коммитов — только noreply GitHub.
 //
 //   node scripts/public_check.js            # код выхода 1 — нашлось личное (что и где; значения секретов не печатаются)
@@ -42,9 +42,6 @@ function needles(data) {
     for (const s of strings(j))
       if (s.length >= 8 && !DATE.test(s) && !s.startsWith('http')) out.set(s, `значение из secrets/${f}`);
   }
-  const meta = path.join(data, 'meta.json');
-  if (fs.existsSync(meta))
-    for (const s of strings(JSON.parse(fs.readFileSync(meta, 'utf8')))) if (s.length >= 30) out.set(s, 'текст из meta.json');
   const docs = path.join(data, 'docs');
   for (const f of list(docs, '.md'))
     for (let line of lines(path.join(docs, f))) {

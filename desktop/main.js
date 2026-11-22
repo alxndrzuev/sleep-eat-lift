@@ -58,11 +58,7 @@ const services = {
     update: async (dir, first) => {
       const r = await whoop.update({dir, app: appKey('whoop', {packaged: app.isPackaged}), user: userKey('whoop'),
         days: updaterLib.whoopDays(first ? null : updaterLib.since(dir, 'whoop'), new Date()), saveUser: keys.saver('whoop')});
-      if (r.ok) {   // ночи «похоже на алкоголь» за последние 30 дней, но не раньше meta.alcohol_from
-        const floor = store.readJson(path.join(dir, 'meta.json')).alcohol_from || '';
-        const from = alcohol.fromDate(today());
-        alcohol.mark(dir, {from: floor > from ? floor : from});
-      }
+      if (r.ok) alcohol.mark(dir, {from: alcohol.fromDate(today())});   // ночи «похоже на алкоголь» за последние 30 дней
       return r;
     },
   },

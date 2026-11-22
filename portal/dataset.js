@@ -106,9 +106,8 @@ var Dataset = (function () {
     const p = inEffect(d.plans, raw.updated);
     d.plan_now = p ? {start: p.start, text: p.text} : null;
     d.updated = raw.updated;
-    d.sync = raw.sync || {};
-    d.errors = raw.errors || [];                           // файлы, которые не читаются (Nav покажет строку на всех страницах)                               // когда сервисы на самом деле обновились (sync.json)
-    Object.assign(d, raw.meta || {});
+    d.sync = raw.sync || {};                               // когда сервисы на самом деле обновились (sync.json)
+    d.errors = raw.errors || [];                           // файлы, которые не читаются (Nav покажет строку на всех страницах)
     d.modules = raw.modules || [];
     return d;
   }

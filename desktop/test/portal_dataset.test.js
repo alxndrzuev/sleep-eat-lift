@@ -11,7 +11,7 @@ const build = raw => js(`Dataset.build(${J(raw)})`);
 function raw(tables = {}) {
   const t = Object.fromEntries(Object.keys(SCHEMA.schema).map(n => [n, []]));
   for (const [k, v] of Object.entries(tables)) t[k + '.csv'] = v;
-  return {tables: t, meta: {}, modules: ['photos'], updated: '2026-11-21'};
+  return {tables: t, modules: ['photos'], updated: '2026-11-21'};
 }
 
 test('full day threshold: dataset.js = schema.json (1200 kcal)', () => {
@@ -47,11 +47,8 @@ test('series skip empty values', () => {
   assert.deepStrictEqual(d.weight, [['2026-11-01', 72.5]]);
 });
 
-test('meta and modules', () => {
-  const r = raw();
-  r.meta.alcohol_from = '2026-11-14';
-  const d = build(r);
-  assert.strictEqual(d.alcohol_from, '2026-11-14');
+test('modules and date', () => {
+  const d = build(raw());
   assert.deepStrictEqual(d.modules, ['photos']);
   assert.strictEqual(d.updated, '2026-11-21');
   for (const gone of ['k2', 'waist', 'photo_notes', 'checkins', 'labs', 'plan', 'priorities', 'photos_summary']) assert.ok(!(gone in d), gone);

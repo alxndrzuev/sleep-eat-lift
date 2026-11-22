@@ -57,11 +57,10 @@ test('data.js is RAW with numbers, built on request and never written to disk', 
   const js = store.dataJs(dir, '2026-11-21', ['photos']);
   assert.ok(!fs.existsSync(path.join(dir, 'data.js')));
   const raw = JSON.parse(js.slice(js.indexOf('const RAW = ') + 12).trim().replace(/;$/, ''));
-  assert.deepStrictEqual(Object.keys(raw).sort(), ['errors', 'meta', 'modules', 'sync', 'tables', 'updated']);
+  assert.deepStrictEqual(Object.keys(raw).sort(), ['errors', 'modules', 'sync', 'tables', 'updated']);
   assert.strictEqual(raw.tables['body.csv'][0].weight_kg, 70.5);
   assert.strictEqual(raw.tables['body.csv'][0].note, null);
   assert.deepStrictEqual(raw.modules, ['photos']);
-  assert.deepStrictEqual(raw.meta, {});
 });
 
 test('modules from secrets', () => {
@@ -113,12 +112,21 @@ test('read: wrong header is an error', () => {
   assert.throws(() => store.read(dir, 'body.csv'), /заголовок/);
 });
 
-test('meta.json: from data folder, missing → empty', () => {
+test('init removes meta.json of older versions only when it holds nothing but alcohol_from', () => {
   const {dir} = tmpDocs();
-  store.init(dir);
-  assert.deepStrictEqual(store.raw(dir, '2026-11-21', []).meta, {});
-  fs.writeFileSync(path.join(dir, 'meta.json'), '{"alcohol_from": "2026-11-14"}');
-  assert.strictEqual(store.raw(dir, '2026-11-21', []).meta.alcohol_from, '2026-11-14');
+  fs.mkdirSync(dir, {recursive: true});
+  const f = path.join(dir, 'meta.json');
+  for (const body of ['{"alcohol_from": "2026-11-14"}', '{}']) {
+    fs.writeFileSync(f, body);
+    store.init(dir);
+    assert.ok(!fs.existsSync(f), body);
+  }
+  for (const body of ['{"alcohol_from": "2026-11-14", "plan": "старый план"}', 'не JSON']) {   // чужие записи — не трогаем
+    fs.writeFileSync(f, body);
+    store.init(dir);
+    assert.strictEqual(fs.readFileSync(f, 'utf8'), body);
+  }
+  assert.ok(!('meta' in store.raw(dir, '2026-11-21', [])));
 });
 
 test('old body.csv with waist columns is read; write drops them', () => {

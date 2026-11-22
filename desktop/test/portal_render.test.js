@@ -214,8 +214,7 @@ test('escaped: sport name on «Тренировки»', {skip}, () => {
 
 test('owner data folder: workout goal, plan, all menu items', {skip}, t => {
   const dir = dataDir();
-  if (!dir || !fs.existsSync(path.join(dir, 'meta.json'))) return t.skip('нет папки данных с meta.json');
-  const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8'));
+  if (!dir || !fs.existsSync(path.join(dir, 'targets.csv'))) return t.skip('нет папки данных');
   const base = site(dir);                                            // настоящие данные — только читаем
   const dom = render(base, 'dashboard.html');
   fs.rmSync(base, {recursive: true, force: true});

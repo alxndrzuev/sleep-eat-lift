@@ -7,7 +7,6 @@ const {pyRound} = require('./pyround');
 
 const TEXT = new Set(SCHEMA.text);
 const README_MARK = '# Папка данных SEL';   // первая строка desktop/data_readme.md — так узнаём свой README
-const META_EMPTY = {};   // meta.json — только alcohol_from (с какого утра размечать алкоголь)
 
 function dataDir(documents) { return path.join(documents, 'SEL', 'data'); }
 
@@ -15,10 +14,16 @@ const keyOf = name => SCHEMA.key[name] || 'date';
 const sortOf = name => SCHEMA.sort[name] || keyOf(name);
 
 /** Папки, CSV с заголовками и README.md; существующие CSV не трогает. → имена созданных CSV.
- *  data.js прежних версий (копия CSV на диске) удаляет: страницы получают данные прямо из CSV (dataJs). */
+ *  data.js прежних версий (копия CSV на диске) удаляет: страницы получают данные прямо из CSV (dataJs).
+ *  meta.json прежних версий (только alcohol_from — с какого утра размечать алкоголь) удаляет; в нём есть что-то ещё
+ *  (план, журнал из самых старых версий) — не трогает. */
 function init(dir) {
   for (const sub of ['', 'secrets', 'photos']) fs.mkdirSync(path.join(dir, sub), {recursive: true});
   for (const old of ['data.js', 'data.js.tmp']) fs.rmSync(path.join(dir, old), {force: true});
+  const meta = path.join(dir, 'meta.json');
+  let old = null;
+  try { old = JSON.parse(fs.readFileSync(meta, 'utf8')); } catch (e) {}   // нет файла или не JSON — не трогаем
+  if (old && typeof old === 'object' && !Array.isArray(old) && Object.keys(old).every(k => k === 'alcohol_from')) fs.rmSync(meta);
   const created = [];
   for (const [name, cols] of Object.entries(SCHEMA.schema)) {
     const f = path.join(dir, name);
@@ -154,14 +159,13 @@ function saveSync(dir, name, iso) {
 }
 
 function raw(dir, today, mods) {
-  const meta = fs.existsSync(path.join(dir, 'meta.json')) ? readJson(path.join(dir, 'meta.json')) : JSON.parse(JSON.stringify(META_EMPTY));
   // испорченный файл (не тот заголовок, не число) — таблица пустая, ошибка — страницам (Nav покажет), файл не трогаем:
   // приложение открывается, а исправить файл можно руками
   const tables = {}, errors = [];
   for (const name of Object.keys(SCHEMA.schema)) {
     try { tables[name] = load(dir, name); } catch (e) { tables[name] = []; errors.push(e.message); }
   }
-  return {tables, meta, modules: mods || modules(dir), updated: today, sync: readSync(dir), errors};
+  return {tables, modules: mods || modules(dir), updated: today, sync: readSync(dir), errors};
 }
 
 /** Скрипт app://h/data/data.js — `const RAW = …` из CSV прямо сейчас (на диск не пишется); расчёт — portal/dataset.js. */

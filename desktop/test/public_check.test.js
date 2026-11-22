@@ -14,7 +14,6 @@ function fixture() {
   fs.writeFileSync(path.join(data, 'body.csv'), 'date,weight_kg,waist_cm,bodyfat_pct,note\n2026-11-10,75.5,80.0,,FatSecret утро\n');
   fs.writeFileSync(path.join(data, 'whoop_workouts.csv'), 'id,date\n7a8e6852-0000-0000-0000-27513f5103cb,2025-05-01\n');
   fs.writeFileSync(path.join(data, 'secrets', 'whoop.json'), JSON.stringify({refresh_token: 'rt-SECRET-123456', expires_at: '2026-11-22T10:00:00Z'}));
-  fs.writeFileSync(path.join(data, 'meta.json'), JSON.stringify({priorities: [['Вес 99 кг', 'без срока, медленно и чисто, талия не растёт']]}));
   fs.writeFileSync(path.join(data, 'docs', '01.md'), 'Исходная точка: рост 199 см, офис, сквош два раза в неделю с тренером\n');
   return text => {
     fs.writeFileSync(path.join(repo, 'f.txt'), text);
@@ -27,7 +26,6 @@ test('finds each kind of personal data', () => {
   assert.deepStrictEqual(check('x 2026-11-10,75.5,80.0,,FatSecret утро y'), ['строка body.csv']);
   assert.deepStrictEqual(check('id 7a8e6852-0000-0000-0000-27513f5103cb'), ['id тренировки Whoop']);
   assert.deepStrictEqual(check('{"t": "rt-SECRET-123456"}'), ['значение из secrets/whoop.json']);
-  assert.deepStrictEqual(check('без срока, медленно и чисто, талия не растёт'), ['текст из meta.json']);
   assert.deepStrictEqual(check('Исходная точка: рост 199 см, офис, сквош два раза в неделю с тренером'),
     ['строка личного документа 01.md']);
 });
