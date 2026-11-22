@@ -113,6 +113,7 @@ cd desktop && npm run app:mac
 | [docs/privacy-policy.html](docs/privacy-policy.html) | Политика конфиденциальности (для экрана входа Whoop) |
 | [docs/superpowers/](docs/superpowers/) | Дизайн и планы: приложение на Electron, «Что нового» |
 | [desktop/CHANGELOG.md](desktop/CHANGELOG.md) | История версий приложения |
+| [SECURITY.md](SECURITY.md) | Как сообщить об уязвимости |
 | [docs/logo/](docs/logo/) | Логотип SEL: знак из трёх плиток (сон, еда, железо), светлая и тёмная версии |
 
 ## Лицензия

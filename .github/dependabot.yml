@@ -1,0 +1,10 @@
+# Обновления зависимостей приложения (desktop/: Electron и сборщик) — раз в месяц, одним PR на группу
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: monthly
+    groups:
+      desktop:
+        patterns: ["*"]
