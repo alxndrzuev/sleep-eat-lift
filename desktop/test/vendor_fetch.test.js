@@ -66,3 +66,13 @@ test('portal/vendor matches its README', () => {
   const log = console.log; console.log = () => {};
   try { assert.strictEqual(vf.check(path.join(ROOT, 'portal', 'vendor')), 0); } finally { console.log = log; }
 });
+
+test('MediaPipe license: full Apache 2.0 text (not just a notice), the same as the generator writes', () => {
+  const full = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'licenses', 'Apache-2.0.txt'));
+  assert.strictEqual(require('node:crypto').createHash('sha256').update(full).digest('hex'),
+    'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30');           // apache.org/licenses/LICENSE-2.0.txt
+  const txt = fs.readFileSync(path.join(__dirname, '..', '..', 'portal', 'vendor', 'LICENSES', 'mediapipe.txt'), 'utf8');
+  assert.strictEqual(txt, require('../../scripts/vendor_fetch').mediapipeLicense());
+  assert.ok(txt.startsWith('@mediapipe/tasks-vision'));
+  assert.ok(txt.includes('TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION'));
+});

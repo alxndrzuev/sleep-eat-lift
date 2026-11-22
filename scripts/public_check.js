@@ -2,7 +2,7 @@
 // Проверка перед коммитом в публичный репозиторий: в файлах проекта нет личного из папки данных.
 //
 // Ищет в каждом файле, который попадёт в git (отслеживаемые и новые, не игнорируемые; кроме portal/vendor — сторонние
-// библиотеки с хэшами), строки CSV, id тренировок Whoop, значения из secrets/*.json, текст из meta.json и строки личных
+// библиотеки с хэшами) — и в рабочей копии, и в версии из индекса git (её заберёт коммит), строки CSV, id тренировок Whoop, значения из secrets/*.json, текст из meta.json и строки личных
 // документов data/docs/*.md. Почта автора коммитов — только noreply GitHub.
 //
 //   node scripts/public_check.js            # код выхода 1 — нашлось личное (что и где; значения секретов не печатаются)
@@ -54,19 +54,34 @@ function needles(data) {
   return out;
 }
 
-/** Файлы, которые попадут в git: отслеживаемые и новые не игнорируемые (кроме сторонних библиотек). */
+/** Файлы, которые попадут в git: в индексе (даже если в рабочей папке их уже нет) и новые не игнорируемые
+ *  (кроме сторонних библиотек). */
 function publicFiles(root) {
-  const ls = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {cwd: root}).toString().split('\0');
-  return ls.filter(p => p && !SKIP.some(s => p.startsWith(s)) && fs.statSync(path.join(root, p), {throwIfNoEntry: false})?.isFile());
+  const z = a => execFileSync('git', a, {cwd: root}).toString().split('\0').filter(Boolean);
+  const staged = new Set(z(['ls-files', '-z', '--cached']));
+  return [...new Set([...staged, ...z(['ls-files', '-z', '--others', '--exclude-standard'])])]
+    .filter(p => !SKIP.some(s => p.startsWith(s)) && (staged.has(p) || fs.statSync(path.join(root, p), {throwIfNoEntry: false})?.isFile()));
 }
 
-/** [[файл, вид]] — что из папки данных нашлось в файлах. */
+/** Что проверять в файле: рабочая копия и версия в индексе git (её и заберёт коммит), если она другая. */
+function contents(root, p) {
+  const out = [];
+  const st = fs.statSync(path.join(root, p), {throwIfNoEntry: false});
+  if (st && st.isFile()) out.push(fs.readFileSync(path.join(root, p)));
+  try {
+    const idx = execFileSync('git', ['show', ':' + p], {cwd: root, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 28});
+    if (!out.some(b => b.equals(idx))) out.push(idx);
+  } catch (e) { /* не в индексе (новый файл) */ }
+  return out;
+}
+
+/** [[файл, вид]] — что из папки данных нашлось в файлах (в рабочей копии или в индексе). */
 function leaks(root, files, data) {
   const ns = [...needles(data)].map(([s, kind]) => [Buffer.from(s), kind]);
   const out = [];
   for (const p of files) {
-    const buf = fs.readFileSync(path.join(root, p));
-    for (const [n, kind] of ns) if (buf.includes(n)) out.push([p, kind]);
+    const bufs = contents(root, p);
+    for (const [n, kind] of ns) if (bufs.some(b => b.includes(n))) out.push([p, kind]);
   }
   return out;
 }

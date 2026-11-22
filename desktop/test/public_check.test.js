@@ -53,3 +53,22 @@ test('tracked symlinks are reported (a link carries a local path into the public
   git('rm', '-q', '--cached', 'node_modules');
   assert.deepStrictEqual(pc.symlinks(repo), []);
 });
+
+test('what goes into the commit is checked: staged content, not only the working copy', () => {
+  const {execFileSync} = require('node:child_process');
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-data-')), repo = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-idx-'));
+  fs.mkdirSync(path.join(data, 'secrets'));
+  fs.writeFileSync(path.join(data, 'secrets', 'whoop.json'), JSON.stringify({refresh_token: 'rt-SECRET-123456'}));
+  const git = (...a) => execFileSync('git', a, {cwd: repo});
+  git('init', '-q');
+  fs.writeFileSync(path.join(repo, 'a.txt'), 'token rt-SECRET-123456');
+  fs.writeFileSync(path.join(repo, 'b.txt'), 'token rt-SECRET-123456');
+  git('add', 'a.txt', 'b.txt');
+  fs.writeFileSync(path.join(repo, 'a.txt'), 'чисто');                 // в рабочей папке убрали, в индексе — осталось
+  fs.rmSync(path.join(repo, 'b.txt'));                                 // файла нет, а в индексе он есть
+  const files = pc.publicFiles(repo);
+  assert.deepStrictEqual(files.slice().sort(), ['a.txt', 'b.txt']);
+  assert.deepStrictEqual(pc.leaks(repo, files, data), [['a.txt', 'значение из secrets/whoop.json'], ['b.txt', 'значение из secrets/whoop.json']]);
+  git('add', '-A');                                                    // поправили и в индексе — чисто
+  assert.deepStrictEqual(pc.leaks(repo, pc.publicFiles(repo), data), []);
+});

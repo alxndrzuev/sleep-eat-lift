@@ -39,10 +39,11 @@ const FILES = [
 ];
 const LICENSES = [['libheif-js', 'LICENSE', 'libheif-js.txt'], ['libheif-js', 'libheif-wasm/LICENSE', 'libheif.txt'],
   ['exifr', 'LICENSE', 'exifr.txt']];
-const APACHE = what => `${what}\nLicensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance\n` +
-  'with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0\n' +
-  'Unless required by applicable law or agreed to in writing, software distributed under the License is distributed\n' +
-  'on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n';
+/** Лицензия MediaPipe и модели позы: кто автор + полный текст Apache 2.0 (scripts/licenses — копия apache.org, её sha256
+ *  проверяет тест): по условиям лицензии получатель сборки должен получить сам текст, ссылки мало. */
+const mediapipeLicense = () => '@mediapipe/tasks-vision и модель pose_landmarker_full.task — Copyright Google LLC (MediaPipe).\n' +
+  'Распространяется по лицензии Apache License, Version 2.0 — полный текст ниже.\n\n' +
+  fs.readFileSync(path.join(__dirname, 'licenses', 'Apache-2.0.txt'), 'utf8');
 
 const sha256 = buf => crypto.createHash('sha256').update(buf).digest('hex');
 
@@ -98,8 +99,7 @@ function build(tars, model, out = OUT) {
   fs.writeFileSync(mf, b64Js('pose_model', model));
   written.push([mf, `pose_landmarker_full.task (${MODEL[0]})`]);
   for (const [pkg, src, dst] of LICENSES) fs.writeFileSync(path.join(out, 'LICENSES', dst), tars[pkg][src]);
-  fs.writeFileSync(path.join(out, 'LICENSES', 'mediapipe.txt'),
-    APACHE('@mediapipe/tasks-vision и модель pose_landmarker_full.task — Copyright Google LLC (MediaPipe).'));
+  fs.writeFileSync(path.join(out, 'LICENSES', 'mediapipe.txt'), mediapipeLicense());
   const lines = ['# portal/vendor — библиотеки страницы «Фото»', '',
     'Собрано `scripts/vendor_fetch.js` — не править руками. Проверка: `node scripts/vendor_fetch.js --check`.', '',
     '| файл | источник | sha256 |', '|---|---|---|',
@@ -148,4 +148,4 @@ if (require.main === module) {
   fetchAll().catch(e => { console.error('ОШИБКА: ' + e.message); process.exit(1); });
 }
 
-module.exports = {untar, stripMap, b64Js, integrityOk, build, check, FILES, LICENSES, PACKAGES};
+module.exports = {untar, stripMap, b64Js, integrityOk, build, check, mediapipeLicense, FILES, LICENSES, PACKAGES};

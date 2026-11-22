@@ -21,8 +21,8 @@ function repo() {
   fs.writeFileSync(path.join(d, 'CHANGELOG.md'), MD);
   const git = (...a) => execFileSync('git', a, {cwd: d, env: ENV, encoding: 'utf8'}).trim();
   git('init', '-q'); git('add', '.'); git('commit', '-qm', 'init');
-  return {d, git, run: v => spawnSync(process.execPath, [SCRIPT, v], {cwd: d, encoding: 'utf8',
-    env: Object.assign({HEALTH_RELEASE_DIR: d, HEALTH_TODAY: '2026-11-25'}, ENV)})};
+  return {d, git, run: (v, tests = 'node -e ""') => spawnSync(process.execPath, [SCRIPT, v], {cwd: d, encoding: 'utf8',
+    env: Object.assign({HEALTH_RELEASE_DIR: d, HEALTH_TODAY: '2026-11-25', HEALTH_RELEASE_TEST: tests}, ENV)})};
 }
 
 test('release 1.0.0: notes dated, versions bumped, commit and tag', () => {
@@ -53,6 +53,28 @@ test('release refused: not newer, bad number, empty notes — files untouched', 
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /«Не выпущено» пуст/);
   assert.strictEqual(git('log', '-1', '--format=%s'), 'Выпуск 1.0.0');
+});
+
+test('release refused: uncommitted changes (changed or new file) — nothing changed', () => {
+  for (const dirty of [d => fs.appendFileSync(path.join(d, 'CHANGELOG.md'), '\n'), d => fs.writeFileSync(path.join(d, 'new.js'), '')]) {
+    const {d, git, run} = repo();
+    dirty(d);
+    const before = git('status', '--porcelain');
+    const r = run('1.0.0');
+    assert.strictEqual(r.status, 1);
+    assert.match(r.stderr, /незакоммиченные изменения/);
+    assert.strictEqual(git('status', '--porcelain'), before);
+    assert.strictEqual(git('tag'), '');
+  }
+});
+
+test('release refused: tests fail — nothing changed', () => {
+  const {git, run} = repo();
+  const r = run('1.0.0', 'node -e "process.exit(1)"');
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /Тесты не прошли/);
+  assert.strictEqual(git('status', '--porcelain'), '');
+  assert.strictEqual(git('tag'), '');
 });
 
 test('entry: dated release with notes, or null', () => {

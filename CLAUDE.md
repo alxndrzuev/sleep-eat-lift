@@ -62,6 +62,7 @@ dist/                    ← собранные приложения (не в gi
   `settings.js`, `photosfs.js`, `secrets.js` (токены дописываются, ключи приложений не трогаются), `keys.js`, `datadir.js`, `preload.js`,
   `changelog.js` (разбор CHANGELOG.md, версии, выпуск), `whatsnew.js` (что показать после обновления),
   `data_readme.md` (README папки данных — описание файлов для LLM; меняется схема — правим и его)
+- Node.js для сборки и тестов — 26+ (`engines` в package.json; проверено на 26.13)
 - Тесты: `cd desktop && npm test` — приложение, страницы portal/ (их скрипты выполняются в Node: test/_portal.js),
   настоящая папка данных (формат, если есть), scripts/; `RENDER=1 npm test` — ещё и отрисовка страниц в Chrome.
   Эталоны прежних Python-скриптов — `desktop/test/fixtures`; окно без клика —
