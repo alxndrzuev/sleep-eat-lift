@@ -1,6 +1,13 @@
-# Здоровье
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/sel-logo-dark.svg">
+    <img src="docs/logo/sel-logo-light.svg" alt="SEL — sleep · eat · lift" width="460">
+  </picture>
+</p>
 
-Приложение для Mac: питание и вес из **FatSecret**, сон, восстановление, тренировки и шаги из **Whoop** —
+# SEL — sleep · eat · lift
+
+**SEL** (sleep · eat · lift) — приложение «Здоровье» для Mac: питание и вес из **FatSecret**, сон, восстановление, тренировки и шаги из **Whoop** —
 на нескольких страницах с графиками, календарями и целями. Плюс скрипты для еженедельных разборов с Claude.
 Интерфейс и документация — на русском.
 
@@ -106,6 +113,7 @@ cd desktop && npm run app:mac
 | [docs/privacy-policy.html](docs/privacy-policy.html) | Политика конфиденциальности (для экрана входа Whoop) |
 | [docs/superpowers/](docs/superpowers/) | Дизайн и планы: приложение на Electron, «Что нового» |
 | [desktop/CHANGELOG.md](desktop/CHANGELOG.md) | История версий приложения |
+| [docs/logo/](docs/logo/) | Логотип SEL: знак из трёх плиток (сон, еда, железо), светлая и тёмная версии |
 
 ## Лицензия
 

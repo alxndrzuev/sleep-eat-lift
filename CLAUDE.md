@@ -1,4 +1,4 @@
-# Здоровье — приложение питания, сна и тренировок (FatSecret + Whoop)
+# SEL (sleep · eat · lift) — приложение «Здоровье»: питание, сон и тренировки (FatSecret + Whoop)
 
 Приложение для Mac на Electron: данные FatSecret (питание, вес) и Whoop (сон, восстановление, тренировки, шаги) — в CSV
 папки данных пользователя, страницы с графиками и целями. Обзор для человека — README.md.
@@ -12,6 +12,7 @@ CLAUDE.md                ← этот файл · README.md — обзор пр�
 CLAUDE.local.md          ← личное (не в git)
 docs/                    ← 06 фото: как снимать и разбирать · 07 формат данных (CSV) · privacy-policy.html (для экрана входа Whoop)
                            · superpowers/ — дизайн и планы приложения
+                           · logo/ — логотип SEL (sleep · eat · lift): sel-mark.svg, sel-logo-light/dark.svg
 ~/Documents/Здоровье/data ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — путь берётся из настроек приложения
                            (~/Library/Application Support/Здоровье/config.json → dataDir; scripts/lib.py → find_data; HEALTH_DATA — подменить).
                            Ниже и в тексте «data/» = эта папка. Формат — docs/07_формат_данных.md
