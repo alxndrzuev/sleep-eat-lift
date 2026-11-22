@@ -1,6 +1,6 @@
 /* «Что нового» — только в приложении (window.health). После обновления — окно поверх страницы с новыми версиями
    («Понятно» / Esc — больше не показывать в этот запуск; «Вся история» — страница whatsnew.html). Вёрстка заметок —
-   WhatsNew.html(releases), её же берёт страница истории. Подключается на всех страницах после nav.js. */
+   WhatsNew.html(releases), её же берёт страница истории; там же «← откуда пришли» — WhatsNew.back. Подключается на всех страницах после nav.js. */
 var WhatsNew = (function () {
   const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
   const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
@@ -21,6 +21,13 @@ var WhatsNew = (function () {
       "</section>").join("");
   }
 
+  /** Ссылка «назад» со страницы истории: last — последняя открытая страница меню (nav.js пишет её в sessionStorage).
+      Известна → {href, title, history: true} (клик — history.back()); нет — на «Сводку» обычной ссылкой. */
+  function back(last) {
+    const t = last && typeof Nav !== "undefined" ? Nav.title(last) : null;
+    return t ? {href: last, title: t, history: true} : {href: "dashboard.html", title: "Сводка", history: false};
+  }
+
   function open(r) {
     const d = document.createElement("dialog");
     d.className = "wn-dialog";
@@ -37,5 +44,5 @@ var WhatsNew = (function () {
       (location.pathname.split("/").pop() !== "whatsnew.html"))
     window.health.whatsNew().then(r => { if (r && r.releases && r.releases.length) open(r); });
 
-  return {html, date};
+  return {html, date, back};
 })();

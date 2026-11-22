@@ -237,7 +237,13 @@ function startNews(hadDataDir) {
     save: test || force ? null : v => datadir.saveCfg(userData, {lastSeenVersion: v})});
 }
 
-/** Меню Mac по-русски; «Справка» — «Что нового» вместо ссылок Electron; инструменты разработчика — только не в сборке. */
+/** «Назад» / «Вперёд» по истории окна (goBack / goForward), если есть куда. */
+function go(dir) {
+  const h = win && !win.isDestroyed() && win.webContents.navigationHistory;
+  if (h && (dir === 'goBack' ? h.canGoBack() : h.canGoForward())) h[dir]();
+}
+
+/** Меню Mac по-русски; «Вид» — «Назад ⌘[» / «Вперёд ⌘]»; «Справка» — «Что нового» вместо ссылок Electron; инструменты разработчика — только не в сборке. */
 function setMenu() {
   if (process.platform !== 'darwin') return;
   const sep = {type: 'separator'}, name = '«Здоровье»';
@@ -250,14 +256,17 @@ function setMenu() {
       {role: 'cut', label: 'Вырезать'}, {role: 'copy', label: 'Скопировать'}, {role: 'paste', label: 'Вставить'},
       {role: 'pasteAndMatchStyle', label: 'Вставить и сохранить стиль'}, {role: 'delete', label: 'Удалить'},
       {role: 'selectAll', label: 'Выбрать все'}]},
-    {label: 'Вид', submenu: [{role: 'reload', label: 'Обновить страницу'},
+    {label: 'Вид', submenu: [{label: 'Назад', accelerator: 'CmdOrCtrl+[', click: () => go('goBack')},
+      {label: 'Вперёд', accelerator: 'CmdOrCtrl+]', click: () => go('goForward')}, sep,
+      {role: 'reload', label: 'Обновить страницу'},
       ...(app.isPackaged ? [] : [{role: 'toggleDevTools', label: 'Инструменты разработчика'}]), sep,
       {role: 'resetZoom', label: 'Фактический размер'}, {role: 'zoomIn', label: 'Увеличить'}, {role: 'zoomOut', label: 'Уменьшить'}, sep,
       {role: 'togglefullscreen', label: 'Во весь экран'}]},
     {label: 'Окно', role: 'window', submenu: [{role: 'minimize', label: 'Свернуть'}, {role: 'zoom', label: 'Масштаб'}, sep,
       {role: 'front', label: 'Все окна — на передний план'}]},
     {label: 'Справка', role: 'help', submenu: [{label: `Что нового в ${name}`,
-      click: () => { if (win && !win.isDestroyed() && DATA) win.loadURL('app://h/portal/whatsnew.html'); }}]},
+      click: () => { if (win && !win.isDestroyed() && DATA && !win.webContents.getURL().endsWith('/whatsnew.html'))
+        win.loadURL('app://h/portal/whatsnew.html'); }}]},
   ]));
 }
 

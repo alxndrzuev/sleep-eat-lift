@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 JS = ROOT / "portal" / "whatsnew.js"
+NAV = ROOT / "portal" / "nav.js"
 JSC = Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc")
 PAGES = ("dashboard.html", "nutrition.html", "training.html", "recovery.html", "photos.html", "settings.html", "whatsnew.html")
 
@@ -11,7 +12,7 @@ PAGES = ("dashboard.html", "nutrition.html", "training.html", "recovery.html", "
 def run(expr):
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
         f.write(f"print(JSON.stringify({expr}));\n")
-    r = subprocess.run([str(JSC), str(JS), f.name], capture_output=True, text=True, timeout=20)
+    r = subprocess.run([str(JSC), str(NAV), str(JS), f.name], capture_output=True, text=True, timeout=20)
     Path(f.name).unlink()
     if r.returncode or not r.stdout.strip():
         raise AssertionError(f"jsc: {r.stdout}{r.stderr}")
@@ -41,7 +42,39 @@ class WhatsNewHtmlTest(unittest.TestCase):
         self.assertEqual(run("WhatsNew.html([])"), "")
 
 
+@unittest.skipUnless(JSC.exists(), "нет jsc (JavaScriptCore)")
+class WhatsNewBackTest(unittest.TestCase):
+    """«← откуда пришли» на странице истории."""
+    def back(self, last):
+        return run(f"WhatsNew.back({json.dumps(last)})")
+
+    def test_back_to_page_we_came_from(self):
+        self.assertEqual(self.back("settings.html"), {"href": "settings.html", "title": "Настройки", "history": True})
+        self.assertEqual(self.back("recovery.html")["title"], "Восстановление")
+
+    def test_unknown_goes_to_dashboard(self):
+        home = {"href": "dashboard.html", "title": "Сводка", "history": False}
+        for last in (None, "", "whatsnew.html", "x.html", "https://evil.example/settings.html"):
+            with self.subTest(last=last):
+                self.assertEqual(self.back(last), home)
+
+    def test_nav_title(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
+            f.write('print(JSON.stringify([Nav.title("photos.html"), Nav.title("whatsnew.html")]));\n')
+        r = subprocess.run([str(JSC), str(NAV), f.name], capture_output=True, text=True, timeout=20)
+        Path(f.name).unlink()
+        self.assertEqual(json.loads(r.stdout.strip().splitlines()[-1]), ["Фото", None])
+
+
 class WhatsNewPagesTest(unittest.TestCase):
+    def test_history_page_has_back_link_and_esc(self):
+        h = (ROOT / "portal" / "whatsnew.html").read_text(encoding="utf-8")
+        self.assertIn('id="back"', h)
+        self.assertIn("WhatsNew.back(last)", h)
+        self.assertIn('sessionStorage.setItem("navLast", cur)', (ROOT / "portal" / "nav.js").read_text(encoding="utf-8"))
+        self.assertIn("'Escape'", h)
+
+
     def test_every_page_loads_whatsnew_after_nav(self):
         for p in PAGES:
             with self.subTest(page=p):

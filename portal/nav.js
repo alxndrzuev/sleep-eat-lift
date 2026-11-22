@@ -16,6 +16,12 @@ var Nav = (function () {
     return ALL.filter(([, , show]) => show(data, inApp)).map(([href, title]) => [href, title]);
   }
 
+  /** Название страницы меню по имени файла («settings.html» → «Настройки»); не из меню — null. */
+  function title(page) {
+    const it = ALL.find(([h]) => h === page);
+    return it ? it[1] : null;
+  }
+
   function inApp() { return typeof window !== "undefined" && !!window.health; }
 
   function render() {
@@ -23,6 +29,7 @@ var Nav = (function () {
     if (!el) return;
     const cur = location.pathname.split("/").pop() || "dashboard.html";
     const data = typeof DATA !== "undefined" ? DATA : {};
+    try { if (title(cur)) sessionStorage.setItem("navLast", cur); } catch (e) {}   // для «← …» на странице «Что нового»
     el.innerHTML = items(data, inApp()).map(([h, t]) => `<a href="${h}"${h === cur ? ' class="on"' : ""}>${t}</a>`).join("");
   }
 
@@ -90,5 +97,5 @@ var Nav = (function () {
     render();
     if (inApp()) { appBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, render, inApp, statusText, NAMES};
+  return {items, title, render, inApp, statusText, NAMES};
 })();
