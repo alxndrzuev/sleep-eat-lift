@@ -6,32 +6,33 @@
 <title>Что нового · здоровье</title>
 <link rel="stylesheet" href="common.css">
 <style>
-.back{display:inline-block;color:var(--text-secondary);text-decoration:none;font-size:13px;margin:2px 0 4px}
-.back:hover{color:var(--text-primary)}
+header{max-width:760px;align-items:flex-start}
+.close{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;flex:none;
+  color:var(--text-secondary);text-decoration:none;font-size:17px;line-height:1;border:1px solid var(--border);background:var(--surface-1)}
+.close:hover{color:var(--text-primary);border-color:var(--text-secondary)}
 .card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;max-width:760px}
 </style>
 </head>
 <body>
 <div class="viz-root">
 <div class="wrap">
-<nav class="nav" id="nav"></nav>
-<a class="back" id="back" href="dashboard.html" title="Вернуться (Esc)">← Сводка</a>
-<header><div><h1>Что нового</h1><div class="sub" id="sub"></div></div></header>
+<header><div><h1>Что нового</h1><div class="sub" id="sub"></div></div>
+<a class="close" id="back" href="dashboard.html" title="Закрыть (Esc)" aria-label="Закрыть">✕</a></header>
 <div id="outside" class="card" hidden><h2>История версий есть только в приложении «Здоровье»</h2></div>
 <div id="list" class="card wn-page" hidden></div>
 </div>
 </div>
 <script src="../data/data.js"></script>
 <script src="dataset.js"></script>
-<script src="nav.js"></script>
+<script src="nav.js"></script>     <!-- меню на этой странице нет: только Nav.title для крестика -->
 <script src="whatsnew.js"></script>
 <script>
 (function () {
   try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   const $ = s => document.querySelector(s);
   let last = null; try { last = sessionStorage.getItem('navLast'); } catch (e) {}
-  const b = WhatsNew.back(last), a = $('#back');                    // назад — туда, откуда пришли
-  a.href = b.href; a.textContent = '← ' + b.title;
+  const b = WhatsNew.back(last), a = $('#back');                    // крестик — назад, туда, откуда пришли
+  a.href = b.href; a.title = 'Закрыть и вернуться в «' + b.title + '» (Esc)';
   a.onclick = e => { if (b.history && history.length > 1) { e.preventDefault(); history.back(); } };
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.querySelector('dialog[open]')) a.click(); });
   if (!window.health) { $('#outside').hidden = false; return; }

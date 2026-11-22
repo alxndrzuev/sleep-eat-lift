@@ -44,7 +44,7 @@ class WhatsNewHtmlTest(unittest.TestCase):
 
 @unittest.skipUnless(JSC.exists(), "нет jsc (JavaScriptCore)")
 class WhatsNewBackTest(unittest.TestCase):
-    """«← откуда пришли» на странице истории."""
+    """Крестик страницы истории: назад, туда, откуда пришли."""
     def back(self, last):
         return run(f"WhatsNew.back({json.dumps(last)})")
 
@@ -67,9 +67,11 @@ class WhatsNewBackTest(unittest.TestCase):
 
 
 class WhatsNewPagesTest(unittest.TestCase):
-    def test_history_page_has_back_link_and_esc(self):
+    def test_history_page_has_close_and_esc(self):
         h = (ROOT / "portal" / "whatsnew.html").read_text(encoding="utf-8")
-        self.assertIn('id="back"', h)
+        self.assertIn('class="close" id="back"', h)
+        self.assertIn('aria-label="Закрыть"', h)
+        self.assertNotIn('id="nav"', h)                     # только крестик: меню разделов на этой странице нет
         self.assertIn("WhatsNew.back(last)", h)
         self.assertIn('sessionStorage.setItem("navLast", cur)', (ROOT / "portal" / "nav.js").read_text(encoding="utf-8"))
         self.assertIn("'Escape'", h)
