@@ -54,11 +54,34 @@ function saveTargets(dir, vals, today) {
   return {ok: true};
 }
 
-/** Удалить цель с даты: kind — 'targets' (КБЖУ) или 'goal_weight'. */
+// группы колонок targets.csv — у каждой своя история в «Настройках»
+const TARGET_GROUPS = {nutrition: ['kcal', 'protein', 'fat', 'carbs'], sleep: ['sleep_h'], training: ['strength_wk', 'cardio_wk']};
+const TARGET_VALUES = Object.values(TARGET_GROUPS).flat();
+
+/** Удалить цель с даты. kind — 'goal_weight', 'targets' (вся строка) или группа targets.csv (nutrition, sleep, training):
+ *  у группы чистятся её колонки в этой строке и в следующих, куда сохранение перенесло те же значения (пока они
+ *  не сменятся); строка без единой цели удаляется. → {ok, removed: сколько строк затронуто}. */
 function removeTarget(dir, kind, date) {
-  const file = {targets: 'targets.csv', goal_weight: 'goal_weight.csv'}[kind];
-  if (!file) return {ok: false, error: 'Неизвестный вид цели'};
-  return {ok: true, removed: store.remove(dir, file, [String(date)])};
+  date = String(date);
+  if (kind === 'goal_weight' || kind === 'targets')
+    return {ok: true, removed: store.remove(dir, kind + '.csv', [date])};
+  const cols = TARGET_GROUPS[kind];
+  if (!cols) return {ok: false, error: 'Неизвестный вид цели'};
+  const rows = store.read(dir, 'targets.csv').sort((a, b) => (a.start < b.start ? -1 : 1));
+  const i = rows.findIndex(r => r.start === date);
+  const key = r => cols.map(c => (r[c] || '').trim()).join(',');
+  const empty = r => cols.every(c => !(r[c] || '').trim());
+  if (i < 0 || empty(rows[i])) return {ok: true, removed: 0};
+  const was = key(rows[i]);
+  let removed = 0;
+  for (const r of rows.slice(i)) {
+    if (empty(r)) continue;                 // в этой строке группы нет — дальше
+    if (key(r) !== was) break;              // цель сменилась — дальше не наша
+    for (const c of cols) r[c] = '';
+    removed++;
+  }
+  store.write(dir, 'targets.csv', rows.filter(r => TARGET_VALUES.some(c => (r[c] || '').trim())));
+  return {ok: true, removed};
 }
 
 // ---------- план: свободный текст, действует с даты до следующей версии ----------

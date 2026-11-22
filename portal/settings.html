@@ -104,9 +104,12 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
 
   <div class="card" id="history">
     <h2>История целей</h2>
-    <div class="desc">Все цели по датам. Ошибочную можно удалить — графики пересчитаются.</div>
-    <div class="hist-h">Питание, сон, тренировки</div><div id="histT"></div>
+    <div class="desc">Когда и какие цели вы ставили. Ошибочную можно удалить — графики пересчитаются,
+      остальные цели с той же даты останутся.</div>
+    <div class="hist-h">Питание в день</div><div id="histFood"></div>
     <div class="hist-h">Целевой вес</div><div id="histW"></div>
+    <div class="hist-h">Сон за ночь</div><div id="histSleep"></div>
+    <div class="hist-h">Тренировки в неделю</div><div id="histTrain"></div>
   </div>
 
   <div class="card" id="plan">
@@ -230,11 +233,26 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
         cols.map(c => `<td>${nf(r[c[0]])}</td>`).join('') +
         `<td><button class="linkbtn" data-kind="${kind}" data-date="${r[key]}">удалить</button></td></tr>`).join('') + '</tbody></table>';
   }
-  $('#histT').innerHTML = table(DATA.targets, 'start', [['kcal', 'ккал'], ['protein', 'Б, г'], ['fat', 'Ж, г'], ['carbs', 'У, г'],
-    ['sleep_h', 'сон, ч'], ['strength_wk', 'силовые'], ['cardio_wk', 'кардио']], 'targets');
+  // targets.csv — по группам: строка попадает в группу, только если там цель задана и сменилась (сохранение переносит
+  // в новую строку прежние значения других групп — их не показываем); удаление чистит только эту группу
+  function changes(rows, cols) {
+    const out = []; let was = null;
+    for (const r of rows.slice().sort((a, b) => (a.start < b.start ? -1 : 1))) {
+      if (cols.every(c => r[c] == null)) continue;
+      const k = cols.map(c => r[c]).join(',');
+      if (k !== was) out.push(r);
+      was = k;
+    }
+    return out;
+  }
+  const group = (el, kind, cols) => $(el).innerHTML = table(changes(DATA.targets, cols.map(c => c[0])), 'start', cols, kind);
+  group('#histFood', 'nutrition', [['kcal', 'ккал'], ['protein', 'белки, г'], ['fat', 'жиры, г'], ['carbs', 'углеводы, г']]);
+  group('#histSleep', 'sleep', [['sleep_h', 'часов']]);
+  group('#histTrain', 'training', [['strength_wk', 'силовые'], ['cardio_wk', 'кардио']]);
   $('#histW').innerHTML = table(DATA.goal_weight, 'date', [['goal_weight_kg', 'кг']], 'goal_weight');
   document.querySelectorAll('#history .linkbtn').forEach(b => b.onclick = async () => {
-    if (!confirm(`Удалить цель с ${fmt(b.dataset.date)}?`)) return;
+    const what = {nutrition: 'по питанию', goal_weight: 'по весу', sleep: 'по сну', training: 'по тренировкам'}[b.dataset.kind] || '';
+    if (!confirm(`Удалить цель ${what} с ${fmt(b.dataset.date)}?`)) return;
     const r = await H.removeTarget(b.dataset.kind, b.dataset.date);
     if (r.ok) location.reload(); else alert(r.error);
   });

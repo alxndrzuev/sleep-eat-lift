@@ -75,6 +75,31 @@ test('removeTarget deletes one row by date', () => {
   assert.deepStrictEqual(settings.removeTarget(dir, 'body', '2026-01-01'), {ok: false, error: 'Неизвестный вид цели'});
 });
 
+test('removeTarget by group clears only that group, with its carried copies; empty rows go', () => {
+  const dir = tmp();
+  // 10.01 — питание; 01.02 — новое питание; 01.03 — только тренировки (питание перенесено из 01.02); 01.04 — снова питание
+  store.upsert(dir, 'targets.csv', {
+    '2026-01-10': {kcal: 2000, protein: 120, fat: 60, carbs: 245},
+    '2026-02-01': {kcal: 2100, protein: 120, fat: 60, carbs: 270, sleep_h: 8},
+    '2026-03-01': {kcal: 2100, protein: 120, fat: 60, carbs: 270, sleep_h: 8, strength_wk: 2, cardio_wk: 2},
+    '2026-04-01': {kcal: 2310, protein: 120, fat: 70, carbs: 300, sleep_h: 8, strength_wk: 2, cardio_wk: 2}});
+  const rows = () => Object.fromEntries(store.read(dir, 'targets.csv').map(r => [r.start, r]));
+  // тренировки с 01.03: чистятся 01.03 и перенесённая копия 01.04; питание и сон не тронуты
+  assert.deepStrictEqual(settings.removeTarget(dir, 'training', '2026-03-01'), {ok: true, removed: 2});
+  let r = rows();
+  assert.deepStrictEqual([r['2026-03-01'].strength_wk, r['2026-04-01'].cardio_wk], ['', '']);
+  assert.deepStrictEqual([r['2026-03-01'].kcal, r['2026-04-01'].kcal, r['2026-04-01'].sleep_h], ['2100', '2310', '8']);
+  // питание с 01.02: чистятся 01.02 и копия 01.03; 01.04 — другое значение, остаётся
+  assert.deepStrictEqual(settings.removeTarget(dir, 'nutrition', '2026-02-01'), {ok: true, removed: 2});
+  r = rows();
+  assert.deepStrictEqual([r['2026-02-01'].protein, r['2026-03-01'].carbs, r['2026-04-01'].carbs], ['', '', '300']);
+  // сон с 01.02: строки 01.02 и 01.03 пустеют целиком и исчезают
+  assert.deepStrictEqual(settings.removeTarget(dir, 'sleep', '2026-02-01'), {ok: true, removed: 3});
+  assert.deepStrictEqual(Object.keys(rows()), ['2026-01-10', '2026-04-01']);
+  assert.deepStrictEqual(settings.removeTarget(dir, 'training', '2026-01-10'), {ok: true, removed: 0});   // целей по тренировкам нет
+  assert.deepStrictEqual(settings.removeTarget(dir, 'sleep', '2025-01-01'), {ok: true, removed: 0});      // нет такой даты
+});
+
 test('kcal computed from macros: 4·Б + 9·Ж + 4·У (blank macros taken from target in effect)', () => {
   const dir = tmp();
   assert.deepStrictEqual(settings.saveTargets(dir, {protein: 120, fat: 60, carbs: 270}, '2026-11-01'), {ok: true});
