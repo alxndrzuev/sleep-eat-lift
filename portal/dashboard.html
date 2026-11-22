@@ -7,9 +7,6 @@
 <link rel="stylesheet" href="common.css">
 <style>
 .controls{display:flex;gap:8px;align-items:center}
-.prio{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 20px}
-.chip{background:var(--surface-1);border:1px solid var(--border);border-radius:999px;padding:4px 12px;color:var(--text-secondary)}
-.chip b{color:var(--text-primary)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;margin-bottom:22px}
 .tile{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
 .tile .lab{color:var(--text-secondary);font-size:13px}
@@ -25,10 +22,8 @@
 svg text{fill:var(--text-muted);font-size:11px}
 .tip{position:absolute;pointer-events:none;background:var(--surface-1);border:1px solid var(--border);box-shadow:0 4px 14px rgba(0,0,0,.12);border-radius:8px;padding:7px 10px;font-size:12.5px;color:var(--text-primary);white-space:nowrap;opacity:0;transition:opacity .08s;z-index:2}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;margin-top:16px}
-.check li{margin:5px 0;list-style:none;display:flex;gap:8px;align-items:baseline}
-.check{padding:0;margin:8px 0 4px}
 .badge{font-size:11.5px;border-radius:6px;padding:1px 7px;border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
-.plan td:first-child{color:var(--text-secondary)}
+.plantext{white-space:pre-wrap;line-height:1.5;margin:6px 0 4px}
 </style>
 </head>
 <body data-needs="weight kcal whoop_daily">
@@ -48,43 +43,24 @@ svg text{fill:var(--text-muted);font-size:11px}
   </div>
 </header>
 
-<div class="prio" id="prio"></div>
-
 <div class="tiles" id="tiles"></div>
 
 <div class="grid" id="charts"></div>
 
 <div class="two">
-  <div class="card" id="card-good">
-    <h2>Хорошая неделя — это</h2>
-    <ul class="check" id="checklist"></ul>
+  <div class="card" id="card-plan">
+    <h2>План <span class="badge" id="planver"></span></h2>
+    <div class="plantext" id="plantext"></div>
+    <div class="desc">Изменить — в «Настройках»</div>
   </div>
-  <div class="card plan" id="card-plan">
-    <h2>Текущий план <span class="badge" id="planver"></span></h2>
-    <table id="plantable"></table>
-    <div class="desc" id="plannotes" style="margin-top:8px"></div>
-  </div>
-</div>
-
-<div class="two">
   <div class="card" id="card-supps">
     <h2>БАДы</h2>
     <div class="desc">Что принимаю сейчас и что принимал раньше</div>
     <div class="tablewrap"><table id="supps"></table></div>
   </div>
-  <div class="card" id="card-events">
-    <h2>События</h2>
-    <div class="desc">Болезни, травмы, поездки, перерывы</div>
-    <div class="tablewrap"><table id="events"></table></div>
-  </div>
 </div>
 
-<div class="card" id="card-labs" style="margin-top:16px">
-  <h2>Анализы</h2>
-  <div class="tablewrap"><table id="labs"></table></div>
-</div>
-
-<footer>Данные: FatSecret API (питание, вес), Whoop API (recovery, HRV, сон, пульс, шаги, тренировки); талия, силовые, БАДы, анализы, события — вручную (папка data/). Файл полностью автономный: все данные внутри него, в интернет ничего не отправляется.</footer>
+<footer>Данные: FatSecret (питание, вес), Whoop (сон, восстановление, пульс, шаги, тренировки); цели, план, БАДы, алкоголь — в приложении. Файл полностью автономный: все данные внутри него, в интернет ничего не отправляется.</footer>
 </div>
 </div>
 
@@ -110,44 +86,40 @@ function targetOn(ds){ let t=TG[0]; for(const x of TG) if(x.start<=ds) t=x; retu
 function targetSeries(key, from){ const out=[]; if(!TG.length) return out; let d=new Date(Math.max(from, P(TG[0].start).getTime())); while(d<=today){ out.push([iso(d), targetOn(iso(d))[key]]); d=new Date(d.getTime()+DAY); } return out; }
 const FULL_DAY = 1200;
 const W = DATA.whoop_daily.length > 0;                         // есть Whoop
-const PW = DATA.plan.workouts;                                 // цель по тренировкам в неделю {strength, squash} или нет
+const G = DATA.goals || {};                                    // цели на сегодня (targets.csv): сон, тренировки в неделю
+const PW = G.strength_wk!=null || G.cardio_wk!=null ? {strength:G.strength_wk||0, cardio:G.cardio_wk||0} : null;   // в неделю или нет
 const GOAL = (()=>{ let g=null; for(const r of DATA.goal_weight.slice().sort((a,b)=>a.date<b.date?-1:1)) if(r.date<=iso(today) && r.goal_weight_kg!=null) g=r.goal_weight_kg; return g; })();
-const TT = TG.length ? targetOn(iso(today)) : (DATA.plan.targets||{});   // цели ккал/белка на сегодня (targets.csv)
+const TT = TG.length ? targetOn(iso(today)) : {};   // цели ккал/белка на сегодня (targets.csv)
 const kcalFull = DATA.kcal.filter(x=>x[1]>=FULL_DAY);
-const K2 = (DATA.k2||{key:'squash'}).key, K2L = (DATA.k2||{lab:'Сквош'}).lab, K2M = (DATA.k2||{many:'сквоша'}).many;   // сквош или кардио
-const weekly = {}; // week -> {strength, K2, other}
-DATA.workouts.forEach(([d,c])=>{ const k=iso(weekStart(P(d))); (weekly[k] ||= {[K2]:0,strength:0,other:0})[c]++; });
-function weeksBetween(days){ const out=[]; let w=weekStart(new Date(today - days*DAY)); while(w<=today){ const k=iso(w); out.push([k, weekly[k]||{[K2]:0,strength:0,other:0}]); w=new Date(w.getTime()+7*DAY);} return out; }
+const weekly = {}; // week -> {strength, cardio}
+DATA.workouts.forEach(([d,c])=>{ const k=iso(weekStart(P(d))); (weekly[k] ||= {cardio:0,strength:0})[c]++; });
+function weeksBetween(days){ const out=[]; let w=weekStart(new Date(today - days*DAY)); while(w<=today){ const k=iso(w); out.push([k, weekly[k]||{cardio:0,strength:0}]); w=new Date(w.getTime()+7*DAY);} return out; }
 const stepsWeekly = (()=>{ const m={}; DATA.steps.forEach(([d,v])=>{const k=iso(weekStart(P(d))); (m[k] ||= []).push(v)}); return Object.entries(m).sort().map(([k,a])=>[k, mean(a)]); })();
 
 // ---------- tiles ----------
 function tiles(){
-  const T = DATA.plan.targets;
+  const T = {sleep: G.sleep_h};
   const sl7 = mean(within(DATA.sleep,7).map(x=>x[1]));
   const rhr7 = mean(within(DATA.rhr,7).map(x=>x[1]));
   const rhr28 = mean(within(DATA.rhr,35,new Date(today-7*DAY)).map(x=>x[1]));
   const kc = mean(within(kcalFull,28).map(x=>x[1]));
   const str4 = weeksBetween(27).reduce((s,[,w])=>s+w.strength,0);
-  const sq4 = weeksBetween(27).reduce((s,[,w])=>s+w[K2],0);
+  const ca4 = weeksBetween(27).reduce((s,[,w])=>s+w.cardio,0);
   const wt = DATA.weight[DATA.weight.length-1];
   const lastM = Object.entries(DATA.macros_month).sort().pop();
-  const ci = DATA.checkins[DATA.checkins.length-1];
-  const feel = ci&&ci.feel!=null ? {v:ci.feel, d:fmtD(P(ci.date))} : null;
-  const wa = DATA.waist[DATA.waist.length-1], wa0 = DATA.waist.length>1 ? DATA.waist[DATA.waist.length-2] : null;
   const pr28 = within(DATA.nutrition.filter(x=>x[1]>=FULL_DAY).map(x=>[x[0],x[2]]),28);
   const prot = pr28.length>=5 ? {v:mean(pr28.map(x=>x[1])), lab:'Белок, 4 нед'} : {v:lastM?lastM[1][0]:null, lab:'Белок, '+(lastM?new Date(lastM[0]+'-01').toLocaleDateString('ru-RU',{month:'long'}):'')};
   const rec7 = mean(within(DATA.whoop_daily.filter(x=>x.recovery!=null).map(x=>[x.date,x.recovery]),7).map(x=>x[1]));
   const st = (ok,warn)=> ok ? 'var(--good)' : (warn ? 'var(--warning)' : 'var(--critical)');
   const items = [
-    ...(feel ? [{lab:'Самочувствие', val: feel.v+'<small>/10</small>', note: feel.d, c: st(feel.v>=7,feel.v>=5)}] : []),
     ...(W ? [{lab:'Сон, 7 дней', val: nf(sl7,1)+'<small> ч</small>', note: T.sleep ? 'цель '+nf(T.sleep,1)+' ч' : '', c: sl7==null||!T.sleep?null:st(sl7>=T.sleep, sl7>=7)},
-             {lab:'Силовые, 4 нед', val: str4+(PW?'<small> / '+PW.strength*4+'</small>':''), note:K2M.replace(/^./,c=>c)+': '+sq4+(PW&&PW[K2]?' / '+PW[K2]*4:''), c: PW ? st(str4>=PW.strength*4, str4>=PW.strength*3) : null},
+             {lab:'Силовые, 4 нед', val: str4+(PW?'<small> / '+PW.strength*4+'</small>':''), note:'Whoop', c: PW&&PW.strength ? st(str4>=PW.strength*4, str4>=PW.strength*3) : null},
+             {lab:'Кардио, 4 нед', val: ca4+(PW?'<small> / '+PW.cardio*4+'</small>':''), note:'от 20 минут', c: PW&&PW.cardio ? st(ca4>=PW.cardio*4, ca4>=PW.cardio*3) : null},
              {lab:'Пульс покоя, 7 дней', val: nf(rhr7,0)+'<small> уд/мин</small>', note: rhr28? ('месяц до этого: '+nf(rhr28,0)) : '', c:null}] : []),
     ...(DATA.kcal.length ? [{lab:'Калории, 4 нед', val: nf(kc,0), note:(TT.kcal?'цель '+nf(TT.kcal)+' · ':'')+'полные дни', c: kc==null||!TT.kcal?null:st(Math.abs(kc-TT.kcal)<=150, Math.abs(kc-TT.kcal)<=300)}] : []),
     ...(DATA.nutrition.length ? [{lab:prot.lab, val: nf(prot.v,0)+'<small> г</small>', note: TT.protein?'цель '+TT.protein+' г':'', c: prot.v==null||!TT.protein?null:st(prot.v>=TT.protein-10, prot.v>=TT.protein-30)}] : []),
     ...(rec7!=null ? [{lab:'Recovery, 7 дней', val: nf(rec7,0)+'<small> %</small>', note:'Whoop', c: st(rec7>=67, rec7>=34)}] : []),
     ...(wt ? [{lab:'Вес', val: nf(wt[1],1)+'<small> кг</small>', note: fmtD(P(wt[0])) + (GOAL!=null ? ' · цель '+nf(GOAL,0)+' кг' : ''), c:null}] : []),
-    ...(wa ? [{lab:'Талия', val: nf(wa[1],1)+'<small> см</small>', note: fmtD(P(wa[0]))+(wa0?' · было '+nf(wa0[1],1):''), c: wa0 ? st(wa[1]<=wa0[1], wa[1]-wa0[1]<=0.5) : null}] : []),
   ];
   tileCards(items);
 }
@@ -165,7 +137,7 @@ function render(){
   $('#charts').innerHTML=''; JOBS.length=0;
   const to = today.getTime()+DAY, from = today.getTime()-RANGE*DAY;
   const c1=css('--series-1'), c1s=css('--series-1-soft'), c2=css('--series-2'), c3=css('--series-3');
-  const T=DATA.plan.targets;
+  const T={sleep: G.sleep_h};
 
   // weight
   let el;
@@ -201,11 +173,11 @@ function render(){
 
   // workouts weekly
   const wk = weeksBetween(RANGE);
-  el = card('cwk','Тренировки по неделям','Whoop'+(PW?'. Цель — '+(PW.strength||0)+' силовые + '+(PW[K2]||0)+' '+K2M+' в неделю':''), L.sw(c2,'Силовые')+L.sw(c1,K2L)+L.sw(c3,'Другое')+(PW?L.ref('Цель'):''), wk.map(([k,o])=>['с '+fmtD(P(k)), o.strength, o.squash, o.other]), ['Неделя','Силовые','Сквош','Другое']);
+  el = card('cwk','Тренировки по неделям','Whoop. Кардио — от 20 минут'+(PW?'. Цель — '+PW.strength+' силовые + '+PW.cardio+' кардио в неделю':''), L.sw(c2,'Силовые')+L.sw(c1,'Кардио')+(PW?L.ref('Цель'):''), wk.map(([k,o])=>['с '+fmtD(P(k)), o.strength, o.cardio]), ['Неделя','Силовые','Кардио']);
   chart(el,{from,to,y:[0,5], yticks:[0,1,2,3,4,5],
-    layers:[{type:'stack',data:wk,keys:['strength',K2,'other'],colors:[c2,c1,c3]}],
-    refs:PW?[{y:(PW.strength||0)+(PW[K2]||0),label:'цель '+((PW.strength||0)+(PW[K2]||0))}]:[],
-    hover:wk.map(([k,o])=>({t:P(k).getTime()+3.5*DAY,html:`<div class="t">неделя с ${fmtD(P(k))}</div>Силовые: <b>${o.strength}</b> · ${K2L}: <b>${o[K2]}</b>${o.other?` · Другое: <b>${o.other}</b>`:''}`}))});
+    layers:[{type:'stack',data:wk,keys:['strength','cardio'],colors:[c2,c1]}],
+    refs:PW?[{y:PW.strength+PW.cardio,label:'цель '+(PW.strength+PW.cardio)}]:[],
+    hover:wk.map(([k,o])=>({t:P(k).getTime()+3.5*DAY,html:`<div class="t">неделя с ${fmtD(P(k))}</div>Силовые: <b>${o.strength}</b> · Кардио: <b>${o.cardio}</b>`}))});
 
   // RHR
   const rR = rolling(DATA.rhr,7);
@@ -234,15 +206,6 @@ function render(){
     refs:TG.length||!T.protein?[]:[{y:T.protein,label:'цель '+T.protein+' г'}],
     hover:mm.map(([k,v])=>({t:P(k+'-01').getTime()+14*DAY,html:`<div class="t">${new Date(k+'-01').toLocaleDateString('ru-RU',{month:'long',year:'numeric'})}</div>Б <b>${nf(v[0])}</b> · Ж <b>${nf(v[1])}</b> · У <b>${nf(v[2])}</b> г`}))});
   }
-  // waist
-  if(DATA.waist.length){
-    const wv2 = DATA.waist.map(x=>x[1]);
-    el = card('cwa','Талия','По пупку, утром. Главный контроль «чистого» набора — не должна расти', '', DATA.waist.map(([d,v])=>[fmtDY(P(d)), nf(v,1)+' см']), ['Дата','Талия']);
-    chart(el,{from,to,y:[Math.floor(Math.min(...wv2)-2), Math.ceil(Math.max(...wv2)+2)], yfmt:v=>nf(v,0),
-      layers:[{type:'line',data:DATA.waist,color:c2,maxGap:60},{type:'dots',data:DATA.waist,color:c2}],
-      hover:DATA.waist.map(([d,v])=>({t:P(d).getTime(),html:`<div class="t">${fmtDY(P(d))}</div><b>${nf(v,1)} см</b>`}))});
-  }
-
   // whoop recovery + HRV
   const WD = DATA.whoop_daily;
   if(WD.length){
@@ -260,26 +223,13 @@ function render(){
 
 function staticParts(){
   $('#updated').textContent = 'Обновлено ' + fmtDY(today);
-  const pr = DATA.priorities || [];
-  $('#prio').hidden = !pr.length;
-  $('#prio').innerHTML = pr.map(([t,n],i)=>`<span class="chip">${i+1} · <b>${t}</b>${n?' — '+n:''}</span>`).join('');
   const show = (id, on)=>{ const c=$(id); c.hidden=!on; const two=c.parentElement; if(two.classList.contains('two')) two.hidden=[...two.children].every(x=>x.hidden); };
-  show('#card-good', (DATA.plan.goodWeek||[]).length); show('#card-plan', (DATA.plan.rows||[]).length);
-  show('#card-supps', DATA.supplements.length); show('#card-events', DATA.events.length);
-  show('#card-labs', DATA.labs.length);
-  $('#checklist').innerHTML = (DATA.plan.goodWeek||[]).map(t=>`<li><span class="dot" style="background:var(--series-1)"></span><span>${t}</span></li>`).join('');
-  $('#planver').textContent = DATA.plan.version;
-  $('#plantable').innerHTML = (DATA.plan.rows||[]).map(r=>`<tr><td>${r[0]}</td><td><b>${r[1]}</b></td></tr>`).join('');
-  $('#plannotes').innerHTML = (DATA.plan.notes||[]).map(n=>'· '+n).join('<br>');
+  const pl = DATA.plan_now;
+  show('#card-plan', !!pl); show('#card-supps', DATA.supplements.length);
+  if(pl){ $('#planver').textContent = 'с '+fmtDY(P(pl.start)); $('#plantext').innerHTML = esc(pl.text); }
   const sup = DATA.supplements, now = sup.filter(x=>!x.end || P(x.end)>=today), past = sup.filter(x=>x.end && P(x.end)<today);
   $('#supps').innerHTML = sup.length ? `<thead><tr><th>Что</th><th>Доза</th><th>Когда</th><th>С</th><th>По</th><th>Зачем</th></tr></thead><tbody>${[...now,...past.reverse()].map(x=>`<tr${x.end&&P(x.end)<today?' class="muted"':''}><td><b>${esc(x.name)}</b></td><td>${esc(x.dose)}</td><td>${esc(x.timing)}</td><td>${fmtD(P(x.start))}</td><td>${x.end?fmtD(P(x.end)):'сейчас'}</td><td>${esc(x.purpose)}</td></tr>`).join('')}</tbody>`
-    : `<tbody><tr><td class="muted">Пока пусто — расскажи, что принимаешь, и я внесу.</td></tr></tbody>`;
-  const ev = DATA.events.slice().reverse();
-  $('#events').innerHTML = ev.length ? `<thead><tr><th>Когда</th><th>Тип</th><th>Что</th></tr></thead><tbody>${ev.map(x=>`<tr><td>${fmtD(P(x.start))}${x.end&&x.end!==x.start?' – '+fmtD(P(x.end)):''}</td><td>${esc(x.type)}</td><td>${esc(x.description)}</td></tr>`).join('')}</tbody>`
-    : `<tbody><tr><td class="muted">Болезни, травмы, поездки, алкоголь — всё, что объясняет провалы на графиках.</td></tr></tbody>`;
-  const lb = DATA.labs.slice().reverse();
-  $('#labs').innerHTML = lb.length ? `<thead><tr><th>Дата</th><th>Показатель</th><th>Значение</th><th>Норма</th></tr></thead><tbody>${lb.map(x=>{ const out = x.value!=null && ((x.ref_low!=null&&x.value<x.ref_low)||(x.ref_high!=null&&x.value>x.ref_high)); return `<tr><td>${fmtDY(P(x.date))}</td><td>${esc(x.marker)}</td><td>${out?'<b style="color:var(--critical)">':'<b>'}${x.value??'—'}</b> ${esc(x.unit)}</td><td class="muted">${x.ref_low??''}–${x.ref_high??''}</td></tr>`; }).join('')}</tbody>`
-    : `<tbody><tr><td class="muted">Анализов пока нет.</td></tr></tbody>`;
+    : `<tbody><tr><td class="muted">Пока пусто — добавьте в «Настройках».</td></tr></tbody>`;
 }
 
 boot(render, b=>{ RANGE=+b.dataset.d; }, ()=>{ staticParts(); tiles(); });

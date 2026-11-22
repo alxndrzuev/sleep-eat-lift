@@ -63,7 +63,6 @@ figcaption b{color:var(--text-primary)}
 .th b{display:block;color:var(--text-primary);font-weight:600}
 h2{font-size:15px;margin:0 0 10px}
 .muted{color:var(--text-muted);font-size:12px}
-.summary p{margin:4px 0}
 .foot{display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:6px}
 /* загрузка */
 .drop-hint{display:none;position:fixed;inset:12px;border:3px dashed var(--series-1);border-radius:16px;background:rgba(42,120,214,.08);z-index:20;
@@ -126,8 +125,6 @@ h2{font-size:15px;margin:0 0 10px}
   <p class="muted">Фото сохраняются в папку <b>data/photos</b> внутри папки проекта: оригинал как есть и версия, выровненная под один масштаб фигуры. В первый раз Chrome попросит один раз выбрать папку — выберите папку проекта <b>health</b> (в ней лежат portal и data): страница сама найдёт или создаст в ней data/photos. Так устроена защита в браузере: страница с диска может писать только туда, куда вы разрешили.</p>
 </div>
 
-<div class="card summary" id="summary" hidden></div>
-
 <div class="card" id="compare">
   <div class="bar">
     <div class="seg" id="poses"></div>
@@ -188,8 +185,6 @@ function setIndex(index, newest) {
     dates.forEach(d => s.add(new Option(`${fmt(d)} · ${wt(S(d))}`, d)));
   }
   $("sub").textContent = dates.length ? `${dates.length} ${plural(dates.length, "серия", "серии", "серий")} · ${fmt(dates[0])} — ${fmt(dates[dates.length - 1])}` : "";
-  $("summary").innerHTML = D.summary ? `<h2>Что видно по фото</h2>${D.summary}` : "";
-  $("summary").hidden = !D.summary || !dates.length;
   $("compare").hidden = $("stripCard").hidden = !dates.length;
   $("empty").hidden = !!dates.length;
   poseButtons();
@@ -239,7 +234,7 @@ function render() {
     sl.onpointermove = e => { if (drag) set(e.clientX); };
     sl.onpointerup = () => drag = false;
   }
-  const n = [[A, "dotA"], [B, "dotB"]].filter(([d]) => S(d).note).map(([d, c]) => `<div><span class="${c}"></span>${fmt(d)}: ${esc(S(d).note)}</div>`);
+  const n = [];
   [A, B].filter((d, i, a) => D.feet_cut.includes(d) && a.indexOf(d) === i).forEach(d => n.push(`<div class="muted">${fmt(d)}: стопы у края кадра или обрезаны — масштаб и линия пола оценены по другим точкам</div>`));
   [A, B].filter((d, i, a) => a.indexOf(d) === i && !D.aligned[`${d}_${pose}`] && D.img[`${d}_${pose}`])
     .forEach(d => n.push(`<div class="muted">${fmt(d)}: фигура на снимке не найдена — показан оригинал без выравнивания</div>`));

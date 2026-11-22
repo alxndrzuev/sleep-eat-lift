@@ -329,13 +329,14 @@ test('nearest weight within 14 days', () => {
 test('page view: paths, sessions, buttons only for poses that exist', () => {
   const idx = {photos: {'2026-07-12_front': {date: '2026-07-12', pose: 'front', kp: KP, feet_cut: true, v: 3},
     '2026-07-12_side': {date: '2026-07-12', pose: 'side', kp: null, feet_cut: false, v: 3}}};
-  const data = {weight: [['2026-07-13', 73]], photo_notes: {'2026-07-12': 'x'}, photos_summary: '<p>s</p>'};
+  const data = {weight: [['2026-07-13', 73]]};
   const v = js(`PhotosCore.buildView(${J(idx)}, ${J(data)}, "../photos/")`);
   assert.deepStrictEqual(v.aligned, {'2026-07-12_front': '../photos/aligned/2026-07-12_front.jpg?v=3'});
   assert.strictEqual(v.img['2026-07-12_side'], '../photos/view/2026-07-12_side.jpg?v=3');
   assert.strictEqual(v.thumb['2026-07-12_side'], '../photos/thumbs/2026-07-12_side.jpg?v=3');
-  assert.deepStrictEqual(v.sessions, [{date: '2026-07-12', weight: 73, note: 'x'}]);
-  assert.deepStrictEqual([v.feet_cut, v.summary], [['2026-07-12'], '<p>s</p>']);
+  assert.deepStrictEqual(v.sessions, [{date: '2026-07-12', weight: 73}]);           // заметок и вывода по фото больше нет
+  assert.deepStrictEqual(v.feet_cut, ['2026-07-12']);
+  assert.ok(!('summary' in v));
   assert.deepStrictEqual(js('PhotosCore.buildView({photos: {}}, {}, "x/").sessions'), []);
   assert.deepStrictEqual(v.poses, ['front', 'side']);
 });

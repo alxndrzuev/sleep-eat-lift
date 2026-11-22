@@ -168,7 +168,7 @@ const END = (()=>{ const ds=DATA.whoop_daily.map(r=>r.date).sort(); const last=d
 const WD = {}; DATA.whoop_daily.forEach(r=>WD[r.date]=r);
 const DAYS = Object.keys(WD).sort();
 const FIRST = DAYS.length ? P(DAYS[0]) : today;
-const SLEEP_T = (DATA.plan&&DATA.plan.targets&&DATA.plan.targets.sleep) || 7.5;
+const SLEEP_T = (DATA.goals||{}).sleep_h || 7.5;   // цель сна — из «Целей» (targets.csv)
 const AC = {}; (DATA.alcohol_check||[]).forEach(r=>AC[r.date]=r);
 const isAlco = ds => AC[ds] && AC[ds].status==='да';
 const isSusp = ds => AC[ds] && AC[ds].status==='?';

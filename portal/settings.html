@@ -26,6 +26,10 @@ table.hist tr.now td{font-weight:600}
 .linkbtn{border:0;background:none;color:var(--text-secondary);cursor:pointer;font:inherit;text-decoration:underline;padding:0}
 .hist-h{margin-top:14px;font-weight:600}
 .card a{color:var(--series-1)}
+textarea{width:100%;box-sizing:border-box;font:inherit;line-height:1.5;padding:8px;margin-top:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-0,transparent);color:var(--text-primary);resize:vertical}
+.plantext{white-space:pre-wrap;line-height:1.5;color:var(--text-secondary);padding:4px 0 8px}
+table.hist tr.past td{color:var(--text-secondary)}
+table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text-primary)}
 </style>
 </head>
 <body>
@@ -55,7 +59,8 @@ table.hist tr.now td{font-weight:600}
   <div class="card">
     <h2>Цели</h2>
     <div class="desc">Цель действует с указанной даты до следующей цели. Можно задать и прошлые цели — тогда графики покажут,
-      к чему вы стремились в то время. Пустое поле — как в цели, действовавшей на эту дату. Калории считаются из БЖУ сами.</div>
+      к чему вы стремились в то время. Пустое поле — как в цели, действовавшей на эту дату. Калории считаются из БЖУ сами.
+      Кардио — любые тренировки от 20 минут, кроме силовых и прогулок.</div>
     <div class="form">
       <label>Действует с<input id="date" type="date"></label>
       <label>Белки, г<input id="protein" inputmode="numeric"></label>
@@ -63,6 +68,9 @@ table.hist tr.now td{font-weight:600}
       <label>Углеводы, г<input id="carbs" inputmode="numeric"></label>
       <label>Калории, ккал — по БЖУ<input id="kcal" readonly tabindex="-1" title="4 ккал на грамм белка и углеводов, 9 — на грамм жира"></label>
       <label>Целевой вес, кг<input id="goalWeight" inputmode="decimal"></label>
+      <label>Сон, ч<input id="sleep" inputmode="decimal"></label>
+      <label>Силовые в неделю<input id="strength" inputmode="numeric"></label>
+      <label>Кардио в неделю<input id="cardio" inputmode="numeric"></label>
     </div>
     <div class="svc"><button class="btn" id="save">Сохранить</button><span id="saved"></span></div>
   </div>
@@ -70,8 +78,34 @@ table.hist tr.now td{font-weight:600}
   <div class="card" id="history">
     <h2>История целей</h2>
     <div class="desc">Все цели по датам. Ошибочную можно удалить — графики пересчитаются.</div>
-    <div class="hist-h">Калории и БЖУ</div><div id="histT"></div>
+    <div class="hist-h">Питание, сон, тренировки</div><div id="histT"></div>
     <div class="hist-h">Целевой вес</div><div id="histW"></div>
+  </div>
+
+  <div class="card" id="plan">
+    <h2>План</h2>
+    <div class="desc">Свободный текст: привычки, цели, правила — как удобно. Действует с указанной даты до следующей версии,
+      прежние версии остаются в истории. На сводке показывается действующий план.</div>
+    <div class="form"><label>Действует с<input id="planDate" type="date"></label></div>
+    <textarea id="planText" rows="12" placeholder="Например: отбой до 23:30 в будни, белок каждый день…"></textarea>
+    <div class="svc"><button class="btn" id="planSave">Сохранить план</button><span id="planSaved"></span></div>
+    <div class="hist-h">История плана</div><div id="planHist"></div>
+  </div>
+
+  <div class="card" id="supps">
+    <h2>БАДы</h2>
+    <div class="desc">Что принимаете сейчас и что раньше. Сменили дозу — прекратите прежний и добавьте новый: так сохранится история.</div>
+    <div id="suppList"></div>
+    <div class="hist-h">Добавить</div>
+    <div class="form">
+      <label>Название<input id="sName"></label>
+      <label>Доза<input id="sDose"></label>
+      <label>Когда<input id="sTiming"></label>
+      <label>Зачем<input id="sPurpose"></label>
+      <label>Заметка<input id="sNote"></label>
+      <label>С даты<input id="sStart" type="date"></label>
+    </div>
+    <div class="svc"><button class="btn" id="suppAdd">Добавить</button><span id="suppSaved"></span></div>
   </div>
 
   <div class="card">
@@ -95,6 +129,8 @@ table.hist tr.now td{font-weight:600}
 (function () {
   try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   const $ = s => document.querySelector(s);
+  // текст из CSV — только через esc (в innerHTML он не должен стать разметкой)
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
   if (!window.health) { $('#outside').hidden = false; return; }
   $('#app').hidden = false;
   const H = window.health;
@@ -146,9 +182,13 @@ table.hist tr.now td{font-weight:600}
   for (const k of ['protein', 'fat', 'carbs']) $('#' + k).addEventListener('input', calc);
   calc();
   $('#goalWeight').placeholder = g.goal_weight_kg != null ? g.goal_weight_kg : '—';
+  for (const [id, col] of [['sleep', 'sleep_h'], ['strength', 'strength_wk'], ['cardio', 'cardio_wk']])
+    $('#' + id).placeholder = t[col] != null ? String(t[col]).replace('.', ',') : '—';
   const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   $('#date').value = $('#date').max = iso(new Date());
   $('#date').min = '2000-01-01';
+  const TODAY = iso(new Date());
+  for (const id of ['#planDate', '#sStart']) { $(id).value = $(id).max = TODAY; $(id).min = '2000-01-01'; }
 
   // история: новые сверху; «сейчас» — последняя цель не позже сегодня
   const fmt = ds => new Date(ds + 'T00:00:00').toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'});
@@ -162,7 +202,8 @@ table.hist tr.now td{font-weight:600}
         cols.map(c => `<td>${nf(r[c[0]])}</td>`).join('') +
         `<td><button class="linkbtn" data-kind="${kind}" data-date="${r[key]}">удалить</button></td></tr>`).join('') + '</tbody></table>';
   }
-  $('#histT').innerHTML = table(DATA.targets, 'start', [['kcal', 'ккал'], ['protein', 'Б, г'], ['fat', 'Ж, г'], ['carbs', 'У, г']], 'targets');
+  $('#histT').innerHTML = table(DATA.targets, 'start', [['kcal', 'ккал'], ['protein', 'Б, г'], ['fat', 'Ж, г'], ['carbs', 'У, г'],
+    ['sleep_h', 'сон, ч'], ['strength_wk', 'силовые'], ['cardio_wk', 'кардио']], 'targets');
   $('#histW').innerHTML = table(DATA.goal_weight, 'date', [['goal_weight_kg', 'кг']], 'goal_weight');
   document.querySelectorAll('#history .linkbtn').forEach(b => b.onclick = async () => {
     if (!confirm(`Удалить цель с ${fmt(b.dataset.date)}?`)) return;
@@ -172,12 +213,63 @@ table.hist tr.now td{font-weight:600}
 
   $('#save').onclick = async () => {
     const vals = {date: $('#date').value};
-    for (const k of ['protein', 'fat', 'carbs', 'goalWeight']) vals[k] = $('#' + k).value;   // ккал считает приложение из БЖУ
+    for (const k of ['protein', 'fat', 'carbs', 'goalWeight', 'sleep', 'strength', 'cardio']) vals[k] = $('#' + k).value;   // ккал считает приложение из БЖУ
     const r = await H.saveTargets(vals);
     $('#saved').className = r.ok ? 'ok' : 'err';
     $('#saved').textContent = r.ok ? 'Сохранено' : r.error;
     if (r.ok) setTimeout(() => location.reload(), 600);
   };
+  const done = (el, r) => {
+    $(el).className = r.ok ? 'ok' : 'err';
+    $(el).textContent = r.ok ? 'Сохранено' : r.error;
+    if (r.ok) setTimeout(() => location.reload(), 600);
+  };
+
+  // план: свободный текст с даты; в поле — действующий план, чтобы править, а не писать заново
+  const plans = (DATA.plans || []).slice().sort((a, b) => (a.start < b.start ? 1 : -1));
+  const planNow = DATA.plan_now;
+  $('#planText').value = planNow ? planNow.text : '';
+  $('#planSave').onclick = async () => done('#planSaved', await H.savePlan({date: $('#planDate').value, text: $('#planText').value}));
+  $('#planHist').innerHTML = !plans.length ? '<div class="muted" style="margin-top:6px">Пока нет</div>' :
+    '<table class="hist"><thead><tr><th>С даты</th><th>Начало текста</th><th></th><th></th></tr></thead><tbody>' +
+    plans.map((p, i) => {
+      const now = planNow && p.start === planNow.start, first = String(p.text || '').split('\n')[0];
+      return `<tr class="${now ? 'now' : ''}"><td>${fmt(p.start)}${now ? ' · сейчас' : ''}</td><td>${esc(first.length > 60 ? first.slice(0, 60) + '…' : first)}</td>` +
+        `<td><button class="linkbtn" data-show="${i}">показать</button></td><td><button class="linkbtn" data-del="${esc(p.start)}">удалить</button></td></tr>` +
+        `<tr hidden id="plan-${i}"><td colspan="4"><div class="plantext">${esc(p.text)}</div></td></tr>`;
+    }).join('') + '</tbody></table>';
+  document.querySelectorAll('#planHist [data-show]').forEach(b => b.onclick = () => {
+    const row = $('#plan-' + b.dataset.show); row.hidden = !row.hidden; b.textContent = row.hidden ? 'показать' : 'скрыть';
+  });
+  document.querySelectorAll('#planHist [data-del]').forEach(b => b.onclick = async () => {
+    if (!confirm(`Удалить план с ${fmt(b.dataset.del)}?`)) return;
+    const r = await H.removePlan(b.dataset.del);
+    if (r.ok) location.reload(); else alert(r.error);
+  });
+
+  // БАДы: сейчас (без даты конца или конец не наступил) и раньше; строка — дата начала + название
+  const sup = DATA.supplements || [], isNow = x => !x.end || x.end >= TODAY;
+  const supRows = [...sup.filter(isNow), ...sup.filter(x => !isNow(x)).reverse()];
+  $('#suppList').innerHTML = !sup.length ? '<div class="muted" style="margin-top:6px">Пока нет</div>' :
+    '<table class="hist"><thead><tr><th>Что</th><th>Доза</th><th>Когда</th><th>Зачем</th><th>С</th><th>По</th><th></th></tr></thead><tbody>' +
+    supRows.map((x, i) => `<tr class="${isNow(x) ? '' : 'past'}"${x.note ? ` title="${esc(x.note)}"` : ''}><td><b>${esc(x.name)}</b></td><td>${esc(x.dose)}</td>` +
+      `<td>${esc(x.timing)}</td><td>${esc(x.purpose)}</td><td>${fmt(x.start)}</td>` +
+      `<td>${x.end ? fmt(x.end) : `<input type="date" id="end-${i}" value="${TODAY}" min="${esc(x.start)}" max="${TODAY}"> <button class="linkbtn" data-stop="${i}">прекратить</button>`}</td>` +
+      `<td><button class="linkbtn" data-rm="${i}">удалить</button></td></tr>`).join('') + '</tbody></table>';
+  document.querySelectorAll('#suppList [data-stop]').forEach(b => b.onclick = async () => {
+    const x = supRows[b.dataset.stop];
+    const r = await H.stopSupplement({start: x.start, name: x.name, end: $('#end-' + b.dataset.stop).value});
+    if (r.ok) location.reload(); else alert(r.error);
+  });
+  document.querySelectorAll('#suppList [data-rm]').forEach(b => b.onclick = async () => {
+    const x = supRows[b.dataset.rm];
+    if (!confirm(`Удалить «${x.name}» с ${fmt(x.start)}? Если вы просто перестали принимать — нажмите «прекратить».`)) return;
+    const r = await H.removeSupplement({start: x.start, name: x.name});
+    if (r.ok) location.reload(); else alert(r.error);
+  });
+  $('#suppAdd').onclick = async () => done('#suppSaved', await H.addSupplement({start: $('#sStart').value, name: $('#sName').value,
+    dose: $('#sDose').value, timing: $('#sTiming').value, purpose: $('#sPurpose').value, note: $('#sNote').value}));
+
   $('#folder').onclick = () => H.openDataFolder();
   $('#chfolder').onclick = () => H.changeDataFolder();   // приложение перезапустится с новой папкой
 })();

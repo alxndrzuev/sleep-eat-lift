@@ -48,6 +48,8 @@ function fatsecret(d) {
   d.put('targets.csv', [{start: '2026-11-01', kcal: '2200', protein: '130', fat: '70', carbs: '260'}]);
   return d;
 }
+// текст из CSV и от сервисов (заметки, вид спорта) выводится как текст, а не как разметка
+const TAG = '<img src="x" id="injected">';
 const has = (dom, s) => assert.ok(dom.includes(s), s);
 const hasNot = (dom, s) => assert.ok(!dom.includes(s), s);
 
@@ -56,11 +58,11 @@ test('FatSecret only: dashboard', {skip}, () => {
   has(dom, 'href="nutrition.html"');
   hasNot(dom, 'href="training.html"');
   hasNot(dom, 'Recovery');
-  hasNot(dom, 'class="chip"');                                       // приоритеты — только из meta.json, а его нет
   hasNot(dom, '/ 8');
-  for (const card of ['supps', 'events', 'labs', 'plan', 'good'])    // пустые блоки скрыты
+  for (const card of ['supps', 'plan'])                              // пустые блоки скрыты
     assert.match(dom, new RegExp(`id="card-${card}"[^>]*hidden`), card);
-  assert.match(dom, /id="prio"[^>]*hidden/);
+  for (const gone of ['card-events', 'card-labs', 'card-good', 'id="prio"', 'Самочувствие', 'Талия'])   // убраны в 1.2
+    hasNot(dom, gone);
   has(dom, 'цель 80');
   has(dom, 'цель 2');                                                // калории: «цель 2 200» из targets.csv
 });
@@ -75,15 +77,53 @@ test('Whoop only: dashboard', {skip}, () => {
   hasNot(dom, 'Подключите');
 });
 
-test('no squash in plan: «Кардио» on «Тренировки»', {skip}, () => {
-  const d = data();
-  d.put('whoop_daily.csv', days(20, {recovery: '60', hrv: '70', rhr: '55'}));
-  d.put('whoop_workouts.csv', [{id: '1', date: '2026-11-10', start: '2026-11-10 19:00', sport: 'running', duration_min: '45'},
-                               {id: '2', date: '2026-11-12', start: '2026-11-12 19:00', sport: 'weightlifting_msk', duration_min: '60'}]);
-  const dom = d.page('training.html');
+function workouts(d) {
+  d.put('whoop_daily.csv', days(20, {recovery: '60', hrv: '70', rhr: '55', sleep_h: '7'}));
+  d.put('whoop_workouts.csv', [{id: '1', date: '2026-11-10', start: '2026-11-10 19:00', sport: 'squash', duration_min: '60'},
+                               {id: '2', date: '2026-11-12', start: '2026-11-12 19:00', sport: 'weightlifting_msk', duration_min: '60'},
+                               {id: '3', date: '2026-11-12', start: '2026-11-12 20:05', sport: 'cycling', duration_min: '15'}]);
+  return d;
+}
+
+test('«Кардио» on «Тренировки» for everyone, no goals — no plan numbers', {skip}, () => {
+  const dom = workouts(data()).page('training.html');
   has(dom, 'Кардио');
   hasNot(dom, 'Сквош');
+  hasNot(dom, 'Другое');
   hasNot(dom, 'план 2');
+});
+
+test('no goals: dashboard and «Восстановление» render', {skip}, () => {
+  const d = workouts(data());
+  const dom = d.page('dashboard.html');
+  has(dom, 'Силовые, 4 нед');
+  has(dom, 'Кардио, 4 нед');
+  hasNot(dom, '<small> / ');
+  hasNot(dom, 'NaN');
+  const rec = d.page('recovery.html');
+  hasNot(rec, 'NaN');
+  has(rec, '7,5');                                                   // цель сна по умолчанию
+});
+
+test('workout and sleep goals from «Цели»', {skip}, () => {
+  const d = workouts(data());
+  d.put('targets.csv', [{start: '2026-11-01', sleep_h: '8', strength_wk: '2', cardio_wk: '3'}]);
+  const dom = d.page('dashboard.html');
+  has(dom, '/ 8</small>');                                           // силовые: 2 в неделю × 4
+  has(dom, '/ 12</small>');                                          // кардио: 3 × 4
+  has(dom, 'цель 8');
+  has(d.page('training.html'), 'план 2 в неделю');
+});
+
+test('plan text on the dashboard: escaped, line breaks kept', {skip}, () => {
+  const d = data();
+  d.put('body.csv', [{date: '2026-11-10', weight_kg: '75.5'}]);
+  d.put('plans.csv', [{start: '2026-10-01', text: 'старый'}, {start: '2026-11-16', text: 'Сон 7,5+\n' + TAG}]);
+  const dom = d.page('dashboard.html');
+  hasNot(dom, TAG);
+  has(dom, 'Сон 7,5+\n&lt;img');
+  has(dom, 'с 16 нояб');
+  hasNot(dom, 'старый');
 });
 
 test('empty dashboard', {skip}, () => {
@@ -134,12 +174,9 @@ test('empty nutrition', {skip}, () => {
   has(data().page('nutrition.html'), 'Подключите FatSecret или Whoop');
 });
 
-// текст из CSV и от сервисов (заметки, вид спорта) выводится как текст, а не как разметка
-const TAG = '<img src="x" id="injected">';
 
-test('escaped: events and supplements on the dashboard', {skip}, () => {
+test('escaped: supplements on the dashboard', {skip}, () => {
   const d = data();
-  d.put('events.csv', [{start: '2026-11-15', end: '2026-11-15', type: 'болезнь', description: TAG}]);
   d.put('supplements.csv', [{name: TAG, start: '2026-11-01'}]);
   d.put('body.csv', [{date: '2026-11-10', weight_kg: '75.5'}]);
   const dom = d.page('dashboard.html');
@@ -163,9 +200,8 @@ test('owner data folder: priorities, workout goal, all menu items', {skip}, t =>
   const base = site(dir);                                            // настоящие данные — только читаем
   const dom = render(base, 'dashboard.html');
   fs.rmSync(base, {recursive: true, force: true});
-  for (const [title] of meta.priorities || []) has(dom, title);
-  const s = ((meta.plan || {}).workouts || {}).strength;
-  if (s) has(dom, `/ ${s * 4}`);
+  const now = store.read(dir, 'targets.csv').filter(r => r.start <= '2026-11-21').pop() || {};
+  if (now.strength_wk) has(dom, `/ ${Number(now.strength_wk) * 4}`);
   has(dom, 'href="training.html"');
-  has(dom, '<h2>Текущий план');
+  if (store.read(dir, 'plans.csv').length) has(dom, '<h2>План');
 });

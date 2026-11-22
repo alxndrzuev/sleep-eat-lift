@@ -361,10 +361,9 @@
       if (p.feet_cut) cut.add(p.date);
       dates.add(p.date);
     }
-    const notes = (data && data.photo_notes) || {};
     return {
-      sessions: [...dates].sort().map(date => ({date, weight: nearestWeight(data && data.weight, date), note: notes[date] || null})),
-      img, aligned, thumb, feet_cut: [...cut].sort(), summary: (data && data.photos_summary) || null,
+      sessions: [...dates].sort().map(date => ({date, weight: nearestWeight(data && data.weight, date)})),
+      img, aligned, thumb, feet_cut: [...cut].sort(),
       poses: POSES.filter(p => Object.values(photos).some(x => x.pose === p)),
     };
   }
