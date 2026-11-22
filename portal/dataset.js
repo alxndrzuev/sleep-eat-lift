@@ -4,17 +4,9 @@ var Dataset = (function () {
   const FULL_DAY_KCAL = 1200;   // дни в FatSecret меньше — «не заполнен», в средние не идут (lib.FULL_DAY_KCAL)
   const STRENGTH = ["weightlifting_msk", "functional-fitness", "powerlifting", "weightlifting"];
   const LABELS = ["strength", "squash", "cardio", "other", "none"];   // метки пользователя (workout_labels.csv)
-  // кардио (у кого в плане нет сквоша): циклические, игровые, единоборства, интервальные
-  const CARDIO = ["running", "cycling", "spin", "mountain-biking", "swimming", "rowing", "elliptical", "stairmaster", "stair-climbing",
-    "hiking", "rucking", "skiing", "cross-country-skiing", "snowboarding", "skating", "inline-skating", "ice-skating", "triathlon",
-    "duathlon", "squash", "tennis", "padel", "pickleball", "badminton", "table-tennis", "racquetball", "basketball", "soccer",
-    "football", "hockey", "ice-hockey", "field-hockey", "volleyball", "handball", "rugby", "lacrosse", "boxing", "kickboxing",
-    "martial-arts", "jiu-jitsu", "wrestling", "muay-thai", "mma", "hiit", "jumping-rope", "assault-bike", "dance", "cardio",
-    "spinning", "track-and-field", "cross-country", "obstacle-course-racing", "surfing", "paddleboarding", "kayaking", "climbing",
-    "rock-climbing", "bouldering"];
+  const SHORT_CARDIO_MIN = 20;  // кардио короче — не тренировка (разминка или заминка на велосипеде после силовой)
   const GOAL_HIT = 0.15, GOAL_NEAR = 0.30;   // день питания: Б, Ж, У в пределах ±15 % от цели — выполнил, до ±30 % — рядом, дальше — мимо
   const MACROS = [["p", "protein", "белок"], ["f", "fat", "жиры"], ["c", "carbs", "углеводы"]];   // [поле дня, поле цели, подпись]
-  const CARDIO_ZONES = 0.5;     // вид не указан (activity): ≥ половины времени в пульсовых зонах 2–5 — кардио
 
   /** Округление до 0,1 как Python round(x, 1): по точному значению числа, ровно половина — к чётному (как desktop/pyround.js). */
   function round1(x) {
@@ -42,31 +34,20 @@ var Dataset = (function () {
     return worst <= GOAL_HIT ? "hit" : worst <= GOAL_NEAR ? "near" : "miss";
   }
 
-  function sportKind(s) {
-    return s === "squash" ? "squash" : STRENGTH.includes(s) ? "strength" : s === "walking" ? "walk" : "other";
-  }
-
-  /** Вид тренировки для режима «кардио»: силовые / кардио (по виду или по пульсу) / прогулка / другое. */
-  function cardioKind(w) {
+  /** Вид тренировки — одинаково у всех: strength (силовые виды Whoop) / cardio (всё остальное, в т. ч. сквош и вид
+      «не указан») / walk (не тренировка: прогулка, кардио короче 20 минут, метка none). Метка пользователя главнее вида. */
+  function workoutKind(w, labels) {
+    const lab = labels && labels[String(w.id)];
+    if (lab && LABELS.includes(lab.label)) return lab.label === "none" ? "walk" : lab.label === "strength" ? "strength" : "cardio";
     const s = String(w.sport || "").toLowerCase();
     if (STRENGTH.includes(s)) return "strength";
     if (s === "walking") return "walk";
-    if (CARDIO.includes(s)) return "cardio";
-    const z = [0, 1, 2, 3, 4, 5].map(i => Number(w["z" + i + "_min"]) || 0), tot = z.reduce((a, b) => a + b, 0);
-    if (tot > 0 && (z[2] + z[3] + z[4] + z[5]) / tot >= CARDIO_ZONES) return "cardio";
-    return "other";
+    return Number(w.duration_min) < SHORT_CARDIO_MIN ? "walk" : "cardio";
   }
 
-  /** Категория тренировки: squash / strength / other / walk; метка пользователя главнее вида из Whoop (lib.workout_kind). */
-  function workoutKind(w, labels, mode = "squash") {
-    const lab = labels[String(w.id)];
-    if (lab && LABELS.includes(lab.label)) {
-      if (lab.label === "none") return "walk";
-      if (mode === "cardio" && lab.label === "squash") return "cardio";
-      if (mode === "squash" && lab.label === "cardio") return "other";
-      return lab.label;
-    }
-    return mode === "cardio" ? cardioKind(w) : sportKind(w.sport);
+  /** Строка таблицы с колонкой start, действующая на день ds (последняя с start ≤ ds), или null. */
+  function inEffect(rows, ds) {
+    return rows.filter(r => r.start && r.start <= ds).sort((a, b) => (a.start < b.start ? -1 : 1)).pop() || null;
   }
 
   function cmp(a, b) {        // сравнение списков по элементам, как sorted() в Python
@@ -84,7 +65,6 @@ var Dataset = (function () {
     const d = {};
     const body = T("body");
     d.weight = body.filter(b => b.weight_kg != null).map(b => [b.date, b.weight_kg]);
-    d.waist = body.filter(b => b.waist_cm != null).map(b => [b.date, b.waist_cm]);
 
     const nut = T("nutrition_daily");
     d.kcal = nut.filter(n => n.kcal != null).map(n => [n.date, n.kcal]);
@@ -101,25 +81,23 @@ var Dataset = (function () {
       d[key] = wd.filter(r => r[col] != null).map(r => [r.date, r[col]]);
     const labels = {};
     for (const l of T("workout_labels")) labels[String(l.id)] = l;
-    // вторая категория тренировок: сквош — если он есть в плане (meta.plan.workouts), иначе кардио
-    const pw = ((raw.meta || {}).plan || {}).workouts;
-    const mode = pw && "squash" in pw ? "squash" : "cardio";
-    d.k2 = mode === "squash" ? {key: "squash", lab: "Сквош", many: "сквоша"} : {key: "cardio", lab: "Кардио", many: "кардио"};
-    const ww = T("whoop_workouts").map(w => Object.assign({}, w, {kind: workoutKind(w, labels, mode)}));
+    const ww = T("whoop_workouts").map(w => Object.assign({}, w, {kind: workoutKind(w, labels)}));
     d.workouts = ww.filter(w => w.kind !== "walk").map(w => [w.start, w.kind, w.duration_min, w.kcal]).sort(cmp);
     d.whoop_daily = wd;
     d.whoop_workouts = ww;
-    for (const name of ["supplements", "checkins", "labs", "events", "targets", "goal_weight", "alcohol_check"])
+    for (const name of ["supplements", "events", "targets", "goal_weight", "alcohol_check", "plans"])
       d[name] = T(name);
-    d.photo_notes = {};
-    for (const r of T("photo_notes")) d.photo_notes[r.date] = r.note;
+    d.plans = d.plans.slice().sort((x, y) => (x.start < y.start ? -1 : 1));
+    d.goals = inEffect(d.targets, raw.updated) || {};      // цели на сегодня: КБЖУ, сон, тренировки в неделю
+    const p = inEffect(d.plans, raw.updated);
+    d.plan_now = p ? {start: p.start, text: p.text} : null;
     d.updated = raw.updated;
     Object.assign(d, raw.meta || {});
     d.modules = raw.modules || [];
     return d;
   }
 
-  return {build, workoutKind, sportKind, cardioKind, round1, foodDay, macroDevs, GOAL_HIT, GOAL_NEAR};
+  return {build, workoutKind, round1, foodDay, macroDevs, GOAL_HIT, GOAL_NEAR};
 })();
 
 if (typeof RAW !== "undefined") var DATA = Dataset.build(RAW);

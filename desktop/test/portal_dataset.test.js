@@ -11,7 +11,7 @@ const build = raw => js(`Dataset.build(${J(raw)})`);
 function raw(tables = {}) {
   const t = Object.fromEntries(Object.keys(SCHEMA.schema).map(n => [n, []]));
   for (const [k, v] of Object.entries(tables)) t[k + '.csv'] = v;
-  return {tables: t, meta: {plan: {targets: {}}, journal: [], photos_summary: '', priorities: []}, modules: ['photos'], updated: '2026-11-21'};
+  return {tables: t, meta: {}, modules: ['photos'], updated: '2026-11-21'};
 }
 
 test('full day threshold: dataset.js = schema.json (1200 kcal)', () => {
@@ -36,53 +36,55 @@ test('workouts: user label overrides Whoop, walks dropped', () => {
                                   w('5', 'weightlifting_msk', '2026-11-08 20:00')],
                  workout_labels: [{id: '1', date: '2026-11-10', start: '2026-11-10 20:00', label: 'strength', note: null},
                                   {id: '3', date: '2026-11-12', start: '2026-11-12 20:00', label: 'none', note: null}]});
-  r.meta.plan.workouts = {strength: 2, squash: 2};                     // режим «сквош» — сквош в плане
   const d = build(r);
   assert.deepStrictEqual(d.workouts, [['2026-11-08 20:00', 'strength', 60, 400], ['2026-11-10 20:00', 'strength', 60, 400],
-                                      ['2026-11-11 20:00', 'squash', 60, 400]]);
-  assert.deepStrictEqual(d.whoop_workouts.map(x => x.kind), ['strength', 'squash', 'walk', 'walk', 'strength']);
+                                      ['2026-11-11 20:00', 'cardio', 60, 400]]);
+  assert.deepStrictEqual(d.whoop_workouts.map(x => x.kind), ['strength', 'cardio', 'walk', 'walk', 'strength']);
 });
 
 test('series skip empty values', () => {
-  const d = build(raw({body: [{date: '2026-11-01', weight_kg: 72.5, waist_cm: null, bodyfat_pct: null, note: null},
-                              {date: '2026-11-02', weight_kg: null, waist_cm: 81, bodyfat_pct: null, note: null}]}));
+  const d = build(raw({body: [{date: '2026-11-01', weight_kg: 72.5, note: null}, {date: '2026-11-02', weight_kg: null, note: 'x'}]}));
   assert.deepStrictEqual(d.weight, [['2026-11-01', 72.5]]);
-  assert.deepStrictEqual(d.waist, [['2026-11-02', 81]]);
 });
 
-test('photo notes map and meta', () => {
-  const r = raw({photo_notes: [{date: '2026-07-12', note: 'x'}]});
-  r.meta.priorities = [['Самочувствие', 'главное']];
+test('meta and modules', () => {
+  const r = raw();
+  r.meta.alcohol_from = '2026-11-14';
   const d = build(r);
-  assert.deepStrictEqual(d.photo_notes, {'2026-07-12': 'x'});
-  assert.deepStrictEqual(d.priorities, [['Самочувствие', 'главное']]);
+  assert.strictEqual(d.alcohol_from, '2026-11-14');
   assert.deepStrictEqual(d.modules, ['photos']);
   assert.strictEqual(d.updated, '2026-11-21');
+  for (const gone of ['k2', 'waist', 'photo_notes', 'checkins', 'labs', 'plan', 'priorities', 'photos_summary']) assert.ok(!(gone in d), gone);
 });
 
-function wo(id, sport, z, start = '2026-11-10 20:00') {
-  const r = {id, date: start.slice(0, 10), start, sport, duration_min: 60, strain: null, avg_hr: null, max_hr: null, kcal: 400};
+function wo(id, sport, z, start = '2026-11-10 20:00', min = 60) {
+  const r = {id, date: start.slice(0, 10), start, sport, duration_min: min, strain: null, avg_hr: null, max_hr: null, kcal: 400};
   for (let k = 0; k < 6; k++) r[`z${k}_min`] = (z || Array(6).fill(null))[k];
   return r;
 }
 
-test('cardio mode without squash in plan: activity by heart-rate zones', () => {
-  const ws = [wo('1', 'running'), wo('2', 'cycling'), wo('3', 'squash'), wo('4', 'weightlifting_msk'),
-    wo('5', 'walking'), wo('6', 'activity', [5, 10, 20, 15, 5, 5]),           // зоны 2–5: 45 из 60 → кардио
-    wo('7', 'activity', [30, 20, 5, 5, 0, 0]),                                // 10 из 60 → другое
-    wo('8', 'activity'), wo('9', 'yoga'), wo('10', 'hiit'), wo('11', 'tennis')];
-  const d = build(raw({whoop_workouts: ws, workout_labels: [{id: '9', date: null, start: null, label: 'squash', note: null}]}));
+test('strength and cardio for everyone: walks and cardio under 20 min are not workouts', () => {
+  const ws = [wo('1', 'weightlifting_msk'), wo('2', 'squash'), wo('3', 'running', null, '2026-11-10 20:00', 30),
+    wo('4', 'activity', null, '2026-11-10 20:00', 40), wo('5', 'dance', null, '2026-11-10 20:00', 118),
+    wo('6', 'cycling', null, '2026-11-10 21:00', 15), wo('7', 'walking'), wo('8', 'functional-fitness', null, '2026-11-10 20:00', 15),
+    wo('9', 'cycling', null, '2026-11-10 21:00', 15), wo('10', 'squash'), wo('11', 'activity', null, '2026-11-10 20:00', 20)];
+  const labels = [{id: '9', date: null, start: null, label: 'squash', note: null}, {id: '10', date: null, start: null, label: 'none', note: null}];
+  const d = build(raw({whoop_workouts: ws, workout_labels: labels}));
   assert.deepStrictEqual(Object.fromEntries(d.whoop_workouts.map(w => [w.id, w.kind])),
-    {1: 'cardio', 2: 'cardio', 3: 'cardio', 4: 'strength', 5: 'walk', 6: 'cardio', 7: 'other', 8: 'other', 9: 'cardio', 10: 'cardio', 11: 'cardio'});
-  assert.deepStrictEqual(d.k2, {key: 'cardio', lab: 'Кардио', many: 'кардио'});
+    {1: 'strength', 2: 'cardio', 3: 'cardio', 4: 'cardio', 5: 'cardio', 6: 'walk', 7: 'walk', 8: 'strength', 9: 'cardio', 10: 'walk', 11: 'cardio'});
 });
 
-test('squash mode with squash in plan', () => {
-  const r = raw({whoop_workouts: [wo('1', 'squash'), wo('2', 'running'), wo('3', 'activity', [0, 0, 30, 30, 0, 0])]});
-  r.meta.plan.workouts = {strength: 2, squash: 2};
-  const d = build(r);
-  assert.deepStrictEqual(Object.fromEntries(d.whoop_workouts.map(w => [w.id, w.kind])), {1: 'squash', 2: 'other', 3: 'other'});
-  assert.deepStrictEqual(d.k2, {key: 'squash', lab: 'Сквош', many: 'сквоша'});
+test('goals and plan in effect on the update day', () => {
+  const t = (start, sleep_h) => ({start, kcal: null, protein: null, fat: null, carbs: null, note: null, sleep_h, strength_wk: 2, cardio_wk: null});
+  const d = build(raw({targets: [t('2026-01-01', 7), t('2026-12-01', 8)],
+                       plans: [{start: '2026-11-16', text: 'a'}, {start: '2026-11-01', text: 'b'}, {start: '2026-12-01', text: 'c'}]}));
+  assert.strictEqual(d.goals.sleep_h, 7);
+  assert.strictEqual(d.goals.strength_wk, 2);
+  assert.deepStrictEqual(d.plan_now, {start: '2026-11-16', text: 'a'});
+  assert.deepStrictEqual(d.plans.map(p => p.start), ['2026-11-01', '2026-11-16', '2026-12-01']);
+  const e = build(raw());
+  assert.deepStrictEqual(e.goals, {});
+  assert.strictEqual(e.plan_now, null);
 });
 
 test('food day by worst of P/F/C: ±15 % hit, ±30 % near, else miss; kcal does not matter', () => {
