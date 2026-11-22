@@ -85,7 +85,7 @@ dist/                    ← собранные приложения (не в gi
   `goal_weight.csv` с даты вступления; старые не трогать; из FatSecret цели не берём
 - **Перед каждым коммитом — `python3 scripts/public_check.py`**: в репозитории нет строк из CSV папки данных и значений из secrets/
   (тест делает то же, если папка данных есть). Почта автора — noreply GitHub (git config в репозитории)
-- Git: после изменений кода — коммит; push в GitHub (`origin` — github.com/alxndrzuev/sleep-eat-lift, пока приватный;
+- Git: после изменений кода — коммит; push в GitHub (`origin` — github.com/alxndrzuev/sleep-eat-lift, публичный;
   HTTPS через `gh auth git-credential`, настройка в репозитории) — только по просьбе пользователя. Данные вне git — резервные копии на совести Time Machine
 
 ## Важные особенности данных
