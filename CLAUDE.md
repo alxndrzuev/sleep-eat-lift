@@ -39,7 +39,7 @@ portal/                  ← страницы приложения: dashboard.ht
 scripts/                 ← Node без зависимостей (берёт модули из desktop/) — служебное
   csv.js                 ← данные из чата: `node scripts/csv.js upsert body.csv '{"2026-11-22": {"weight_kg": 75.4}}'`
                            (тот же store.js, что в приложении; пересобирает data.js) · read <файл> [N] · remove · dir
-  vendor_fetch.py        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
+  vendor_fetch.js        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
   public_check.js        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
 dist/                    ← собранные приложения (не в git)
 ```
@@ -53,7 +53,7 @@ dist/                    ← собранные приложения (не в gi
   алкоголя за 30 дней, не раньше `meta.alcohol_from`). Цели КБЖУ и веса — в «Настройках», с любой даты, ккал = 4·Б + 9·Ж + 4·У.
   Алкоголь — на «Восстановлении»: ответы «Мало / Умеренно / Много / Не было», ручное добавление, удаление (events.csv → level)
 - Тренировки: у кого в `meta.plan.workouts` есть сквош — «Сквош» (основной пользователь), иначе «Кардио» (вид спорта или пульс в зонах 2–5)
-- Код: `main.js` (окно, протокол app://h/, IPC), `protocol.js` (что отдаёт app://h/ + CSP: страницы ничего не грузят и не шлют наружу), `store.js` (CSV как lib.py), `fatsecret.js`, `whoop.js`, `alcohol.js`, `updater.js`,
+- Код: `main.js` (окно, протокол app://h/, IPC), `protocol.js` (что отдаёт app://h/ + CSP: страницы ничего не грузят и не шлют наружу), `store.js` (чтение и запись CSV), `fatsecret.js`, `whoop.js`, `alcohol.js`, `updater.js`,
   `settings.js`, `photosfs.js`, `secrets.js` (токены дописываются, ключи приложений не трогаются), `keys.js`, `datadir.js`, `preload.js`,
   `changelog.js` (разбор CHANGELOG.md, версии, выпуск), `whatsnew.js` (что показать после обновления)
 - Тесты: `cd desktop && npm test` — приложение, страницы portal/ (их скрипты выполняются в Node: test/_portal.js),

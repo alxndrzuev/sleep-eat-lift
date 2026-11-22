@@ -1,6 +1,6 @@
 # portal/vendor — библиотеки страницы «Фото»
 
-Собрано `scripts/vendor_fetch.py` — не править руками. Проверка: `python3 scripts/vendor_fetch.py --check`.
+Собрано `scripts/vendor_fetch.js` — не править руками. Проверка: `node scripts/vendor_fetch.js --check`.
 
 | файл | источник | sha256 |
 |---|---|---|
