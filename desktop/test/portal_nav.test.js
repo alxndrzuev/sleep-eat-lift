@@ -122,3 +122,10 @@ test('profiles window table: names escaped, current «открыт», delete onl
   assert.match(locked, /data-open="b"[^>]*disabled/);
   assert.match(locked, /data-del="b"[^>]*disabled/);
 });
+
+test('profiles window closes on a click outside it, not on a click on its own padding (that click also targets <dialog>)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(ROOT, 'portal', 'nav.js'), 'utf8');
+  const win = src.slice(src.indexOf('function profilesWindow('), src.indexOf('function profileBar('));
+  assert.match(win, /e\.target === d && outside/);
+  assert.match(win, /getBoundingClientRect\(\)/);
+});

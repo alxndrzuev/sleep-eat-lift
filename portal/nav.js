@@ -217,7 +217,9 @@ var Nav = (function () {
     const $ = q => d.querySelector(q), err = t => { $(".profs-err").textContent = t || ""; };
     const draw = () => H.profiles().then(info => { $(".profs-t").innerHTML = profilesTable(info); if (info.locked) err(info.locked); });
     d.addEventListener("click", async e => {
-      if (e.target === d || e.target.closest("[data-close]")) { d.close(); return; }   // клик по затемнению или ✕
+      // ✕ или клик по затемнению — за границами окна (клик по полям окна тоже приходит на сам <dialog>: его не закрываем)
+      const rc = d.getBoundingClientRect(), outside = e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom;
+      if ((e.target === d && outside) || e.target.closest("[data-close]")) { d.close(); return; }
       const b = e.target.closest("button.lnk");
       if (!b || b.disabled) return;
       err("");
