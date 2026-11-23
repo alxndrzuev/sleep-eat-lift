@@ -90,3 +90,13 @@ test('no prompt() in pages: Electron does not support it (throws «prompt() is n
   for (const f of fs.readdirSync(PORTAL).filter(f => /\.(html|js)$/.test(f))) assert.ok(!/(^|[^.\w])prompt\(/.test(source(f)), f);
   assert.ok(source('nav.js').includes('function ask('));
 });
+
+test('«Обновить данные» is not in the top menu: time and the button sit at the end of the line under the heading', () => {
+  const nav = source('nav.js');
+  const line = nav.slice(nav.indexOf('function updateLine('), nav.indexOf('// ---------- профили'));
+  assert.ok(line.includes('getElementById("sub")'), 'строка под заголовком');
+  assert.ok(!line.includes('nav.appendChild'), 'не в меню');
+  for (const p of ['nutrition.html', 'training.html', 'recovery.html']) assert.ok(source(p).includes('id="sub"'), p);
+  // на «Питании» «обновлено» было датой открытия страницы, а не загрузки — теперь настоящее время из строки обновления
+  assert.ok(!source('nutrition.html').includes('обновлено ${fmtDY(today)}'));
+});

@@ -113,23 +113,24 @@ var Nav = (function () {
     return "Обновлено: " + on.map((n, i) => NAMES[n] + " — " + (at[i] ? when(at[i]) : "ещё не загружен")).join(" · ");
   }
 
-  const UPDATE_PAGES = ["nutrition.html", "training.html", "recovery.html"];   // «Обновить данные» — на профильных страницах сервисов; ещё — в «Настройках» у FatSecret и Whoop
+  const UPDATE_PAGES = ["nutrition.html", "training.html", "recovery.html"];   // «Обновить» — на профильных страницах сервисов; ещё — в «Настройках» у FatSecret и Whoop
 
-  function appBar() {
-    const nav = document.getElementById("nav");
+  /** Время обновления и «Обновить» — в конце строки под заголовком (#sub), не в верхнем меню. */
+  function updateLine() {
+    const sub = document.getElementById("sub");
     const cur = location.pathname.split("/").pop() || "dashboard.html";
-    if (!nav || !inApp() || !UPDATE_PAGES.includes(cur)) return;
-    nav.style.alignItems = "center";
-    const bar = document.createElement("span");
-    bar.className = "app";
-    bar.style.cssText = "margin-left:auto;display:flex;gap:10px;align-items:center;font-size:13px";   // свои стили — у страниц они разные
-    bar.innerHTML = '<span id="upd" class="muted"></span><button class="iconbtn" id="updbtn" title="Загрузить свежие данные из FatSecret и Whoop">Обновить данные</button>';
-    nav.appendChild(bar);
+    if (!sub || !inApp() || !UPDATE_PAGES.includes(cur)) return;
+    profStyle();
+    sub.style.display = "inline";                       // текст периода страница пишет в #sub; строка обновления — сразу за ним
+    const line = document.createElement("span");
+    line.className = "sub updl";
+    line.innerHTML = ' · <span id="upd"></span> · <button class="lnk" id="updbtn" title="Загрузить свежие данные из FatSecret и Whoop">Обновить</button>';
+    sub.insertAdjacentElement("afterend", line);
     const show = s => {
-      const t = statusText(s), u = document.getElementById("upd");
-      u.textContent = t.text; u.className = t.err ? "err" : "muted";
+      const t = statusText(s), u = document.getElementById("upd"), b = document.getElementById("updbtn");
+      u.textContent = t.text || "ещё не обновлялось"; u.style.color = t.err ? "var(--critical)" : "";
       const any = Object.values(s.services || {}).some(v => v.connected);
-      const b = document.getElementById("updbtn"); b.disabled = s.updating || !any; b.hidden = !any;
+      line.hidden = !any; b.disabled = s.updating;
     };
     window.health.status().then(show);
     window.health.onStatus(show);
@@ -264,7 +265,7 @@ var Nav = (function () {
     profStyle();
     nav.style.alignItems = "center";
     const box = document.createElement("span");
-    box.style.marginLeft = nav.querySelector(".app") ? "12px" : "auto";
+    box.style.marginLeft = "auto";
     nav.appendChild(box);
     // обновить список, не трогая сам <details>: заменить его или поставить open заново — это снова «toggle» → refresh →
     // бесконечная перерисовка, кнопки всё время новые, и клик по ним не срабатывает
@@ -319,7 +320,7 @@ var Nav = (function () {
 
   if (typeof document !== "undefined") {
     render();
-    if (inApp()) { appBar(); profileBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
+    if (inApp()) { profileBar(); updateLine(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
   return {items, title, render, inApp, statusText, syncText, dataErrors, profileMenu, profilesTable, ask, NAMES, MARK, mark, logo, logoSvg};
 })();

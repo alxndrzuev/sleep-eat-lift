@@ -193,7 +193,7 @@ function summarize(days){
 // ---------- hero ----------
 function hero(){
   const cur=period(PER), S=summarize(cur.days), prv=prevPeriod(cur), PS=prv.days.length>=Math.min(7,cur.days.length)?summarize(prv.days):null;
-  $('#sub').textContent = `${fmtDY(cur.start)} — ${fmtDY(cur.end)} · ${dni(S.n)} · обновлено ${fmtDY(today)}`;
+  $('#sub').textContent = `${fmtDY(cur.start)} — ${fmtDY(cur.end)} · ${dni(S.n)}`;   // когда обновлено — дописывает nav.js
   $('#logdesc').textContent = 'Полностью записанные дни (от 1200 ккал) из всех дней периода';
   const pct = S.n ? Math.round(S.full/S.n*100) : 0;
   $('#logbig').innerHTML = `${S.full}<small> из ${S.n}</small> <small style="font-size:18px">· ${pct}%</small>`;
