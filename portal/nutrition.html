@@ -227,7 +227,7 @@ function heatmap(){
   const cur=period(PER);
   const el=$('#hm'); const cs=18, gap=4, st=cs+gap, top=20, left=28;   // крупнее: календарь на полкарточки рядом с «Последними 2 неделями»
   const first=new Date(FIRST); const wd0=(first.getDay()+6)%7; const gridStart=addD(first,-wd0);
-  const weeks=Math.ceil(((END-gridStart)/DAY+1)/7);
+  const weeks=Math.ceil(((today-gridStart)/DAY+1)/7);   // по сегодня: в понедельник уже видна колонка новой недели
   const W=left+weeks*st+4, H=top+7*st+2;
   let s=`<svg width="${W}" height="${H}" role="img" aria-label="Календарь дневника питания">`;
   ['пн','','ср','','пт','','вс'].forEach((t,i)=>{ if(t) s+=`<text x="0" y="${top+i*st+cs-2}">${t}</text>`; });
@@ -238,12 +238,13 @@ function heatmap(){
   for(let w=0; w<weeks; w++){
     const d0=addD(gridStart,w*7);
     for(let i=0;i<7;i++){
-      const d=addD(d0,i); if(d<first||d>END) continue;
+      const d=addD(d0,i); if(d<first||d>today) continue;
       const ds=iso(d), k=status(ds), x=left+w*st, y=top+i*st;
+      const cls=d>END?'c today':'c', op=d>END&&k!=='empty'?' fill-opacity=".5"':'';   // сегодня — день ещё идёт: бледнее, в период не входит
       const tgt=target(ds); const switchDay = TG.some(t=>t.start===ds);
       s+= k==='empty'
-        ? `<rect class="c" data-d="${ds}" x="${x+.75}" y="${y+.75}" width="${cs-1.5}" height="${cs-1.5}" rx="3" fill="var(--cell-empty)" stroke="var(--text-muted)" stroke-width="1.5" stroke-opacity=".55"/>`
-        : `<rect class="c" data-d="${ds}" x="${x}" y="${y}" width="${cs}" height="${cs}" rx="3" fill="${ST[k].col()}"/>`;
+        ? `<rect class="${cls}" data-d="${ds}" x="${x+.75}" y="${y+.75}" width="${cs-1.5}" height="${cs-1.5}" rx="3" fill="var(--cell-empty)" stroke="var(--text-muted)" stroke-width="1.5" stroke-opacity=".55"/>`
+        : `<rect class="${cls}" data-d="${ds}" x="${x}" y="${y}" width="${cs}" height="${cs}" rx="3" fill="${ST[k].col()}"${op}/>`;
       if(switchDay) s+=`<circle cx="${x+cs/2}" cy="${y+cs/2}" r="2.2" fill="var(--text-primary)" pointer-events="none"/>`;
     }
   }
@@ -256,7 +257,7 @@ function heatmap(){
   el.innerHTML=s;
   calTips(el, ds=>{
     const R=ROWS[ds], t=target(ds), k=status(ds), d=P(ds);
-    return `<div class="t">${fmtW(d)}, ${fmtDY(d)}</div><b>${ST[k].lab}</b>${R?`<br>${nf(R.k)} ккал · Б ${nf(R.p)} · Ж ${nf(R.f)} · У ${nf(R.c)}`:''}${why(ds)?`<br><span class="muted">${why(ds)}</span>`:''}${t.kcal!=null?`<br><span class="muted">цель: ${nf(t.kcal)} ккал · Б ${t.protein} · Ж ${t.fat} · У ${t.carbs}</span>`:''}${TG.some(x=>x.start===ds)?'<br><span class="muted">● с этого дня новая цель</span>':''}`;
+    return `<div class="t">${fmtW(d)}, ${fmtDY(d)}${d>END?' · сегодня, день ещё идёт':''}</div><b>${ST[k].lab}</b>${R?`<br>${nf(R.k)} ккал · Б ${nf(R.p)} · Ж ${nf(R.f)} · У ${nf(R.c)}`:''}${why(ds)?`<br><span class="muted">${why(ds)}</span>`:''}${t.kcal!=null?`<br><span class="muted">цель: ${nf(t.kcal)} ккал · Б ${t.protein} · Ж ${t.fat} · У ${t.carbs}</span>`:''}${TG.some(x=>x.start===ds)?'<br><span class="muted">● с этого дня новая цель</span>':''}`;
   });
   el.scrollLeft=el.scrollWidth;
   if(!TG.length) $('#hmdesc').textContent = 'Цели ещё не заданы — показано, какие дни записаны полностью. Рамкой выделен выбранный период';

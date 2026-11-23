@@ -21,11 +21,11 @@ function render(base, page) {
   return r.stdout.replace(/<(script|style)\b[\s\S]*?<\/\1>/g, '');
 }
 
-function site(dataFolder) {
+function site(dataFolder, updated = '2026-11-21') {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-render-'));
   fs.symlinkSync(PORTAL, path.join(base, 'portal'));
   fs.mkdirSync(path.join(base, 'data'));
-  fs.writeFileSync(path.join(base, 'data', 'data.js'), 'const RAW = ' + JSON.stringify(store.raw(dataFolder, '2026-11-21')) + ';\n');
+  fs.writeFileSync(path.join(base, 'data', 'data.js'), 'const RAW = ' + JSON.stringify(store.raw(dataFolder, updated)) + ';\n');
   return base;
 }
 
@@ -35,7 +35,7 @@ function data() {
   store.init(dir);
   return {
     put: (name, rows) => store.write(dir, name, rows),
-    page: name => { const base = site(dir); try { return render(base, name); } finally { fs.rmSync(base, {recursive: true, force: true}); } },
+    page: (name, updated) => { const base = site(dir, updated); try { return render(base, name); } finally { fs.rmSync(base, {recursive: true, force: true}); } },
   };
 }
 
@@ -187,6 +187,15 @@ test('dashboard without targets', {skip}, () => {
   const d = fatsecret(data());
   d.put('targets.csv', []);
   assert.ok(d.page('dashboard.html').split('<svg').length - 1 >= 2);
+});
+
+test('nutrition calendar: Monday — the new week\'s column with today (day still going)', {skip}, () => {
+  const d = fatsecret(data());
+  d.put('nutrition_daily.csv', [...days(20, {kcal: '2100', protein: '120', fat: '60', carbs: '250'}),
+                                {date: '2026-11-23', kcal: '1500', protein: '90', fat: '45', carbs: '190'}]);
+  const dom = d.page('nutrition.html', '2026-11-23');                // понедельник
+  assert.match(dom, /<rect class="c today" data-d="2026-11-23"/);
+  has(dom, 'data-d="2026-11-22"');
 });
 
 test('empty nutrition', {skip}, () => {
