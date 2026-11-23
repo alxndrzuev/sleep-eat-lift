@@ -206,3 +206,9 @@ test('migration failed midway and «Создать» pressed again → the same 
   assert.ok(fs.existsSync(path.join(dir, 'photos', 'originals', '2026-11-01_front.jpg')));
   assert.deepStrictEqual(store.read(dir, 'body.csv').map(r => r.weight_kg), ['80']);
 });
+
+test('firstOpen: true only the first time a profile is opened in this run (update data then, not on every switch)', () => {
+  const first = pr.firstOpen();
+  assert.deepStrictEqual(['a', 'b', 'a', 'b', 'c'].map(first), [true, true, false, false, true]);
+  assert.strictEqual(pr.firstOpen()('a'), true);                    // новый запуск приложения — заново
+});

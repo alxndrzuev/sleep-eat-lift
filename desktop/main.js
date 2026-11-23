@@ -36,7 +36,8 @@ let ROOT = TEST ? store.dataDir(process.env.HEALTH_DOCUMENTS) : null;
 let DATA = null, PROFILE = null;
 let firstRun = null;                             // экран имени профиля: 'migrate' (данные 1.x), 'new', 'adopt' (старое в корне)
 let signingIn = 0;                               // идёт вход в FatSecret или Whoop (окно и обмен кодом) — профиль не переключаем
-let removing = false;                            // профиль уезжает в Корзину — не обновлять и не переключать
+let removing = false;
+const firstOpen = profiles.firstOpen();          // данные профиля обновляем при первом открытии за запуск, не при каждом переключении                            // профиль уезжает в Корзину — не обновлять и не переключать
 const secretsDir = () => path.join(DATA, 'secrets');
 const START = 'app://h/portal/' + (process.env.HEALTH_PAGE || 'dashboard.html');
 let win = null;
@@ -227,7 +228,7 @@ function useProfile(id) {
   firstRun = null;
   openProfile(id);
   if (wasFirst || win.webContents.getURL().includes('/profile.html')) win.loadURL(START); else reload();
-  updateAll();
+  if (firstOpen(id)) updateAll();
   return {id};
 }
 
@@ -427,7 +428,7 @@ app.whenReady().then(async () => {
     app.quit(); return;
   }
   if (process.env.HEALTH_CONNECT) console.log('CONNECT ' + JSON.stringify(await connect(process.env.HEALTH_CONNECT)));
-  else updateAll();
+  else if (firstOpen(PROFILE)) updateAll();
 });
 
 app.on('window-all-closed', () => app.quit());

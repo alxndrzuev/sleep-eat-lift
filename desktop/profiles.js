@@ -194,4 +194,10 @@ function writeRootReadme(root) {
   fs.renameSync(f + '.tmp', f);
 }
 
-module.exports = {writeRootReadme, needsMigration, migrate, resume, oldRootData, adoptOld, KNOWN, slug, cleanName, dir, list, create, rename, pick, photoCount, remove, readMeta, writeMeta, PROFILES};
+/** Профиль открыт впервые за этот запуск приложения? → функция id → true один раз на id (обновлять данные только тогда). */
+function firstOpen() {
+  const seen = new Set();
+  return id => !seen.has(id) && !!seen.add(id);
+}
+
+module.exports = {firstOpen, writeRootReadme, needsMigration, migrate, resume, oldRootData, adoptOld, KNOWN, slug, cleanName, dir, list, create, rename, pick, photoCount, remove, readMeta, writeMeta, PROFILES};
