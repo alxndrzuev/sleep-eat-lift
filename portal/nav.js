@@ -171,7 +171,7 @@ var Nav = (function () {
       d.querySelector("form").onsubmit = e => { e.preventDefault(); res = inp.value; d.close(); };
       d.querySelector("[data-no]").onclick = () => d.close();
       d.addEventListener("close", () => { d.remove(); done(res); });
-      document.body.appendChild(d);
+      (document.querySelector(".viz-root") || document.body).appendChild(d);   // цвета темы и шрифт заданы на .viz-root
       d.showModal(); inp.select();
     });
   }

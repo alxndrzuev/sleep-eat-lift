@@ -101,3 +101,9 @@ test('profile menu refresh keeps its <details> (re-creating or re-opening it fir
   assert.ok(draw.includes('replaceChildren('), draw);
   assert.ok(!/\.open = true/.test(draw) && !/box\.innerHTML =/.test(draw), draw);
 });
+
+test('ask dialog lives inside .viz-root (theme colours and font are defined there; in <body> it is transparent and Times)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(ROOT, 'portal', 'nav.js'), 'utf8');
+  const ask = src.slice(src.indexOf('function ask('), src.indexOf('function profileMenu('));
+  assert.match(ask, /document\.querySelector\("\.viz-root"\) \|\| document\.body\)\.appendChild\(d\)/);
+});
