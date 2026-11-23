@@ -104,6 +104,7 @@
       if (!DATE.test(s.date || "")) errors.push("Не указана дата серии");
       const none = s.rows.filter(r => !r.pose).length;
       if (none) errors.push(`${s.date}: у ${none} снимк${none === 1 ? "а" : "ов"} не выбрана поза`);
+      if (String(s.weight ?? "").trim()) try { parseKg(s.weight); } catch (e) { errors.push(`${s.date}: ${e.message}`); }
       // по дате, а не по серии: дату серии могли поменять на дату другой серии
       (byDate[s.date] = byDate[s.date] || []).push(...s.rows.map(r => r.pose).filter(p => p && p !== "skip"));
     }
@@ -350,6 +351,20 @@
     return best ? best.kg : null;
   }
 
+  /** Вес ровно на дату (для поля «Вес, кг» серии) или null. */
+  function exactWeight(weights, date) {
+    const w = (weights || []).find(([d]) => d === date);
+    return w ? w[1] : null;
+  }
+
+  /** «80,1» → 80.1; не число или вне 20–300 → ошибка (те же правила, что settings.parseKg в приложении). */
+  function parseKg(v) {
+    const s = String(v ?? "").trim().replace(",", ".");
+    const kg = /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+    if (!(kg >= 20 && kg <= 300)) throw new Error("Вес: число от 20 до 300");
+    return kg;
+  }
+
   /** Индекс data/photos/photos.js + DATA портала → данные страницы (та же форма, что у прежнего photos_data.js). */
   function buildView(index, data, base) {
     const photos = (index && index.photos) || {}, img = {}, aligned = {}, thumb = {}, cut = new Set(), dates = new Set();
@@ -369,5 +384,5 @@
   }
 
   root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
-                     keypointsFromLandmarks, guessPose, silhouette, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, buildView};
+                     keypointsFromLandmarks, guessPose, silhouette, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
 })(globalThis);

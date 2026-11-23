@@ -36,7 +36,7 @@ h1{font-size:26px;margin:0;letter-spacing:-.01em}
 .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .seg button{border:0;background:transparent;color:var(--text-secondary);padding:5px 11px;font:inherit;cursor:pointer}
 .seg button.on{background:var(--page);color:var(--text-primary);font-weight:600}
-select,input[type=date]{font:inherit;color:var(--text-primary);background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:4px 8px}
+select,input[type=date],.ser-head input[data-w]{font:inherit;color:var(--text-primary);background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:4px 8px}
 .btn{font:inherit;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);border-radius:8px;padding:5px 12px;cursor:pointer}
 .btn.main{background:var(--series-1);border-color:var(--series-1);color:#fff;font-weight:600}
 .btn:disabled{opacity:.45;cursor:default}
@@ -171,7 +171,10 @@ let D, dates = [], pose = "front", mode = "pair", src = "aligned", A, B;
 const fmt = d => new Date(d + "T12:00").toLocaleDateString("ru-RU", {day:"numeric", month:"short", year:"numeric"});
 const plural = (n, one, few, many) => n % 10 === 1 && n % 100 !== 11 ? one : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? few : many;
 const S = d => D.sessions.find(s => s.date === d);
-const wt = s => s && s.weight ? `${String(s.weight).replace(".", ",")} кг` : "вес —";
+const manualW = {};                              // вес, введённый на этой странице (DATA — с момента загрузки страницы)
+const kgOf = s => s && (s.date in manualW ? manualW[s.date] : s.weight);
+const wt = s => kgOf(s) ? `${String(kgOf(s)).replace(".", ",")} кг` : "вес —";
+const inApp = !!(window.health && window.health.setWeight);
 const img = (d, p) => (src === "aligned" && D.aligned[`${d}_${p}`]) || D.img[`${d}_${p}`] || "";
 const th = (d, p) => D.thumb[`${d}_${p}`] || "";
 
@@ -207,7 +210,8 @@ for (const id of ["selA", "selB"]) $(id).onchange = () => { if (id === "selA") A
 
 function cap(d, cls, has) {
   const s = S(d);
-  return `<figcaption><span class="${cls}"></span><b>${fmt(d)}</b> · ${wt(s)}${has ? ` · <button class="link del" data-del="${d}_${pose}">удалить снимок</button>` : ""}</figcaption>`;
+  const w = inApp ? `<button class="link" data-w="${d}" title="Поправить вес на дату серии">${wt(s)}</button>` : wt(s);
+  return `<figcaption><span class="${cls}"></span><b>${fmt(d)}</b> · ${w}${has ? ` · <button class="link del" data-del="${d}_${pose}">удалить снимок</button>` : ""}</figcaption>`;
 }
 function fig(d, cls) {
   const u = img(d, pose);
@@ -310,6 +314,7 @@ async function openUpload(files) {
     const already = P.findAlready(job.items, (window.PHOTOS_INDEX || {}).photos);   // те же снимки, что уже загружены
     job.items.forEach(it => { if (already[it.id]) it.already = already[it.id]; });
     job.series = P.planSeries(job.items, existing());
+    for (const s of job.series) s.weight = weightFor(s.date);
     for (const s of job.series) for (const r of s.rows) if (job.items[r.id].error) r.pose = "skip";
   } catch (e) {
     busy = false;
@@ -320,6 +325,8 @@ async function openUpload(files) {
 }
 
 const alreadyText = name => { const d = name.slice(0, 10), p = name.slice(11); return `${fmt(d)}, ${P.POSE_NAMES[p] || p}`; };
+/** Вес на дату серии для поля «Вес, кг»: введённый здесь или из body.csv ровно на эту дату; нет — пусто. */
+const weightFor = d => { const kg = d in manualW ? manualW[d] : P.exactWeight(DATA_.weight, d); return kg == null ? "" : String(kg).replace(".", ","); };
 /** Подсказка над серией: какие снимки уже загружены раньше (тот же файл или тот же кадр). */
 function alreadyNote(s) {
   const n = s.rows.filter(r => r.already).length;
@@ -409,6 +416,7 @@ function renderPlan() {
     <div class="muted">Позы определены по фигуре на снимке. Поправьте, если не так.</div>
     ${job.series.map((s, si) => `<div class="ser">
       <div class="ser-head"><label><span class="lab">Дата серии</span><input type="date" data-si="${si}" value="${s.date}"></label>
+        ${inApp ? `<label><span class="lab">Вес, кг</span><input data-w data-si="${si}" inputmode="decimal" size="6" value="${esc(s.weight)}" placeholder="—"></label>` : ""}
         <span class="muted">${s.rows.length} ${plural(s.rows.length, "снимок", "снимка", "снимков")}</span></div>
       ${dupNote(s)}${alreadyNote(s)}
       <div class="ups">${s.rows.map((r, ri) => { const it = job.items[r.id]; return `<div class="up${r.dup ? " dup" : ""}${(r.dup || r.already) && r.pose === "skip" ? " off" : ""}">
@@ -423,7 +431,9 @@ function renderPlan() {
     ${errs.length ? `<ul class="errs">${errs.map(e => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
     <div class="mfoot"><span class="muted">Сохранится: ${toSave}</span><button class="btn" id="mCancel">Отмена</button>
       <button class="btn main" id="mSave"${errs.length || !toSave ? " disabled" : ""}>Сохранить</button></div>`;
-  mbox.querySelectorAll("input[type=date]").forEach(el => el.onchange = () => { job.series[+el.dataset.si].date = el.value; renderPlan(); });
+  mbox.querySelectorAll("input[type=date]").forEach(el => el.onchange = () => {
+    const s = job.series[+el.dataset.si]; s.date = el.value; if (!String(s.weight).trim()) s.weight = weightFor(s.date); renderPlan(); });
+  mbox.querySelectorAll("input[data-w]").forEach(el => el.onchange = () => { job.series[+el.dataset.si].weight = el.value; renderPlan(); });
   mbox.querySelectorAll("select[data-ri]").forEach(el => el.onchange = () => {
     const r = job.series[+el.dataset.si].rows[+el.dataset.ri]; r.pose = el.value || null; r.replace = false; renderPlan(); });
   mbox.querySelectorAll("input[data-replace]").forEach(el => el.onchange = () => { job.series[+el.dataset.si].rows[+el.dataset.ri].replace = el.checked; renderPlan(); });
@@ -471,10 +481,19 @@ async function save() {
   await withDir(async dir => {
     progress("Сохраняю…", 0, rows.length);
     const res = await APP.saveSeries(dir, rows, progress);
+    for (const s of job.series) await saveWeight(s.date, s.weight, res.failed);   // вес серии — в body.csv на её дату
     await afterWrite(res, `Сохранено снимков: ${res.saved}.`);
   });
 }
 
+/** Вес на дату → body.csv профиля (приложение); пусто или не изменился — ничего; ошибка — в failed. */
+async function saveWeight(date, value, failed) {
+  if (!inApp || !String(value ?? "").trim() || String(value).trim() === weightFor(date)) return true;
+  const r = await window.health.setWeight(date, value);
+  if (!r.ok) { failed.push({name: `вес на ${fmt(date)}`, error: r.error}); return false; }
+  manualW[date] = P.parseKg(value);
+  return true;
+}
 $("rebuildBtn").onclick = () => {
   if (busy || !confirm("Перечитать все оригиналы из папки data/photos и заново выровнять их и пересобрать превью? Займёт несколько минут — страницу не закрывать.")) return;
   job = {title: "Пересборка", items: []};
@@ -488,6 +507,16 @@ $("rebuildBtn").onclick = () => {
   });
 };
 
+/** Вес под снимком — поправить вес на дату серии. */
+$("view").addEventListener("click", async e => {
+  const b = e.target.closest("[data-w]");
+  if (!b) return;
+  e.preventDefault();
+  const d = b.dataset.w, v = prompt(`Вес на ${fmt(d)}, кг`, weightFor(d));
+  if (v === null || !v.trim()) return;
+  const failed = [];
+  if (await saveWeight(d, v, failed)) setIndex(window.PHOTOS_INDEX); else alert(failed[0].error);
+});
 /** Удалить снимок из папки (оригинал и все копии) — по кнопке под снимком в сравнении. */
 $("view").addEventListener("click", e => {
   const b = e.target.closest("[data-del]");

@@ -340,3 +340,26 @@ test('page view: paths, sessions, buttons only for poses that exist', () => {
   assert.deepStrictEqual(js('PhotosCore.buildView({photos: {}}, {}, "x/").sessions'), []);
   assert.deepStrictEqual(v.poses, ['front', 'side']);
 });
+
+test('exactWeight — weight on that very date, not the nearest', () => {
+  assert.strictEqual(js(`PhotosCore.exactWeight([['2026-11-01', 80], ['2026-11-03', 81]], '2026-11-01')`), 80);
+  assert.strictEqual(js(`PhotosCore.exactWeight([['2026-11-01', 80]], '2026-11-02')`), null);
+  assert.strictEqual(js(`PhotosCore.exactWeight(undefined, '2026-11-02')`), null);
+});
+
+test('parseKg on the page — same rules as the app (settings.parseKg)', () => {
+  const settings = require('../settings');
+  for (const v of ['80,1', ' 80.1 ', '75']) assert.strictEqual(js(`PhotosCore.parseKg(${J(v)})`), settings.parseKg(v));
+  for (const bad of ['abc', '0', '500', '80,1,2']) {
+    assert.throws(() => js(`PhotosCore.parseKg(${J(bad)})`), /Вес: число от 20 до 300/);
+    assert.throws(() => settings.parseKg(bad));
+  }
+});
+
+test('validatePlan: a wrong weight of a series is an error; empty — fine', () => {
+  const rows = [{id: 0, pose: 'front'}];
+  assert.deepStrictEqual(js(`PhotosCore.validatePlan([{date: '2026-11-01', weight: '', rows: ${J(rows)}}])`), []);
+  assert.deepStrictEqual(js(`PhotosCore.validatePlan([{date: '2026-11-01', weight: '80,5', rows: ${J(rows)}}])`), []);
+  assert.deepStrictEqual(js(`PhotosCore.validatePlan([{date: '2026-11-01', weight: 'abc', rows: ${J(rows)}}])`),
+    ['2026-11-01: Вес: число от 20 до 300']);
+});
