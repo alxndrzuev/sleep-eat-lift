@@ -84,3 +84,28 @@ test('прежнее «Здоровье»: настройки и тема пер
   assert.strictEqual(dd.migrate(tmp(), path.join(tmp(), 'SEL')), false);   // прежних настроек нет — новичок
   assert.ok(fs.existsSync(path.join(old, 'config.json')), 'прежние настройки остаются на месте');
 });
+
+// ---------- формат папки данных (sel.json): старая SEL не открывает данные, обновлённые более новой ----------
+test('data format: none yet → ok; same or older → ok; newer → not ok with the version that wrote it', () => {
+  const root = tmp();
+  assert.strictEqual(dd.FORMAT, 2);
+  assert.deepStrictEqual(dd.checkFormat(root), {ok: true, format: null, app: null});
+  dd.writeFormat(root, '2.0.1');
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(root, 'sel.json'), 'utf8')), {format: 2, app: '2.0.1'});
+  assert.deepStrictEqual(dd.checkFormat(root), {ok: true, format: 2, app: '2.0.1'});
+  fs.writeFileSync(path.join(root, 'sel.json'), JSON.stringify({format: 1, app: '1.9.0'}));
+  assert.strictEqual(dd.checkFormat(root).ok, true);
+  fs.writeFileSync(path.join(root, 'sel.json'), JSON.stringify({format: 3, app: '3.0.0'}));
+  assert.deepStrictEqual(dd.checkFormat(root), {ok: false, format: 3, app: '3.0.0'});
+});
+
+test('writeFormat never lowers the format; a broken sel.json counts as missing', () => {
+  const root = tmp();
+  fs.writeFileSync(path.join(root, 'sel.json'), JSON.stringify({format: 3, app: '3.0.0'}));
+  dd.writeFormat(root, '2.0.1');                                     // старая версия формат не понижает
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(root, 'sel.json'), 'utf8')), {format: 3, app: '3.0.0'});
+  fs.writeFileSync(path.join(root, 'sel.json'), '{не json');
+  assert.deepStrictEqual(dd.checkFormat(root), {ok: true, format: null, app: null});
+  dd.writeFormat(root, '2.0.1');
+  assert.strictEqual(dd.checkFormat(root).format, 2);
+});

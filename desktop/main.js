@@ -216,6 +216,7 @@ function openProfile(id) {
   delete pending.fatsecret;
   store.init(DATA);
   profiles.writeRootReadme(ROOT);
+  datadir.writeFormat(ROOT, app.getVersion());     // какой формат у папки и какая версия открывала её последней
   if (!TEST) datadir.saveCfg(app.getPath('userData'), {profile: id});
 }
 
@@ -402,6 +403,19 @@ app.whenReady().then(async () => {
   const hadDataDir = !!datadir.readCfg(app.getPath('userData')).dataDir;   // до выбора папки: новичок или обновился
   ROOT = await resolveDataDir();
   if (!ROOT) { app.quit(); return; }
+  // данные обновлены более новой версией SEL (формат новее) — не читаем и не пишем: эта версия может их испортить
+  for (let fmt = datadir.checkFormat(ROOT); !fmt.ok; fmt = datadir.checkFormat(ROOT)) {
+    if (process.env.HEALTH_SMOKE) { console.log('SMOKE-NEWER ' + JSON.stringify(fmt)); app.quit(); return; }
+    const {response} = await dialog.showMessageBox(win, {type: 'warning', title: 'SEL',
+      message: 'Эти данные обновлены более новой версией SEL',
+      detail: `Папка: ${ROOT}\nЕё открывала SEL ${fmt.app || 'новее этой'}, а у вас SEL ${app.getVersion()} — она не знает, как теперь ` +
+        'устроены данные, и может их испортить. Установите новую версию SEL или выберите другую папку.',
+      buttons: ['Выбрать папку…', 'Выйти'], defaultId: 0, cancelId: 1});
+    const d = response === 0 ? await askDataDir({change: true}) : null;
+    if (!d) { app.quit(); return; }
+    ROOT = d;
+    if (!TEST) datadir.save(app.getPath('userData'), d);
+  }
   startNews(hadDataDir);
   protocol.handle('app', serve);
   setupIpc();

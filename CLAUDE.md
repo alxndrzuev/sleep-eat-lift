@@ -20,6 +20,8 @@ docs/                    ← 06 фото: как снимать и разбир�
                            (~/Library/Application Support/SEL/config.json → dataDir, текущий профиль → profile;
                            scripts/csv.js → rootDir/profileDir; HEALTH_DATA — подменить). Формат — docs/07_формат_данных.md
   README.md              ← про корень и профили (пишет приложение из desktop/root_readme.md — править там)
+  sel.json               ← формат папки и версия SEL, открывавшая её последней (datadir.FORMAT): SEL не открывает папку
+                           с форматом новее своего. Меняется устройство папки (X в версии) — поднять FORMAT
   secrets/               ← ключи приложений FatSecret, Whoop (*_app.json; для сборки) — не показывать в чате
   profiles/<id>/         ← ПРОФИЛЬ = один человек (с 2.0; дизайн — specs/2026-11-23-profiles-design.md). Ниже и в тексте
                            «data/» = папка ТЕКУЩЕГО профиля. id — латиница из имени при создании, не меняется
