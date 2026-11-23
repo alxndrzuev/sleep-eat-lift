@@ -1,7 +1,7 @@
 {
   "name": "sleep-eat-lift",
   "productName": "SEL",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "SEL (sleep · eat · lift) — питание, вес, сон, восстановление и тренировки из FatSecret и Whoop",
   "private": true,
   "engines": {
