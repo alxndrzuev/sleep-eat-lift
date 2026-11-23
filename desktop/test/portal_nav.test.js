@@ -87,3 +87,10 @@ test('profile menu while locked: items disabled, the reason is shown', () => {
   assert.match(h, /data-prof="b"[^>]*disabled/);
   assert.match(h, /data-prof-new[^>]*disabled/);
 });
+
+test('profile menu closes on a click outside it and on Esc (not only on its own button)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(ROOT, 'portal', 'nav.js'), 'utf8');
+  const bar = src.slice(src.indexOf('function profileBar('), src.indexOf('function footer('));
+  assert.match(bar, /addEventListener\("click", e => \{ if \(!box\.contains\(e\.target\)\) close\(\)/);
+  assert.match(bar, /e\.key === "Escape"/);
+});

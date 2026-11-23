@@ -205,6 +205,12 @@ var Nav = (function () {
     const refresh = () => window.health.profiles().then(draw);
     refresh();
     box.addEventListener("toggle", e => { if (e.target.open) refresh(); }, true);
+    // закрыть меню: клик в любом месте страницы вне меню или Esc (повторный клик по имени — тоже, это details)
+    const close = () => { const d = box.querySelector("details[open]"); if (d) d.open = false; return d; };
+    document.addEventListener("click", e => { if (!box.contains(e.target)) close(); });
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) { const d = close(); if (d) d.querySelector("summary").focus(); }
+    });
     box.addEventListener("click", async e => {
       const b = e.target.closest("button");
       if (!b || b.disabled) return;
