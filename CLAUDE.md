@@ -16,15 +16,20 @@ docs/                    ← 06 фото: как снимать и разбир�
                              sel-logo-light/dark.svg (README) собираются из Nav.logoSvg в portal/nav.js (тест), там же
                              плитки для меню; sel-mark.svg — одни плитки. Круг из трёх дуг — только где нужен квадрат:
                              sel-icon.svg — значок приложения → desktop/build/icon.png, 1024×1024, прозрачные углы
-~/Documents/SEL/data      ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — путь берётся из настроек приложения
-                           (~/Library/Application Support/SEL/config.json → dataDir; scripts/csv.js → dataDir; HEALTH_DATA — подменить).
-                           Ниже и в тексте «data/» = эта папка. Формат — docs/07_формат_данных.md
-  *.csv                  ← вся история (только дописываем)
-  README.md              ← описание папки для LLM (пишет приложение из desktop/data_readme.md — править там)
-  sync.json              ← когда FatSecret и Whoop последний раз обновились (пишет приложение; с него — догрузка пропусков)
-  photos/                ← фото формы: originals/ · aligned/ · view/ · thumbs/ · photos.js (индекс) — docs/06
-  secrets/               ← ключи приложений и токены FatSecret, Whoop — не показывать в чате
-  docs/                  ← личные документы (профиль, план, журнал, решения, анализ)
+~/Documents/SEL/data      ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — корень с профилями; путь берётся из настроек приложения
+                           (~/Library/Application Support/SEL/config.json → dataDir, текущий профиль → profile;
+                           scripts/csv.js → rootDir/profileDir; HEALTH_DATA — подменить). Формат — docs/07_формат_данных.md
+  README.md              ← про корень и профили (пишет приложение из desktop/root_readme.md — править там)
+  secrets/               ← ключи приложений FatSecret, Whoop (*_app.json; для сборки) — не показывать в чате
+  profiles/<id>/         ← ПРОФИЛЬ = один человек (с 2.0; дизайн — specs/2026-11-23-profiles-design.md). Ниже и в тексте
+                           «data/» = папка ТЕКУЩЕГО профиля. id — латиница из имени при создании, не меняется
+    profile.json         ← имя профиля (пишет приложение)
+    *.csv                ← вся история (только дописываем)
+    README.md            ← описание папки для LLM (пишет приложение из desktop/data_readme.md — править там)
+    sync.json            ← когда FatSecret и Whoop последний раз обновились (пишет приложение; с него — догрузка пропусков)
+    photos/              ← фото формы: originals/ · aligned/ · view/ · thumbs/ · photos.js (индекс) — docs/06
+    secrets/             ← токены FatSecret, Whoop этого человека — не показывать в чате
+    docs/                ← личные документы (профиль, план, журнал, решения, анализ)
 desktop/                 ← ПРИЛОЖЕНИЕ SEL (Electron) — основной интерфейс, см. «Приложение»
 portal/                  ← страницы приложения: dashboard.html (сводка), nutrition.html, training.html, recovery.html, photos.html, settings.html,
                            whatsnew.html (вся история версий) + whatsnew.js (окно «Что нового» после обновления, на всех страницах)
@@ -40,6 +45,7 @@ portal/                  ← страницы приложения: dashboard.ht
 scripts/                 ← Node без зависимостей (берёт модули из desktop/) — служебное
   csv.js                 ← данные из чата: `node scripts/csv.js upsert body.csv '{"2026-11-22": {"weight_kg": 75.4}}'`
                            (тот же store.js, что в приложении; в SEL видно после ⌘R) · read <файл> [N] · remove · dir
+                           (папка и список профилей); пишет в текущий профиль, другой — `--profile <id>`
   vendor_fetch.js        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
   public_check.js        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
 dist/                    ← собранные приложения (не в git): dist/<версия>/ — release-notes.md + zip Mac + exe Windows;
@@ -56,7 +62,12 @@ dist/                    ← собранные приложения (не в gi
   с любой даты, с историей; ккал = 4·Б + 9·Ж + 4·У.
   Алкоголь — на «Восстановлении»: ответы «Мало / Умеренно / Много / Не было», ручное добавление, удаление (events.csv → level)
 - Тренировки у всех: силовые (силовые виды Whoop) и кардио (всё остальное от 20 минут); прогулки и кардио короче 20 минут — не тренировки
-- Код: `main.js` (окно, протокол app://h/, IPC), `protocol.js` (что отдаёт app://h/ + CSP: страницы ничего не грузят и не шлют наружу), `store.js` (чтение и запись CSV), `fatsecret.js`, `whoop.js`, `alcohol.js`, `updater.js`,
+- Профили (`profiles.js`): в `main.js` ROOT — корень, DATA — папка текущего профиля (весь прежний код работает с ней);
+  переключение = новый DATA + свой updater + перезагрузка окна; нельзя во время обновления, входа в сервис, записи фото.
+  Первый запуск и обновление с 1.x — экран имени `portal/profile.html` (данные 1.x из корня переносятся в профиль).
+  Меню профилей — nav.js (справа в шапке), управление — «Настройки» → «Профили»; удаление — в Корзину.
+  Окно входа FatSecret/Whoop перед каждым входом очищается (иначе второй войдёт под первым)
+- Код: `main.js` (окно, протокол app://h/, IPC), `profiles.js` (профили, перенос 1.x), `root_readme.md` (README корня), `protocol.js` (что отдаёт app://h/ + CSP: страницы ничего не грузят и не шлют наружу), `store.js` (чтение и запись CSV), `fatsecret.js`, `whoop.js`, `alcohol.js`, `updater.js`,
   `settings.js`, `photosfs.js`, `secrets.js` (токены дописываются, ключи приложений не трогаются), `keys.js`, `datadir.js`, `preload.js`,
   `changelog.js` (разбор CHANGELOG.md, версии, выпуск), `whatsnew.js` (что показать после обновления),
   `data_readme.md` (README папки данных — описание файлов для LLM; меняется схема — правим и его)
