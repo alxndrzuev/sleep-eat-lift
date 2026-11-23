@@ -139,6 +139,14 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
   </div>
 
   <div class="card">
+    <h2>Оформление</h2>
+    <div class="desc">Тема — одна на всё приложение, для всех профилей. «Авто» — как в системе.</div>
+    <div class="svc"><div class="seg" id="themes">
+      <button data-t="light">Светлая</button><button data-t="dark">Тёмная</button><button data-t="auto">Авто</button>
+    </div></div>
+  </div>
+
+  <div class="card">
     <h2>Данные</h2>
     <div class="desc">Всё хранится только на этом компьютере, в папке: <b id="datadir"></b></div>
     <div class="svc"><button class="btn plain" id="folder">Открыть папку с данными</button><button class="btn plain" id="chfolder">Сменить папку…</button></div>
@@ -157,7 +165,6 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
 <script src="whatsnew.js"></script>
 <script>
 (function () {
-  try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   const $ = s => document.querySelector(s);
   // текст из CSV — только через esc (в innerHTML он не должен стать разметкой)
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c]);
@@ -192,6 +199,11 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
     if (r && !r.ok && r.error) { const e = $('#' + name + ' .err'); e.hidden = false; e.textContent = r.error; }
   }
   H.status().then(show); H.onStatus(show);
+
+  // тема: светлая / тёмная / авто (nav.js применяет на каждой странице)
+  const themeBtns = () => document.querySelectorAll('#themes button').forEach(b => b.classList.toggle('on', b.dataset.t === Nav.theme()));
+  document.querySelectorAll('#themes button').forEach(b => b.onclick = () => { Nav.setTheme(b.dataset.t); themeBtns(); });
+  themeBtns();
 
   for (const name of ['fatsecret', 'whoop']) {
     $('#' + name + ' .connect').onclick = async () => err(name, await H.connect(name));

@@ -129,3 +129,11 @@ test('profiles window closes on a click outside it, not on a click on its own pa
   assert.match(win, /e\.target === d && outside/);
   assert.match(win, /getBoundingClientRect\(\)/);
 });
+
+test('theme: light / dark / auto (auto — like the system: no data-theme); unknown → auto', () => {
+  assert.strictEqual(js(`Nav.themeAttr("light")`), 'light');
+  assert.strictEqual(js(`Nav.themeAttr("dark")`), 'dark');
+  assert.strictEqual(js(`Nav.themeAttr("auto")`), null);
+  assert.strictEqual(js(`Nav.themeAttr(null)`), null);
+  assert.strictEqual(js(`Nav.themeAttr("pink")`), null);
+});

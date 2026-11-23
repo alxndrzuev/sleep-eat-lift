@@ -29,7 +29,6 @@ header{max-width:760px;align-items:flex-start}
 <script src="whatsnew.js"></script>
 <script>
 (function () {
-  try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
   const $ = s => document.querySelector(s);
   $('#title').insertAdjacentHTML('afterbegin', Nav.mark(30));
   let last = null; try { last = sessionStorage.getItem('navLast'); } catch (e) {}

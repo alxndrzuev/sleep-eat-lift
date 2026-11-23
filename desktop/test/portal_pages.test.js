@@ -112,3 +112,16 @@ test('period dates sit next to the period buttons, not under the heading; no «N
   assert.ok(!source('dashboard.html').includes('id="updated"'));
   assert.ok(!source('nav.js').includes('syncText'));
 });
+
+test('theme is chosen in «Настройки» (light / dark / auto), not by a button on every page; every page applies it', () => {
+  for (const f of fs.readdirSync(PORTAL).filter(f => f.endsWith('.html'))) {
+    const h = source(f);
+    assert.ok(!h.includes('id="theme"'), f + ': кнопки «Тема» на странице нет');
+    assert.ok(!h.includes("localStorage.getItem('theme')"), f + ': тему применяет nav.js');
+    assert.ok(h.includes('src="nav.js"'), f + ': nav.js применяет тему');
+  }
+  assert.ok(!source('common.js').includes("$('#theme')"));
+  const s = source('settings.html');
+  assert.match(s, /<div class="seg" id="themes">\s*<button data-t="light">Светлая<\/button><button data-t="dark">Тёмная<\/button><button data-t="auto">Авто<\/button>/);
+  assert.ok(source('photos.html').includes(':root[data-theme="dark"] .viz-root'), '«Фото» — и выбранная тёмная тема');
+});

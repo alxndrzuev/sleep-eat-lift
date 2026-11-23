@@ -308,9 +308,25 @@ var Nav = (function () {
     f.querySelectorAll("a[data-ext]").forEach(a => a.onclick = e => { e.preventDefault(); window.health.openExternal(a.href); });
   }
 
+  // ---------- тема: светлая / тёмная / авто (как в системе) — одна на всё приложение, выбирается в «Настройках» ----------
+  /** Режим → значение data-theme у <html>: light / dark; авто и всё прочее — null (атрибута нет, решает система). */
+  const themeAttr = m => (m === "light" || m === "dark" ? m : null);
+  function theme() { try { return themeAttr(localStorage.getItem("theme")) || "auto"; } catch (e) { return "auto"; } }
+  function applyTheme(m = theme()) {
+    const a = themeAttr(m), r = document.documentElement;
+    if (a) r.dataset.theme = a; else delete r.dataset.theme;
+  }
+  /** Выбрать тему (из «Настроек»): запомнить и применить; onTheme — перерисовать графики страницы. */
+  function setTheme(m) {
+    try { if (themeAttr(m)) localStorage.setItem("theme", m); else localStorage.removeItem("theme"); } catch (e) {}
+    applyTheme(m);
+    if (typeof window.onTheme === "function") window.onTheme();
+  }
+
   if (typeof document !== "undefined") {
+    applyTheme();
     render();
     if (inApp()) { profileBar(); updateLine(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, dataErrors, profileMenu, profilesTable, ask, NAMES, MARK, mark, logo, logoSvg};
+  return {items, title, render, inApp, statusText, dataErrors, themeAttr, theme, setTheme, profileMenu, profilesTable, ask, NAMES, MARK, mark, logo, logoSvg};
 })();

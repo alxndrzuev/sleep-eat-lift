@@ -163,11 +163,11 @@ function tileCards(items){
 
 // ---------- запуск страницы ----------
 // render — перерисовать всё; onRange(button) — что сделать при выборе периода (#range button);
-// init — один раз после применения сохранённой темы, до первой отрисовки
+// init — один раз до первой отрисовки
 function boot(render, onRange, init){
   document.querySelectorAll('#range button').forEach(b=>b.onclick=()=>{ document.querySelectorAll('#range button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); onRange(b); render(); });
-  $('#theme').onclick=()=>{ const r=document.documentElement; const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme=dark?'light':'dark'; try{localStorage.setItem('theme',r.dataset.theme)}catch(e){} render(); };
-  try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+  // тему применяет nav.js (выбор — в «Настройках»); в режиме «Авто» система сменила тему — перерисовать графики
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(!document.documentElement.dataset.theme) render(); });
   if(init) init();
   render();
   let rz; addEventListener('resize',()=>{clearTimeout(rz); rz=setTimeout(render,150)});
