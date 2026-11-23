@@ -171,3 +171,21 @@ test('old data in the root next to profiles: empty CSV — silence; rows — war
   assert.strictEqual(pr.oldRootData(root), null);
   assert.deepStrictEqual(pr.list(root).map(p => p.name), ['Александр', 'Старое']);
 });
+
+test('root README: written from root_readme.md, a foreign README is left alone', () => {
+  const root = tmp();
+  pr.writeRootReadme(root);
+  const want = read(__dirname, '..', 'root_readme.md');
+  assert.strictEqual(read(root, 'README.md'), want);
+  assert.ok(want.startsWith('# Папка данных SEL — профили'));
+  const other = tmp();
+  fs.writeFileSync(path.join(other, 'README.md'), '# Мой файл');
+  pr.writeRootReadme(other);
+  assert.strictEqual(read(other, 'README.md'), '# Мой файл');
+});
+
+test('profile README is the per-person data README', () => {
+  const {dir} = pr.create(tmp(), 'Иван', T);
+  assert.ok(read(dir, 'README.md').startsWith('# Папка данных SEL'));
+  assert.match(read(dir, 'README.md'), /одного профиля/);
+});

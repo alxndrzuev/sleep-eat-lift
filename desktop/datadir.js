@@ -7,6 +7,12 @@ const SCHEMA = require('./schema.json');
 
 const CSV = Object.keys(SCHEMA.schema);
 const hasCsv = dir => CSV.some(f => fs.existsSync(path.join(dir, f)));
+/** Корень с профилями (2.0): profiles/ и в ней хотя бы одна папка. */
+const hasProfiles = dir => {
+  try { return fs.readdirSync(path.join(dir, 'profiles'), {withFileTypes: true}).some(d => d.isDirectory()); }
+  catch (e) { return false; }
+};
+const hasData = dir => hasCsv(dir) || hasProfiles(dir);
 const cfgFile = userData => path.join(userData, 'config.json');
 
 function readCfg(userData) {
@@ -28,10 +34,10 @@ function saveCfg(userData, patch) {
 
 const save = (userData, dir) => saveCfg(userData, {dataDir: dir});
 
-/** Выбранная папка → папка данных: её data/ с CSV, она сама (если в ней CSV), иначе новая <папка>/SEL/data. */
+/** Выбранная папка → папка данных: её data/ с данными (профили или CSV 1.x), она сама, иначе новая <папка>/SEL/data. */
 function fromPicked(picked) {
-  if (hasCsv(path.join(picked, 'data'))) return {dir: path.join(picked, 'data'), existing: true};
-  if (hasCsv(picked)) return {dir: picked, existing: true};
+  if (hasData(path.join(picked, 'data'))) return {dir: path.join(picked, 'data'), existing: true};
+  if (hasData(picked)) return {dir: picked, existing: true};
   return {dir: path.join(picked, 'SEL', 'data'), existing: false};
 }
 
@@ -56,4 +62,4 @@ const appUserData = () => path.join(os.homedir(), 'Library', 'Application Suppor
 /** Папка данных из настроек приложения или null. */
 const configured = () => current(appUserData()).dir;
 
-module.exports = {current, save, saveCfg, readCfg, fromPicked, defaultDir, hasCsv, appUserData, configured, migrate, OLD_NAME};
+module.exports = {current, save, saveCfg, readCfg, fromPicked, defaultDir, hasCsv, hasProfiles, hasData, appUserData, configured, migrate, OLD_NAME};

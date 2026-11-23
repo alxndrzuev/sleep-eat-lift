@@ -1,6 +1,7 @@
 # Папка данных SEL (sleep · eat · lift)
 
-Это личные данные одного человека о питании, весе, сне, восстановлении и тренировках. Их собирает приложение SEL
+Это личные данные одного человека — одного профиля SEL — о питании, весе, сне, восстановлении и тренировках.
+Имя человека — в `profile.json` этой папки; другие профили лежат рядом, в соседних папках `profiles/`. Их собирает приложение SEL
 из FatSecret и Whoop, остальное человек вводит в приложении сам. Файл написан для того, кто будет читать папку
 и делать выводы (человека или LLM). Приложение перезаписывает его при запуске, поэтому править его
 бесполезно.
@@ -12,7 +13,8 @@
 - `photos/` — фото формы: `originals/` (как сняты), `aligned/` (выровнены под один масштаб фигуры), `view/`,
   `thumbs/`, индекс `photos.js` (дата серии, поза: front, side, back, back_biceps, biceps).
 - `secrets/` — ключи и токены FatSecret и Whoop. **Не читать, никуда не пересылать и не показывать.**
-- `docs/` — личные заметки владельца, если есть.
+- `profile.json` — имя профиля (пишет приложение).
+- `docs/` — личные заметки этого человека, если есть.
 
 ## Общие правила CSV
 - Одна строка — одна запись. Даты `ГГГГ-ММ-ДД`, время `ГГГГ-ММ-ДД ЧЧ:ММ` (местное), десятичный разделитель — точка,
@@ -30,7 +32,7 @@
 | Файл | Строка — это | Колонки | Откуда |
 |---|---|---|---|
 | `nutrition_daily.csv` | день питания | date, kcal, protein, fat, carbs, fiber (г) | FatSecret, дневник питания |
-| `body.csv` | взвешивание | date, weight_kg, note («FatSecret» — из FatSecret) | FatSecret |
+| `body.csv` | взвешивание | date, weight_kg, note («FatSecret» — из FatSecret) | FatSecret или вручную на «Фото» (на дату серии; кто записал последним — тот и прав) |
 | `whoop_daily.csv` | день Whoop | date, recovery (%), hrv (мс), rhr (уд/мин), spo2 (%), skin_temp (°C), strain (0–21), kcal (расход), steps, sleep_h, deep_h, rem_h, light_h, awake_h, sleep_perf (%), sleep_eff (%), resp_rate, bed / wake (отбой и подъём, ЧЧ:ММ), note | Whoop |
 | `whoop_workouts.csv` | тренировка | id, date, start, sport (вид в Whoop), duration_min, strain, avg_hr, max_hr, kcal, z0_min…z5_min (минуты в пульсовых зонах 0–5) | Whoop |
 | `targets.csv` | цель с даты | start, kcal, protein, fat, carbs (г в день), note, sleep_h (сон, ч), strength_wk, cardio_wk (тренировок в неделю) | человек, «Настройки» → «Цели» |

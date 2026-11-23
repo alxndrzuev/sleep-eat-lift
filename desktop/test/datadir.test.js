@@ -31,6 +31,16 @@ test('picked folder that is data itself → as is', () => {
   assert.deepStrictEqual(dd.fromPicked(p), {dir: p, existing: true});
 });
 
+test('picked folder with profiles (2.0) → its data, or itself', () => {
+  const p = tmp();
+  fs.mkdirSync(path.join(p, 'data', 'profiles', 'ivan'), {recursive: true});
+  assert.deepStrictEqual(dd.fromPicked(p), {dir: path.join(p, 'data'), existing: true});
+  assert.deepStrictEqual(dd.fromPicked(path.join(p, 'data')), {dir: path.join(p, 'data'), existing: true});
+  assert.strictEqual(dd.hasProfiles(path.join(p, 'data')), true);
+  const e = tmp(); fs.mkdirSync(path.join(e, 'profiles'));           // пустая profiles/ — данных нет
+  assert.strictEqual(dd.hasProfiles(e), false);
+});
+
 test('empty or unrelated folder → new SEL/data inside', () => {
   const p = tmp();
   fs.writeFileSync(path.join(p, 'отчёт.docx'), 'x');

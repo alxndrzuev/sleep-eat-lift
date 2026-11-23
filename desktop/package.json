@@ -49,6 +49,7 @@
       "whatsnew.js",
       "menu.js",
       "CHANGELOG.md",
+      "root_readme.md",
       "schema.json",
       "data_readme.md",
       "fatsecret_app.json",

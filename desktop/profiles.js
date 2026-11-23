@@ -178,4 +178,17 @@ function oldRootData(root) {
 /** Старые данные корня → новый профиль (пустые CSV корня, созданные 1.x, переезжают вместе с ними). */
 function adoptOld(root, name, today) { return intoNew(root, name, today); }
 
-module.exports = {needsMigration, migrate, resume, oldRootData, adoptOld, KNOWN, slug, cleanName, dir, list, create, rename, pick, photoCount, remove, readMeta, writeMeta, PROFILES};
+/** README.md корня — что такое профили (шаблон root_readme.md); чужой README (не с нашим заголовком) не трогаем. */
+const ROOT_MARK = '# Папка данных SEL — профили';
+function writeRootReadme(root) {
+  const want = fs.readFileSync(path.join(__dirname, 'root_readme.md'), 'utf8'), f = path.join(root, 'README.md');
+  if (fs.existsSync(f)) {
+    const cur = fs.readFileSync(f, 'utf8');
+    if (cur === want || !cur.startsWith(ROOT_MARK)) return;
+  }
+  fs.mkdirSync(root, {recursive: true});
+  fs.writeFileSync(f + '.tmp', want);
+  fs.renameSync(f + '.tmp', f);
+}
+
+module.exports = {writeRootReadme, needsMigration, migrate, resume, oldRootData, adoptOld, KNOWN, slug, cleanName, dir, list, create, rename, pick, photoCount, remove, readMeta, writeMeta, PROFILES};
