@@ -35,7 +35,8 @@ const TEST = !!process.env.HEALTH_DOCUMENTS;                    // провер�
 let ROOT = TEST ? store.dataDir(process.env.HEALTH_DOCUMENTS) : null;
 let DATA = null, PROFILE = null;
 let firstRun = null;                             // экран имени профиля: 'migrate' (данные 1.x), 'new', 'adopt' (старое в корне)
-let loginOpen = false;                           // открыто окно входа FatSecret или Whoop — профиль не переключаем
+let signingIn = 0;                               // идёт вход в FatSecret или Whoop (окно и обмен кодом) — профиль не переключаем
+let removing = false;                            // профиль уезжает в Корзину — не обновлять и не переключать
 const secretsDir = () => path.join(DATA, 'secrets');
 const START = 'app://h/portal/' + (process.env.HEALTH_PAGE || 'dashboard.html');
 let win = null;
@@ -71,10 +72,11 @@ const services = {
 };
 let updater = updaterLib.create(services);
 
-/** Окно входа; пока оно открыто, профиль не переключается (токены легли бы в другой профиль). */
-async function login(opts) {
-  loginOpen = true;
-  try { return await oauthwin.open(opts); } finally { loginOpen = false; }
+const login = opts => oauthwin.open(opts);
+/** Пока идёт вход (окно, обмен кодом, первая загрузка), профиль не переключается: токены и данные легли бы в другой. */
+async function signIn(fn) {
+  signingIn++;
+  try { return await fn(); } finally { signingIn--; }
 }
 
 /** Подключить сервис: окно входа → ключ доступа → загрузка за год. → {ok} | {ok: false, cancelled} | {ok: false, error}. */
@@ -174,7 +176,7 @@ function status() {
 function pushStatus() { if (win && !win.isDestroyed()) win.webContents.send('health:status', status()); }
 
 async function updateAll(first) {
-  if (!DATA) return {};
+  if (!DATA || removing) return {};
   const p = updater.runAll(DATA, first);
   pushStatus();
   const r = await p;
@@ -201,7 +203,8 @@ async function answer(fn) {
 /** Почему сейчас нельзя переключить профиль (или null). */
 function lockReason() {
   if (updater.busy) return 'Идёт обновление данных — подождите, пока закончится';
-  if (loginOpen) return 'Открыт вход в FatSecret или Whoop — закончите или закройте его';
+  if (signingIn) return 'Идёт вход в FatSecret или Whoop — закончите или закройте его';
+  if (removing) return 'Профиль удаляется — секунду';
   return null;
 }
 
@@ -240,7 +243,9 @@ function createProfile(name) {
 async function removeProfile(id) {
   const why = lockReason();
   if (why) throw new Error(why);
-  await profiles.remove(ROOT, id, p => shell.trashItem(p));
+  removing = true;
+  try { await profiles.remove(ROOT, id, p => shell.trashItem(p)); }
+  finally { removing = false; }
   if (id === PROFILE) useProfile(profiles.pick(ROOT, null));
   else pushStatus();
 }
@@ -262,9 +267,9 @@ function openStart() {
 function setupIpc() {
   ipc('health:status', status);
   ipc('health:update', () => updateAll());
-  ipc('health:connect', async s => { const r = await connect(String(s)); pushStatus(); return r; });
+  ipc('health:connect', async s => { const r = await signIn(() => connect(String(s))); pushStatus(); return r; });
   ipc('health:code', async v => {
-    try { const r = await finishFatSecret(String(v || '')); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
+    try { const r = await signIn(() => finishFatSecret(String(v || ''))); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
   });
   ipc('health:disconnect', s => { if (s in services) keys.clear(s); pushStatus(); reload(); return {ok: true}; });
   ipc('health:targets', v => settings.saveTargets(need(), v || {}, today()));
@@ -397,22 +402,30 @@ app.whenReady().then(async () => {
   protocol.handle('app', serve);
   setupIpc();
   if (process.env.HEALTH_SMOKE) smoke();
-  profiles.resume(ROOT);                                     // перенос, прерванный в прошлый раз, — довести
-  if (profiles.needsMigration(ROOT)) firstRun = 'migrate';   // данные 1.x в корне: спросить имя и перенести
-  else if (!profiles.list(ROOT).length) firstRun = 'new';   // новичок: спросить имя
-  else {
-    const old = profiles.oldRootData(ROOT);
-    if (old && old.sig !== datadir.readCfg(app.getPath('userData')).oldRootSig && !process.env.HEALTH_SMOKE) {
-      const {response} = await dialog.showMessageBox(win, {type: 'question', title: 'SEL',
-        message: 'В папке данных, вне профилей, лежат старые данные',
-        detail: `Записей: ${old.rows}. SEL их не показывает — так бывает после запуска старой версии или восстановления копии. ` +
-          'Можно перенести их в новый профиль.', buttons: ['Перенести в новый профиль', 'Оставить как есть'], defaultId: 0, cancelId: 1});
-      if (response === 0) firstRun = 'adopt'; else skipOld();
+  try {
+    profiles.resume(ROOT);                                     // перенос, прерванный в прошлый раз, — довести
+    if (profiles.needsMigration(ROOT)) firstRun = 'migrate';   // данные 1.x в корне: спросить имя и перенести
+    else if (!profiles.list(ROOT).length) firstRun = 'new';   // новичок: спросить имя
+    else {
+      const old = profiles.oldRootData(ROOT);
+      if (old && old.sig !== datadir.readCfg(app.getPath('userData')).oldRootSig && !process.env.HEALTH_SMOKE) {
+        const {response} = await dialog.showMessageBox(win, {type: 'question', title: 'SEL',
+          message: 'В папке данных, вне профилей, лежат старые данные',
+          detail: `Записей: ${old.rows}. SEL их не показывает — так бывает после запуска старой версии или восстановления копии. ` +
+            'Можно перенести их в новый профиль.', buttons: ['Перенести в новый профиль', 'Оставить как есть'], defaultId: 0, cancelId: 1});
+        if (response === 0) firstRun = 'adopt'; else skipOld();
+      }
     }
+    if (firstRun) { win.loadURL(`app://h/portal/profile.html?first=${firstRun}`); return; }
+    openStart();
+    if (process.env.HEALTH_SMOKE) { if (process.env.HEALTH_SMOKE_UPDATE) await updater.runAll(DATA); return; }
+  } catch (e) {                                              // перенос или чтение профилей не удались — не пустое окно, а причина
+    const text = `Не получилось открыть данные: ${e.message}\n\nПапка: ${ROOT}\nЕсли её держит другая программа (Finder, OneDrive, ` +
+      'антивирус) — закройте её и запустите SEL снова. Перенос продолжится с того места, где остановился; данные не пропадут.';
+    if (process.env.HEALTH_SMOKE) { console.log('SMOKE-ERROR ' + text); app.quit(); return; }
+    await dialog.showMessageBox(win, {type: 'error', title: 'SEL', message: 'SEL не может открыть данные', detail: text});
+    app.quit(); return;
   }
-  if (firstRun) { win.loadURL(`app://h/portal/profile.html?first=${firstRun}`); return; }
-  openStart();
-  if (process.env.HEALTH_SMOKE) { if (process.env.HEALTH_SMOKE_UPDATE) await updater.runAll(DATA); return; }
   if (process.env.HEALTH_CONNECT) console.log('CONNECT ' + JSON.stringify(await connect(process.env.HEALTH_CONNECT)));
   else updateAll();
 });

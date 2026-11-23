@@ -512,7 +512,7 @@ $("view").addEventListener("click", async e => {
   const b = e.target.closest("[data-w]");
   if (!b) return;
   e.preventDefault();
-  const d = b.dataset.w, v = prompt(`Вес на ${fmt(d)}, кг`, weightFor(d));
+  const d = b.dataset.w, v = await Nav.ask(`Вес на ${fmt(d)}, кг`, weightFor(d));
   if (v === null || !v.trim()) return;
   const failed = [];
   if (await saveWeight(d, v, failed)) setIndex(window.PHOTOS_INDEX); else alert(failed[0].error);

@@ -189,3 +189,20 @@ test('profile README is the per-person data README', () => {
   assert.ok(read(dir, 'README.md').startsWith('# Папка данных SEL'));
   assert.match(read(dir, 'README.md'), /одного профиля/);
 });
+
+test('migration failed midway and «Создать» pressed again → the same profile is finished, no second one', () => {
+  const root = oldFolder();
+  const real = fs.renameSync;
+  let failed = false;
+  fs.renameSync = (from, to) => {                                    // занятая папка (Windows: Проводник, OneDrive)
+    if (!failed && from.endsWith(`${path.sep}photos`)) { failed = true; const e = new Error('EBUSY: photos'); e.code = 'EBUSY'; throw e; }
+    return real(from, to);
+  };
+  try { assert.throws(() => pr.migrate(root, 'Александр', T), /EBUSY/); }
+  finally { fs.renameSync = real; }
+  const {id, dir} = pr.migrate(root, 'Александр', T);
+  assert.strictEqual(id, 'aleksandr');
+  assert.deepStrictEqual(pr.list(root).map(p => [p.id, p.migrating]), [['aleksandr', false]]);
+  assert.ok(fs.existsSync(path.join(dir, 'photos', 'originals', '2026-11-01_front.jpg')));
+  assert.deepStrictEqual(store.read(dir, 'body.csv').map(r => r.weight_kg), ['80']);
+});

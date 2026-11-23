@@ -45,3 +45,14 @@ test('«Отключить» во время обновления: токены,
   keys.saver('whoop')({refresh_token: 'again'});                           // новое подключение — сохраняется
   assert.strictEqual(JSON.parse(fs.readFileSync(file('whoop'))).refresh_token, 'again');
 });
+
+test('saver keeps the file it started with: a sign-in started in one profile writes there even if the profile switched', () => {
+  const a = fs.mkdtempSync(path.join(os.tmpdir(), 'health-sec-a-')), b = fs.mkdtempSync(path.join(os.tmpdir(), 'health-sec-b-'));
+  let cur = a;
+  const keys = secrets.keeper(name => path.join(cur, `${name}.json`));
+  const save = keys.saver('whoop');
+  cur = b;                                                           // пока шёл вход, переключили профиль
+  assert.strictEqual(save({refresh_token: 'ivan'}), true);
+  assert.strictEqual(secrets.read(path.join(a, 'whoop.json')).refresh_token, 'ivan');
+  assert.ok(!fs.existsSync(path.join(b, 'whoop.json')));
+});

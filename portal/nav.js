@@ -145,7 +145,36 @@ var Nav = (function () {
     ".prof-list button,.prof-list a{all:unset;cursor:pointer;padding:6px 10px;border-radius:6px;color:var(--text-primary)}" +
     ".prof-list button:hover:not(:disabled),.prof-list a:hover{background:var(--page)}.prof-list button:disabled{opacity:.45;cursor:default}" +
     ".prof-list [aria-current]{font-weight:600}.prof-list hr{border:0;border-top:1px solid var(--border);margin:4px 0}" +
-    ".prof-lock{padding:4px 10px 6px;color:var(--text-secondary);font-size:12px;max-width:240px}";
+    ".prof-lock{padding:4px 10px 6px;color:var(--text-secondary);font-size:12px;max-width:240px}" +
+    "dialog.ask{border:1px solid var(--border);border-radius:12px;background:var(--surface-1);color:var(--text-primary);padding:18px;min-width:320px}" +
+    "dialog.ask::backdrop{background:rgba(0,0,0,.4)}dialog.ask label{display:flex;flex-direction:column;gap:8px;font:inherit}" +
+    "dialog.ask input{font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--page);color:var(--text-primary)}" +
+    ".ask-b{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.ask-b button{font:inherit;padding:5px 14px;border-radius:8px;" +
+    "border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);cursor:pointer}" +
+    ".ask-b button[value=ok]{background:var(--series-1);border-color:var(--series-1);color:#fff;font-weight:600}";
+  function profStyle() {
+    if (document.getElementById("profstyle")) return;
+    const st = document.createElement("style"); st.id = "profstyle"; st.textContent = PROF_CSS; document.head.appendChild(st);
+  }
+
+  /** Вопрос с полем ввода — вместо window.prompt (в Electron его нет). → Promise: введённая строка или null (Отмена, Esc). */
+  function ask(title, value = "") {
+    return new Promise(done => {
+      profStyle();
+      const d = document.createElement("dialog");
+      d.className = "ask";
+      d.innerHTML = `<form><label>${escH(title)}<input maxlength="80" autocomplete="off"></label>` +
+        `<div class="ask-b"><button type="button" data-no>Отмена</button><button value="ok">OK</button></div></form>`;
+      const inp = d.querySelector("input");
+      inp.value = value;
+      let res = null;
+      d.querySelector("form").onsubmit = e => { e.preventDefault(); res = inp.value; d.close(); };
+      d.querySelector("[data-no]").onclick = () => d.close();
+      d.addEventListener("close", () => { d.remove(); done(res); });
+      document.body.appendChild(d);
+      d.showModal(); inp.select();
+    });
+  }
 
   /** Меню профилей: {list: [{id, name}], current, locked: причина или null} → HTML (имена — только через escH). */
   function profileMenu(info) {
@@ -163,9 +192,7 @@ var Nav = (function () {
   function profileBar() {
     const nav = document.getElementById("nav");
     if (!nav || !inApp() || !window.health.profiles) return;
-    if (!document.getElementById("profstyle")) {
-      const st = document.createElement("style"); st.id = "profstyle"; st.textContent = PROF_CSS; document.head.appendChild(st);
-    }
+    profStyle();
     nav.style.alignItems = "center";
     const box = document.createElement("span");
     box.style.marginLeft = nav.querySelector(".app") ? "12px" : "auto";
@@ -185,7 +212,8 @@ var Nav = (function () {
       if (busy) { alert("Сейчас нельзя сменить профиль: " + busy); return; }
       let r;
       if (b.hasAttribute("data-prof-new")) {
-        const name = prompt("Имя нового профиля (например, имя клиента)");
+        box.querySelector("details").open = false;
+        const name = await ask("Имя нового профиля (например, имя клиента)");
         if (name === null) return;
         r = await window.health.createProfile(name);
       } else if (b.getAttribute("aria-current")) { box.querySelector("details").open = false; return; }
@@ -215,5 +243,5 @@ var Nav = (function () {
     render();
     if (inApp()) { appBar(); profileBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, syncText, dataErrors, profileMenu, NAMES, MARK, mark, logo, logoSvg};
+  return {items, title, render, inApp, statusText, syncText, dataErrors, profileMenu, ask, NAMES, MARK, mark, logo, logoSvg};
 })();

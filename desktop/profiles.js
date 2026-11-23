@@ -147,9 +147,12 @@ function finish(root, id) {
   return {id, dir: d};
 }
 
-/** Новый профиль из данных корня: отметка migrating → перенос → снять отметку. */
+/** Новый профиль из данных корня: отметка migrating → перенос → снять отметку. Прошлая попытка упала посреди
+ *  (есть профиль с migrating) — доводим её, а не заводим второй: иначе данные разъехались бы по двум профилям. */
 function intoNew(root, name, today) {
   const n = cleanName(name);
+  const half = list(root).find(p => p.migrating);
+  if (half) { writeMeta(root, half.id, Object.assign(readMeta(root, half.id), {name: n})); return finish(root, half.id); }
   const base = path.join(root, PROFILES);
   const id = slug(n, new Set(fs.existsSync(base) ? fs.readdirSync(base) : []));
   fs.mkdirSync(dir(root, id), {recursive: true});

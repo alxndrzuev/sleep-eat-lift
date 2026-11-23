@@ -41,6 +41,14 @@ test('picked folder with profiles (2.0) → its data, or itself', () => {
   assert.strictEqual(dd.hasProfiles(e), false);
 });
 
+test('picked folder is a profile itself → its root (not a nested migration)', () => {
+  const root = tmp(), prof = path.join(root, 'profiles', 'aleksandr');
+  fs.mkdirSync(prof, {recursive: true});
+  fs.writeFileSync(path.join(prof, 'profile.json'), '{"name": "Александр"}');
+  fs.writeFileSync(path.join(prof, 'nutrition_daily.csv'), 'date,kcal,protein,fat,carbs,fiber\n');
+  assert.deepStrictEqual(dd.fromPicked(prof), {dir: root, existing: true});
+});
+
 test('empty or unrelated folder → new SEL/data inside', () => {
   const p = tmp();
   fs.writeFileSync(path.join(p, 'отчёт.docx'), 'x');

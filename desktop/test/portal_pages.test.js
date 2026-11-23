@@ -84,3 +84,8 @@ test('settings: «Профили» is the first card of the app part; photos pag
   for (const call of ['H.renameProfile(', 'H.removeProfile(', 'H.profileInfo(', 'H.createProfile(']) assert.ok(h.includes(call), call);
   assert.ok(source('photos.html').includes('window.pageBusy'));
 });
+
+test('no prompt() in pages: Electron does not support it (throws «prompt() is not supported») — Nav.ask instead', () => {
+  for (const f of fs.readdirSync(PORTAL).filter(f => /\.(html|js)$/.test(f))) assert.ok(!/(^|[^.\w])prompt\(/.test(source(f)), f);
+  assert.ok(source('nav.js').includes('function ask('));
+});

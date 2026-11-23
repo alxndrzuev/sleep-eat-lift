@@ -217,7 +217,7 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
     let r;
     if (b.dataset.open) r = await H.switchProfile(b.dataset.open);
     else if (b.dataset.ren) {
-      const cur = b.closest('tr').cells[0].textContent, name = prompt('Новое имя профиля', cur);
+      const cur = b.closest('tr').cells[0].textContent, name = await Nav.ask('Новое имя профиля', cur);
       if (name === null || name === cur) return;
       r = await H.renameProfile(b.dataset.ren, name);
       if (r.ok) { location.reload(); return; }                         // имя — и в меню вверху
@@ -231,7 +231,9 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
   };
   $('#profAdd').onclick = async () => {
     profErr('');
+    $('#profAdd').disabled = true;                                    // двойной клик не создаёт два профиля
     const r = await H.createProfile($('#profName').value);           // получилось — приложение откроет новый профиль
+    $('#profAdd').disabled = false;
     if (!r.ok) profErr(r.error);
   };
   for (const name of ['fatsecret', 'whoop']) {

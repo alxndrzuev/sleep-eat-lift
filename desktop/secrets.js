@@ -25,16 +25,17 @@ function clear(f) {
 }
 
 /** Токены сервисов (file(name) → путь): сохраняются только поля токенов. saver(name) — сохранение для начатого входа или
- *  обновления: после clear(name) («Отключить») оно ничего не пишет — запрос, начатый до отключения, не подключит сервис снова. */
+ *  обновления: после clear(name) («Отключить») оно ничего не пишет — запрос, начатый до отключения, не подключит сервис снова;
+ *  путь берётся в начале (профиль переключили, пока шёл вход, — токены всё равно лягут в профиль, где вход начат). */
 function keeper(file) {
   const gen = {};
-  const put = (name, obj) => save(file(name), Object.fromEntries(Object.entries(obj).filter(([k]) => TOKENS.includes(k))));
+  const putTo = (f, obj) => save(f, Object.fromEntries(Object.entries(obj).filter(([k]) => TOKENS.includes(k))));
   return {
-    save: put,
+    save: (name, obj) => putTo(file(name), obj),
     clear(name) { gen[name] = (gen[name] || 0) + 1; clear(file(name)); },
     saver(name) {
-      const g = gen[name] || 0;
-      return obj => { if ((gen[name] || 0) !== g) return false; put(name, obj); return true; };
+      const g = gen[name] || 0, f = file(name);
+      return obj => { if ((gen[name] || 0) !== g) return false; putTo(f, obj); return true; };
     },
   };
 }

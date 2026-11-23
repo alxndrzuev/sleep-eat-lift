@@ -36,6 +36,8 @@ const save = (userData, dir) => saveCfg(userData, {dataDir: dir});
 
 /** Выбранная папка → папка данных: её data/ с данными (профили или CSV 1.x), она сама, иначе новая <папка>/SEL/data. */
 function fromPicked(picked) {
+  const up = path.dirname(path.dirname(picked));                     // выбрали папку самого профиля — берём его корень
+  if (fs.existsSync(path.join(picked, 'profile.json')) && path.basename(path.dirname(picked)) === 'profiles') return {dir: up, existing: true};
   if (hasData(path.join(picked, 'data'))) return {dir: path.join(picked, 'data'), existing: true};
   if (hasData(picked)) return {dir: picked, existing: true};
   return {dir: path.join(picked, 'SEL', 'data'), existing: false};
