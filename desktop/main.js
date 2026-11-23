@@ -114,16 +114,25 @@ async function connect(name) {
   } catch (e) { return {ok: false, error: e.message}; }
 }
 
-/** Ключи по коду: вход в окне SEL (token — с адреса возврата; код — если окно «по коду») или ссылка профиля для другого человека. */
+/** Ключи по коду. token — вход в окне SEL вернулся на адрес возврата (код от FatSecret); без token — код ввели руками:
+ *  к входу «по коду» в окне SEL, потом к ссылке профиля для другого человека (fatsecret.exchangeCode). Подключено —
+ *  ссылка профиля больше не нужна (и её секрет). */
 async function finishFatSecret(verifier, token) {
-  const dir = DATA, save = keys.saver('fatsecret');
-  const byLink = !token && !(pending.fatsecret && pending.fatsecret.oob) && fatsecret.link.read(dir);
-  const t = byLink || pending.fatsecret;
-  if (!t || (token && token !== t.token)) return {ok: false, error: 'Вход устарел — нажмите «Подключить» ещё раз'};
-  let user;
-  try { user = await fatsecret.accessToken(appKey('fatsecret', {packaged: app.isPackaged}), t.token, t.secret, verifier); }
-  catch (e) { throw token ? e : fatsecret.codeError(e); }            // код ввели руками — неверный или ссылка устарела
-  if (byLink) fatsecret.link.clear(dir); else delete pending.fatsecret;
+  const dir = DATA, save = keys.saver('fatsecret'), key = appKey('fatsecret', {packaged: app.isPackaged}), p = pending.fatsecret;
+  if (!key) return {ok: false, error: 'В приложении нет ключа FatSecret'};
+  const stale = {ok: false, error: 'Вход устарел — нажмите «Подключить» ещё раз'};
+  let via = 'window', user;
+  if (token) {
+    if (!p || token !== p.token) return stale;
+    user = await fatsecret.accessToken(key, p.token, p.secret, verifier);
+  } else {
+    const l = fatsecret.link.read(dir);
+    const sources = [p && p.oob && {via: 'window', t: p}, l && {via: 'link', t: l}].filter(Boolean);
+    if (!sources.length) return stale;
+    ({via, user} = await fatsecret.exchangeCode(key, sources, verifier));
+  }
+  if (via === 'window') delete pending.fatsecret;
+  fatsecret.link.clear(dir);
   if (!save(user)) return {ok: false, cancelled: true};               // пока шёл вход, нажали «Отключить»
   const r = await updateAll('fatsecret');
   return {ok: true, update: r.fatsecret};

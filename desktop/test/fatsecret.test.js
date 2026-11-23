@@ -133,9 +133,34 @@ test('link for another person: saved in the profile secrets (600), read back, br
   fs_.link.clear(dir);                                         // нет файла — не ошибка
 });
 
-test('wrong code or stale link → plain text; network error stays as is', () => {
-  const api = fs_.codeError(new fs_.FatSecretError('api', 'HTTP 401: Invalid token'));
-  assert.strictEqual(api.message, 'Код не подошёл или ссылка устарела — проверьте код или сделайте новую ссылку');
-  const net = new fs_.FatSecretError('network');
-  assert.strictEqual(fs_.codeError(net), net);
+/** Заглушка access_token: код подходит только к запросу с токеном good; net — нет связи. */
+function fakeAuth({net = false} = {}) {
+  const seen = [];
+  const fetch = async url => {
+    const t = new URL(url).searchParams.get('oauth_token'); seen.push(t);
+    if (net) throw new Error('offline');
+    return t === 'good' ? resp('oauth_token=at&oauth_token_secret=as') : resp('Invalid token', 401);
+  };
+  return {fetch, seen};
+}
+const W = t => ({via: 'window', t: {token: t, secret: 's'}}), L = t => ({via: 'link', t: {token: t, secret: 's'}});
+
+test('code goes to the login window first, then to the link: a window closed without a code does not eat the link code', async () => {
+  let f = fakeAuth();
+  assert.deepStrictEqual(await fs_.exchangeCode(APP, [W('stale'), L('good')], '123', {fetch: f.fetch}),
+                         {via: 'link', user: {access_token: 'at', access_secret: 'as'}});
+  assert.deepStrictEqual(f.seen, ['stale', 'good']);
+  f = fakeAuth();
+  assert.strictEqual((await fs_.exchangeCode(APP, [W('good'), L('other')], '123', {fetch: f.fetch})).via, 'window');
+  assert.deepStrictEqual(f.seen, ['good'], 'ссылку не трогаем, если код подошёл к окну');
+});
+
+test('wrong code: text by where it went (link → make a new link; window → connect again); no network → as is, nothing else tried', async () => {
+  await assert.rejects(fs_.exchangeCode(APP, [W('x'), L('y')], '1', {fetch: fakeAuth().fetch}),
+                       {message: 'Код не подошёл или ссылка устарела — проверьте код или сделайте новую ссылку'});
+  await assert.rejects(fs_.exchangeCode(APP, [W('x')], '1', {fetch: fakeAuth().fetch}),
+                       {message: 'Код не подошёл — проверьте его или нажмите «Подключить» ещё раз'});
+  const f = fakeAuth({net: true});
+  await assert.rejects(fs_.exchangeCode(APP, [W('x'), L('good')], '1', {fetch: f.fetch}), {kind: 'network'});
+  assert.strictEqual(f.seen.length, 1);
 });

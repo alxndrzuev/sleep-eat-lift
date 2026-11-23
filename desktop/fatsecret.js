@@ -12,7 +12,8 @@ const CALLBACK = 'https://health.local/fatsecret';
 const TIMEOUT = 30000;              // мс на запрос вместе с ответом: зависшая сеть — ошибка «нет связи», а не вечное «обновляю…»
 const TEXTS = {network: 'Нет связи с FatSecret — попробуйте позже',
                token: 'Доступ к FatSecret пропал — подключите заново',
-               code: 'Код не подошёл или ссылка устарела — проверьте код или сделайте новую ссылку'};
+               code: 'Код не подошёл или ссылка устарела — проверьте код или сделайте новую ссылку',
+               codeWindow: 'Код не подошёл — проверьте его или нажмите «Подключить» ещё раз'};
 
 class FatSecretError extends Error {
   constructor(kind, detail) { super(TEXTS[kind] || `FatSecret ответил ошибкой: ${detail}`); this.kind = kind; }
@@ -66,8 +67,18 @@ async function accessToken(app, token, secret, verifier, deps) {
   return {access_token: a.oauth_token, access_secret: a.oauth_token_secret};
 }
 
-/** Ошибка обмена кода на ключи: ответ FatSecret с ошибкой — неверный код или устаревшая ссылка; нет связи — как есть. */
-const codeError = e => (e instanceof FatSecretError && e.kind === 'api' ? new FatSecretError('code') : e);
+/** Код, введённый руками, → ключи. sources — куда он может относиться, по порядку: [{via: 'window'|'link', t: {token, secret}}]
+ *  (вход «по коду» в окне SEL, потом ссылка профиля). FatSecret отверг — пробуем следующий: окно могли закрыть, не дождавшись
+ *  кода, а код прислали к ссылке. Отверг все — понятный текст по последнему; нет связи — как есть, дальше не пробуем.
+ *  → {via, user}. */
+async function exchangeCode(app, sources, verifier, deps) {
+  let last;
+  for (const s of sources) {
+    try { return {via: s.via, user: await accessToken(app, s.t.token, s.t.secret, verifier, deps)}; }
+    catch (e) { if (!(e instanceof FatSecretError) || e.kind !== 'api') throw e; last = s; }
+  }
+  throw new FatSecretError(last && last.via === 'window' ? 'codeWindow' : 'code');
+}
 
 // ---------- ссылка для другого человека ----------
 // Вход «по коду» (oob), начатый ссылкой: человек входит в свой FatSecret у себя и присылает код, а он может прийти через
@@ -148,4 +159,4 @@ async function update({dir, app, user, months: [a, b], fetch, timeout}) {
   return {ok: true, days: Object.keys(food).length, weights: Object.keys(wt).length};
 }
 
-module.exports = {FatSecretError, signedUrl, enc, call, requestToken, authorizeUrl, accessToken, codeError, link, month, weights, months, update, CALLBACK, TEXTS};
+module.exports = {FatSecretError, signedUrl, enc, call, requestToken, authorizeUrl, accessToken, exchangeCode, link, month, weights, months, update, CALLBACK, TEXTS};

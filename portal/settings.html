@@ -199,7 +199,7 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
     showService('fatsecret', s.services.fatsecret, s);
     showService('whoop', s.services.whoop, s);
     // ссылка для другого человека (пока FatSecret не подключён); код — к входу в окне SEL или к ссылке
-    const fsv = s.services.fatsecret || {}, link = !fsv.connected && s.fatsecretLink;
+    const fsv = s.services.fatsecret || {}, link = fsv.hasKey && !fsv.connected && s.fatsecretLink;
     $('#fslinkbtn').hidden = fsv.connected || !fsv.hasKey;
     $('#fslinkbtn').disabled = s.updating;
     $('#fslinkbtn').textContent = link ? 'Новая ссылка' : 'Ссылка для другого человека';
@@ -211,6 +211,7 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
     }
     $('#fscodelabel').textContent = !s.oob && link ? 'Код от человека:' : 'Код со страницы FatSecret:';
     $('#fatsecret .code').hidden = fsv.connected || !(s.oob || link);
+    $('#fscodebtn').disabled = s.updating || codeBusy;            // во время обновления первая загрузка не пошла бы
     $('#about').innerHTML = Nav.logo(48);
     $('#version').textContent = 'Версия ' + s.version;
     $('#datadir').textContent = s.dataDir || '';
@@ -219,6 +220,7 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
   function err(name, r) {
     if (r && !r.ok && r.error) { const e = $('#' + name + ' .err'); e.hidden = false; e.textContent = r.error; }
   }
+  let codeBusy = false;                                         // идёт обмен кода FatSecret
   H.status().then(show); H.onStatus(show);
 
   // тема: светлая / тёмная / авто (nav.js применяет на каждой странице)
@@ -232,11 +234,17 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
     const rf = $('#' + name + ' .refresh'); if (rf) rf.onclick = () => H.update();
   }
   $('#fscodebtn').onclick = async () => {
-    const r = await H.codeEntered($('#fscode').value);
-    if (r && r.ok) $('#fscode').value = '';
-    err('fatsecret', r);
+    if (codeBusy) return;
+    codeBusy = true; $('#fscodebtn').disabled = true;           // двойной щелчок — один обмен кода
+    try {
+      const r = await H.codeEntered($('#fscode').value);
+      if (r && r.ok) $('#fscode').value = '';
+      err('fatsecret', r);
+    } finally { codeBusy = false; H.status().then(show); }
   };
   $('#fslinkbtn').onclick = async () => {
+    if (!$('#fatsecret .fslink').hidden &&
+        !confirm('Сделать новую ссылку?\n\nПрежняя перестанет работать — если человек уже получил её, отправьте ему новую.')) return;
     $('#fatsecret .err').hidden = true;
     err('fatsecret', await H.fatsecretLink());
   };
