@@ -20,6 +20,15 @@ contextBridge.exposeInMainWorld('health', {
   removeAlcohol: evening => ipcRenderer.invoke('health:alcoholRemove', evening),
   openDataFolder: () => ipcRenderer.invoke('health:folder'),
   changeDataFolder: () => ipcRenderer.invoke('health:changeFolder'),
+  // профили: список, переключить, создать, переименовать, удалить; вес вручную (окно загрузки фото)
+  profiles: () => ipcRenderer.invoke('health:profiles'),
+  switchProfile: id => ipcRenderer.invoke('health:profileSwitch', id),
+  createProfile: name => ipcRenderer.invoke('health:profileCreate', name),
+  renameProfile: (id, name) => ipcRenderer.invoke('health:profileRename', id, name),
+  removeProfile: id => ipcRenderer.invoke('health:profileRemove', id),
+  profileInfo: id => ipcRenderer.invoke('health:profileInfo', id),
+  skipAdopt: () => ipcRenderer.invoke('health:profileSkipAdopt'),
+  setWeight: (date, kg) => ipcRenderer.invoke('health:weight', date, kg),
   openExternal: url => ipcRenderer.invoke('health:external', url),
   // «Что нового»: что показать в окне после обновления, «Понятно», вся история
   whatsNew: () => ipcRenderer.invoke('health:whatsNew'),

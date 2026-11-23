@@ -191,3 +191,21 @@ test('supplement written by hand (spaces around the name, empty start) can be st
   assert.deepStrictEqual(settings.removeSupplement(dir, {start: null, name: 'B'}), {ok: true});
   assert.deepStrictEqual(store.read(dir, 'supplements.csv').map(r => r.name.trim()), ['A']);
 });
+
+test('parseKg: comma or dot, spaces; not a number or outside 20–300 → error', () => {
+  assert.strictEqual(settings.parseKg('80,1'), 80.1);
+  assert.strictEqual(settings.parseKg(' 80.1 '), 80.1);
+  assert.strictEqual(settings.parseKg(75), 75);
+  for (const bad of ['abc', '0', '500', '', '80,1,2', null]) assert.throws(() => settings.parseKg(bad), /Вес: число от 20 до 300/);
+});
+
+test('saveWeight writes only weight_kg on that date, keeps note and other dates', () => {
+  const dir = tmp();
+  store.upsert(dir, 'body.csv', {'2026-11-01': {weight_kg: 80, note: 'FatSecret'}, '2026-11-02': {weight_kg: 81}});
+  settings.saveWeight(dir, '2026-11-01', '79,5', '2026-11-23');
+  settings.saveWeight(dir, '2026-11-10', 82, '2026-11-23');
+  assert.deepStrictEqual(store.read(dir, 'body.csv').map(r => [r.date, r.weight_kg, r.note]),
+    [['2026-11-01', '79.5', 'FatSecret'], ['2026-11-02', '81', ''], ['2026-11-10', '82', '']]);
+  assert.throws(() => settings.saveWeight(dir, '2026-12-01', 80, '2026-11-23'), /Дата/);
+  assert.throws(() => settings.saveWeight(dir, 'x', 80, '2026-11-23'), /Дата/);
+});

@@ -18,6 +18,7 @@ const updaterLib = require('./updater');
 const settings = require('./settings');
 const photosfs = require('./photosfs');
 const datadir = require('./datadir');
+const profiles = require('./profiles');
 const alcohol = require('./alcohol');
 const secretsFile = require('./secrets');
 const whatsnew = require('./whatsnew');
@@ -28,8 +29,13 @@ protocol.registerSchemesAsPrivileged([{scheme: 'app', privileges: {standard: tru
 const PORTAL = app.isPackaged ? path.join(process.resourcesPath, 'portal') : path.join(__dirname, '..', 'portal');
 // раньше приложение называлось «Здоровье» — перенести его настройки (проверочный запуск настройки не трогает)
 if (!process.env.HEALTH_DOCUMENTS) datadir.migrate(path.join(app.getPath('appData'), datadir.OLD_NAME), app.getPath('userData'));
-// папка данных: HEALTH_DOCUMENTS (проверки) или выбор пользователя, запомненный в userData/config.json
-let DATA = process.env.HEALTH_DOCUMENTS ? store.dataDir(process.env.HEALTH_DOCUMENTS) : null;
+// папка данных (корень с profiles/): HEALTH_DOCUMENTS (проверки) или выбор пользователя, запомненный в userData/config.json;
+// DATA — папка текущего профиля (profiles/<id>/): весь прежний код работает с ней, как раньше с корнем
+const TEST = !!process.env.HEALTH_DOCUMENTS;                    // проверочный запуск — настройки приложения не трогаем
+let ROOT = TEST ? store.dataDir(process.env.HEALTH_DOCUMENTS) : null;
+let DATA = null, PROFILE = null;
+let firstRun = null;                             // экран имени профиля: 'migrate' (данные 1.x), 'new', 'adopt' (старое в корне)
+let loginOpen = false;                           // открыто окно входа FatSecret или Whoop — профиль не переключаем
 const secretsDir = () => path.join(DATA, 'secrets');
 const START = 'app://h/portal/' + (process.env.HEALTH_PAGE || 'dashboard.html');
 let win = null;
@@ -63,7 +69,13 @@ const services = {
     },
   },
 };
-const updater = updaterLib.create(services);
+let updater = updaterLib.create(services);
+
+/** Окно входа; пока оно открыто, профиль не переключается (токены легли бы в другой профиль). */
+async function login(opts) {
+  loginOpen = true;
+  try { return await oauthwin.open(opts); } finally { loginOpen = false; }
+}
 
 /** Подключить сервис: окно входа → ключ доступа → загрузка за год. → {ok} | {ok: false, cancelled} | {ok: false, error}. */
 const pending = {};
@@ -77,8 +89,8 @@ async function connect(name) {
       catch (e) { if (e.kind !== 'api') throw e; cb = 'oob'; t = await fatsecret.requestToken(key, 'oob'); }
       pending.fatsecret = Object.assign(t, {oob: cb === 'oob'});
       pushStatus();                                                   // «Настройки» сразу покажут поле кода (oob)
-      const back = await oauthwin.open({url: fatsecret.authorizeUrl(t.token), callbackPrefix: fatsecret.CALLBACK,
-                                        partition: 'fatsecret-login', parent: win, title: 'Вход в FatSecret'});
+      const back = await login({url: fatsecret.authorizeUrl(t.token), callbackPrefix: fatsecret.CALLBACK,
+                                partition: 'fatsecret-login', parent: win, title: 'Вход в FatSecret'});
       if (cb === 'oob') return {ok: false, oob: true};                 // код вводится на «Настройках»
       if (!back) { delete pending.fatsecret; return {ok: false, cancelled: true}; }
       return await finishFatSecret(back.searchParams.get('oauth_verifier'), back.searchParams.get('oauth_token'));
@@ -87,8 +99,8 @@ async function connect(name) {
       const key = appKey('whoop', {packaged: app.isPackaged});
       if (!key) return {ok: false, error: 'В этой сборке нет ключа Whoop'};
       const state = whoop.newState(), save = keys.saver('whoop');
-      const back = await oauthwin.open({url: whoop.authUrl(key, state), callbackPrefix: key.redirect_uri || whoop.CALLBACK,
-                                        partition: 'whoop-login', parent: win, title: 'Вход в Whoop'});
+      const back = await login({url: whoop.authUrl(key, state), callbackPrefix: key.redirect_uri || whoop.CALLBACK,
+                                partition: 'whoop-login', parent: win, title: 'Вход в Whoop'});
       if (!back) return {ok: false, cancelled: true};
       const user = await whoop.exchange(key, whoop.codeFrom(back, state), {fetch: globalThis.fetch});
       if (!save(user)) return {ok: false, cancelled: true};             // пока шёл вход, нажали «Отключить»
@@ -141,7 +153,7 @@ async function askDataDir({missing = null, change = false} = {}) {
 
 /** Папка данных при запуске: сохранённая → она; нет или пропала → спросить. null — пользователь выбрал «Выйти». */
 async function resolveDataDir() {
-  if (DATA) return DATA;
+  if (ROOT) return ROOT;
   const cur = datadir.current(app.getPath('userData'));
   if (cur.dir) return cur.dir;
   const d = await askDataDir({missing: cur.missing});
@@ -151,16 +163,18 @@ async function resolveDataDir() {
 
 // ---------- статус и IPC для страниц ----------
 function status() {
+  if (!DATA) return {version: app.getVersion(), dataDir: ROOT, profile: null, modules: [], updating: false, services: {}, oob: false};
   const svc = {};
   for (const name of Object.keys(services))
     svc[name] = Object.assign({connected: services[name].connected(), hasKey: !!appKey(name, {packaged: app.isPackaged})},
                               updater.status[name], {lastUpdate: updater.status[name].lastUpdate || store.readSync(DATA)[name] || null});
-  return {version: app.getVersion(), dataDir: DATA, modules: store.modules(DATA), updating: updater.busy, services: svc,
+  return {version: app.getVersion(), dataDir: DATA, profile: {id: PROFILE, name: (profiles.readMeta(ROOT, PROFILE) || {}).name || PROFILE}, modules: store.modules(DATA), updating: updater.busy, services: svc,
           oob: !!(pending.fatsecret && pending.fatsecret.oob)};
 }
 function pushStatus() { if (win && !win.isDestroyed()) win.webContents.send('health:status', status()); }
 
 async function updateAll(first) {
+  if (!DATA) return {};
   const p = updater.runAll(DATA, first);
   pushStatus();
   const r = await p;
@@ -176,6 +190,75 @@ function ipc(channel, fn) {
   });
 }
 
+/** Папка текущего профиля; на экране имени профиля (профиль ещё не выбран) — ошибка. */
+function need() { if (!DATA) throw new Error('Профиль не выбран'); return DATA; }
+/** Выполнить и ответить странице {ok: true, …} или {ok: false, error}. */
+async function answer(fn) {
+  try { return Object.assign({ok: true}, await fn()); } catch (e) { return {ok: false, error: e.message}; }
+}
+
+// ---------- профили ----------
+/** Почему сейчас нельзя переключить профиль (или null). */
+function lockReason() {
+  if (updater.busy) return 'Идёт обновление данных — подождите, пока закончится';
+  if (loginOpen) return 'Открыт вход в FatSecret или Whoop — закончите или закройте его';
+  return null;
+}
+
+/** Сделать профиль id текущим: DATA, свой updater, без чужого незаконченного входа; запомнить. */
+function openProfile(id) {
+  DATA = profiles.dir(ROOT, id); PROFILE = id;
+  updater = updaterLib.create(services);
+  delete pending.fatsecret;
+  store.init(DATA);
+  profiles.writeRootReadme(ROOT);
+  if (!TEST) datadir.saveCfg(app.getPath('userData'), {profile: id});
+}
+
+/** Переключиться на профиль: окно — на ту же страницу (с экрана имени — на сводку), обновить его данные. */
+function useProfile(id) {
+  const why = lockReason();
+  if (why) throw new Error(why);
+  if (!profiles.readMeta(ROOT, id)) throw new Error('Нет такого профиля');
+  const wasFirst = !DATA || firstRun;
+  firstRun = null;
+  openProfile(id);
+  if (wasFirst || win.webContents.getURL().includes('/profile.html')) win.loadURL(START); else reload();
+  updateAll();
+  return {id};
+}
+
+/** «Создать»: на экране имени — перенос данных 1.x или старых из корня; иначе новый пустой профиль. */
+function createProfile(name) {
+  if (!firstRun && lockReason()) throw new Error(lockReason());
+  const t = today();
+  const r = firstRun === 'migrate' ? profiles.migrate(ROOT, name, t)
+          : firstRun === 'adopt' ? profiles.adoptOld(ROOT, name, t) : profiles.create(ROOT, name, t);
+  return useProfile(r.id);
+}
+
+async function removeProfile(id) {
+  const why = lockReason();
+  if (why) throw new Error(why);
+  await profiles.remove(ROOT, id, p => shell.trashItem(p));
+  if (id === PROFILE) useProfile(profiles.pick(ROOT, null));
+  else pushStatus();
+}
+
+/** Старые данные в корне при профилях: «Оставить как есть» — не спрашивать, пока эти файлы не изменятся. */
+function skipOld() {
+  const old = profiles.oldRootData(ROOT);
+  if (old && !TEST) datadir.saveCfg(app.getPath('userData'), {oldRootSig: old.sig});
+}
+
+/** Открыть профиль из настроек (или HEALTH_PROFILE, или первый) и сводку. */
+function openStart() {
+  firstRun = null;
+  openProfile(profiles.pick(ROOT, process.env.HEALTH_PROFILE || datadir.readCfg(app.getPath('userData')).profile));
+  win.loadURL(START);
+  return {id: PROFILE};
+}
+
 function setupIpc() {
   ipc('health:status', status);
   ipc('health:update', () => updateAll());
@@ -184,31 +267,41 @@ function setupIpc() {
     try { const r = await finishFatSecret(String(v || '')); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
   });
   ipc('health:disconnect', s => { if (s in services) keys.clear(s); pushStatus(); reload(); return {ok: true}; });
-  ipc('health:targets', v => settings.saveTargets(DATA, v || {}, today()));
-  ipc('health:removeTarget', (kind, date) => settings.removeTarget(DATA, String(kind), String(date)));
+  ipc('health:targets', v => settings.saveTargets(need(), v || {}, today()));
+  ipc('health:removeTarget', (kind, date) => settings.removeTarget(need(), String(kind), String(date)));
   // план, БАДы, алкоголь: пишем CSV — страница при следующей загрузке получит их из CSV (store.dataJs)
-  ipc('health:plan', v => settings.savePlan(DATA, v || {}, today()));
-  ipc('health:removePlan', date => settings.removePlan(DATA, String(date)));
-  ipc('health:supplementAdd', v => settings.addSupplement(DATA, v || {}, today()));
-  ipc('health:supplementStop', v => settings.stopSupplement(DATA, v || {}, today()));
-  ipc('health:supplementRemove', v => settings.removeSupplement(DATA, v || {}));
-  ipc('health:alcohol', (morning, value) => alcohol.answer(DATA, String(morning), typeof value === 'boolean' ? value : String(value)));
-  ipc('health:alcoholAdd', (evening, lvl, note) => alcohol.add(DATA, String(evening), String(lvl), String(note || '').slice(0, 80), today()));
-  ipc('health:alcoholLevel', (evening, lvl) => alcohol.setLevel(DATA, String(evening), String(lvl)));
-  ipc('health:alcoholRemove', evening => alcohol.removeEvening(DATA, String(evening)));
-  ipc('health:folder', () => shell.openPath(DATA));
+  ipc('health:plan', v => settings.savePlan(need(), v || {}, today()));
+  ipc('health:removePlan', date => settings.removePlan(need(), String(date)));
+  ipc('health:supplementAdd', v => settings.addSupplement(need(), v || {}, today()));
+  ipc('health:supplementStop', v => settings.stopSupplement(need(), v || {}, today()));
+  ipc('health:supplementRemove', v => settings.removeSupplement(need(), v || {}));
+  ipc('health:alcohol', (morning, value) => alcohol.answer(need(), String(morning), typeof value === 'boolean' ? value : String(value)));
+  ipc('health:alcoholAdd', (evening, lvl, note) => alcohol.add(need(), String(evening), String(lvl), String(note || '').slice(0, 80), today()));
+  ipc('health:alcoholLevel', (evening, lvl) => alcohol.setLevel(need(), String(evening), String(lvl)));
+  ipc('health:alcoholRemove', evening => alcohol.removeEvening(need(), String(evening)));
+  ipc('health:folder', () => shell.openPath(need()));
   ipc('health:changeFolder', async () => {
     const d = await askDataDir({change: true});
-    if (!d || d === DATA) return {ok: false};
+    if (!d || d === ROOT) return {ok: false};
     datadir.save(app.getPath('userData'), d);
     app.relaunch(); app.exit(0);
     return {ok: true};
   });
   ipc('health:photos', (op, rel, bytes) => {
     if (!['list', 'read', 'write', 'mkdir', 'remove', 'exists'].includes(op)) throw new Error('недопустимая операция');
-    try { return photosfs[op](path.join(DATA, 'photos'), String(rel ?? ''), bytes); }
+    try { return photosfs[op](path.join(need(), 'photos'), String(rel ?? ''), bytes); }
     catch (e) { throw new Error((e.code === 'NotFoundError' ? 'NotFoundError: ' : '') + e.message); }
   });
+  // профили: список и текущий, переключить, создать (на экране имени — перенос данных), переименовать, удалить
+  ipc('health:profiles', () => ({list: profiles.list(ROOT).map(p => ({id: p.id, name: p.name})), current: PROFILE, locked: lockReason()}));
+  ipc('health:profileSwitch', id => answer(() => useProfile(String(id))));
+  ipc('health:profileCreate', name => answer(() => createProfile(String(name ?? ''))));
+  ipc('health:profileRename', (id, name) => answer(() => { profiles.rename(ROOT, String(id), String(name ?? '')); pushStatus(); }));
+  ipc('health:profileRemove', id => answer(() => removeProfile(String(id))));
+  ipc('health:profileInfo', id => { const d = profiles.dir(ROOT, String(id)), m = profiles.readMeta(ROOT, String(id));
+    if (!m) throw new Error('Нет такого профиля'); return {name: m.name, photos: profiles.photoCount(d)}; });
+  ipc('health:profileSkipAdopt', () => answer(() => { skipOld(); return openStart(); }));
+  ipc('health:weight', (date, kg) => answer(() => settings.saveWeight(need(), String(date), kg, today())));
   ipc('health:whatsNew', () => news.show());
   ipc('health:whatsNewSeen', () => news.seen());
   ipc('health:changelog', () => news.history());
@@ -219,15 +312,15 @@ function setupIpc() {
 function serve(req) {
   if (isDataJs(req.url)) {                             // данные страниц — из CSV прямо сейчас (store.dataJs)
     let js;
-    try { js = store.dataJs(DATA, today()); }
+    try { js = DATA ? store.dataJs(DATA, today()) : 'const RAW = null;\n'; }
     catch (e) { return new Response('Данные не читаются: ' + e.message, {status: 500, headers: {'Content-Type': 'text/plain; charset=utf-8'}}); }
     return new Response(js, {headers: {'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store',
                                        'Content-Security-Policy': CSP}});
   }
-  const p = resolve(req.url, PORTAL, DATA);
+  const p = resolve(req.url, PORTAL, DATA || ROOT);       // без профиля фото не отдаём: ниже разрешён только PORTAL
   if (!p || !fs.existsSync(p)) return new Response('Not found', {status: 404});
   const real = fs.realpathSync(p);                       // симлинк наружу разрешённой папки — не отдаём
-  const bases = [PORTAL, path.join(DATA, 'photos')].map(b => fs.existsSync(b) ? fs.realpathSync(b) : b);
+  const bases = (DATA ? [PORTAL, path.join(DATA, 'photos')] : [PORTAL]).map(b => fs.existsSync(b) ? fs.realpathSync(b) : b);
   if (!bases.some(b => inside(b, real))) return new Response('Not found', {status: 404});
   return net.fetch(pathToFileURL(real).toString()).then(r => new Response(r.body, {
     status: r.status, headers: {'Content-Type': r.headers.get('Content-Type') || '', 'Cache-Control': 'no-store',
@@ -276,39 +369,54 @@ function createWindow() {
 const ABOUT = {applicationName: 'SEL', version: '', copyright: 'sleep · eat · lift\n' +
   'Питание, сон и тренировки из FatSecret и Whoop\ngithub.com/alxndrzuev/sleep-eat-lift\n© 2026 alxndrzuev · лицензия MIT'};
 
+/** Проверка без клика (HEALTH_SMOKE): после первой загрузки страницы — текст, меню, статус в консоль; выход. */
+function smoke() {
+  win.webContents.once('did-finish-load', async () => {
+    const r = await win.webContents.executeJavaScript(
+      `new Promise(r => setTimeout(() => r({title: document.title, nav: [...document.querySelectorAll('#nav a')].map(a => a.textContent),
+         empty: document.body.innerText.includes('Подключите FatSecret или Whoop'), modules: typeof DATA !== 'undefined' && DATA ? DATA.modules : null,
+         text: document.body.innerText.replace(/\\s+/g, ' ').slice(0, 700),
+         foot: (document.querySelector('.foot') || {}).innerText || '', upd: (document.getElementById('upd') || {}).innerText || ''}), ${+(process.env.HEALTH_SMOKE_WAIT || 500)}))`);
+    if (process.env.HEALTH_SMOKE_JS) r.js = await win.webContents.executeJavaScript(process.env.HEALTH_SMOKE_JS).catch(e => 'ERR ' + e.message);
+    if (process.env.HEALTH_SMOKE_SHOT) fs.writeFileSync(process.env.HEALTH_SMOKE_SHOT, (await win.webContents.capturePage()).toPNG());
+    const menu = (Menu.getApplicationMenu() || {items: []}).items.map(i => [i.label, (i.submenu ? i.submenu.items : []).map(x => x.label)]);
+    console.log('SMOKE ' + JSON.stringify(Object.assign(r, {status: status(), menu})));
+    app.quit();
+  });
+}
+
 app.whenReady().then(async () => {
   app.setAboutPanelOptions(Object.assign({applicationVersion: app.getVersion()}, ABOUT));
   setMenu();
   createWindow();                              // окно сразу — вопрос о папке данных показывается поверх него
   if (!process.env.HEALTH_SMOKE) app.focus({steal: true});
   const hadDataDir = !!datadir.readCfg(app.getPath('userData')).dataDir;   // до выбора папки: новичок или обновился
-  DATA = await resolveDataDir();
-  if (!DATA) { app.quit(); return; }
+  ROOT = await resolveDataDir();
+  if (!ROOT) { app.quit(); return; }
   startNews(hadDataDir);
   protocol.handle('app', serve);
   setupIpc();
-  store.init(DATA);
-  if (process.env.HEALTH_SMOKE && process.env.HEALTH_SMOKE_UPDATE) await updater.runAll(DATA);   // проверка: обновить до окна
-  win.loadURL(START);
-  if (process.env.HEALTH_SMOKE) {
-    win.webContents.once('did-finish-load', async () => {
-      const r = await win.webContents.executeJavaScript(
-        `new Promise(r => setTimeout(() => r({title: document.title, nav: [...document.querySelectorAll('#nav a')].map(a => a.textContent),
-           empty: document.body.innerText.includes('Подключите FatSecret или Whoop'), modules: DATA.modules,
-           text: document.body.innerText.replace(/\\s+/g, ' ').slice(0, 700),
-           foot: (document.querySelector('.foot') || {}).innerText || '', upd: (document.getElementById('upd') || {}).innerText || ''}), ${+(process.env.HEALTH_SMOKE_WAIT || 500)}))`);
-      if (process.env.HEALTH_SMOKE_JS) r.js = await win.webContents.executeJavaScript(process.env.HEALTH_SMOKE_JS).catch(e => 'ERR ' + e.message);
-      if (process.env.HEALTH_SMOKE_SHOT) fs.writeFileSync(process.env.HEALTH_SMOKE_SHOT, (await win.webContents.capturePage()).toPNG());
-      const menu = (Menu.getApplicationMenu() || {items: []}).items.map(i => [i.label, (i.submenu ? i.submenu.items : []).map(x => x.label)]);
-      console.log('SMOKE ' + JSON.stringify(Object.assign(r, {status: status(), menu})));
-      app.quit();
-    });
-    return;
+  if (process.env.HEALTH_SMOKE) smoke();
+  profiles.resume(ROOT);                                     // перенос, прерванный в прошлый раз, — довести
+  if (profiles.needsMigration(ROOT)) firstRun = 'migrate';   // данные 1.x в корне: спросить имя и перенести
+  else if (!profiles.list(ROOT).length) firstRun = 'new';   // новичок: спросить имя
+  else {
+    const old = profiles.oldRootData(ROOT);
+    if (old && old.sig !== datadir.readCfg(app.getPath('userData')).oldRootSig && !process.env.HEALTH_SMOKE) {
+      const {response} = await dialog.showMessageBox(win, {type: 'question', title: 'SEL',
+        message: 'В папке данных, вне профилей, лежат старые данные',
+        detail: `Записей: ${old.rows}. SEL их не показывает — так бывает после запуска старой версии или восстановления копии. ` +
+          'Можно перенести их в новый профиль.', buttons: ['Перенести в новый профиль', 'Оставить как есть'], defaultId: 0, cancelId: 1});
+      if (response === 0) firstRun = 'adopt'; else skipOld();
+    }
   }
+  if (firstRun) { win.loadURL(`app://h/portal/profile.html?first=${firstRun}`); return; }
+  openStart();
+  if (process.env.HEALTH_SMOKE) { if (process.env.HEALTH_SMOKE_UPDATE) await updater.runAll(DATA); return; }
   if (process.env.HEALTH_CONNECT) console.log('CONNECT ' + JSON.stringify(await connect(process.env.HEALTH_CONNECT)));
   else updateAll();
 });
 
 app.on('window-all-closed', () => app.quit());
 
-module.exports = {connect, finishFatSecret, services, updater, keys, userKey};
+module.exports = {connect, finishFatSecret, services, keys, userKey};

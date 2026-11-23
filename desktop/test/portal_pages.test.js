@@ -54,7 +54,7 @@ test('workouts only on their own page, not on «Восстановление»',
 
 test('page JavaScript parses (data.js + dataset + common + inline code)', () => {
   const head = 'const RAW = {"tables": {}, "meta": {"plan": {}}, "modules": [], "updated": "2026-11-21"};\n' + source('dataset.js');
-  for (const p of [...PAGES, 'settings.html', 'whatsnew.html']) {
+  for (const p of [...PAGES, 'settings.html', 'whatsnew.html', 'profile.html']) {
     const inline = [...source(p).matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
     const code = (!PAGES.includes(p) || p === 'photos.html' ? '' : head + '\n' + source('common.js')) + '\n' + inline;
     assert.doesNotThrow(() => new vm.Script(code, {filename: p}), p);
@@ -66,4 +66,13 @@ test('every page: window title «<section> · SEL» (Electron shows the page tit
     const t = /<title>([^<]*)<\/title>/.exec(source(p));
     assert.ok(t && / · SEL$/.test(t[1]), p + ': ' + (t && t[1]));
   }
+});
+
+test('profile.html — the name screen: no menu, name field up to 40, creates the profile, three modes', () => {
+  const h = source('profile.html');
+  assert.ok(!h.includes('id="nav"'), 'на экране имени меню нет');
+  assert.match(h, /<input[^>]*id="name"[^>]*maxlength="40"/);
+  assert.ok(h.includes('health.createProfile('));
+  assert.ok(h.includes('health.skipAdopt('));
+  for (const m of ['migrate', 'new', 'adopt']) assert.ok(h.includes(`${m}:`), m);
 });

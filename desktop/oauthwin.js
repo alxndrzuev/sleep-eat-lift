@@ -1,9 +1,11 @@
 // Окно входа сервиса (FatSecret, Whoop): открыть страницу авторизации в отдельной сессии без моста preload,
 // дождаться перехода на обратный адрес (он не существует — переход перехватываем), вернуть его и закрыть окно.
-// Закрыли окно без «Allow» → null.
+// Закрыли окно без «Allow» → null. Перед каждым входом сессия окна очищается: в SEL несколько профилей, и без этого
+// второй человек вошёл бы автоматически под аккаунтом первого (куки остались с прошлого входа).
 const {BrowserWindow, session} = require('electron');
 
-function open({url, callbackPrefix, partition, parent, title}) {
+async function open({url, callbackPrefix, partition, parent, title}) {
+  await session.fromPartition(partition).clearStorageData();
   return new Promise(resolve => {
     let done = false;
     const win = new BrowserWindow({width: 560, height: 760, parent, title,

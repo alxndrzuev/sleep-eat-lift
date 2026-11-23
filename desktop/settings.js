@@ -142,9 +142,26 @@ function removeSupplement(dir, vals) {
   return {ok: true};
 }
 
+// ---------- вес вручную (окно загрузки фото и вес под снимком) ----------
+const KG_ERR = 'Вес: число от 20 до 300';
+/** «80,1» / « 80.1 » / 80.1 → 80.1; не число или вне 20–300 → ошибка. */
+function parseKg(v) {
+  const s = String(v ?? '').trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(s)) throw new Error(KG_ERR);
+  const kg = Number(s);
+  if (kg < 20 || kg > 300) throw new Error(KG_ERR);
+  return kg;
+}
+
+/** Вес на дату → body.csv: только weight_kg (заметку не трогаем); кто записал последним — тот и прав (FatSecret тоже). */
+function saveWeight(dir, date, kg, today) {
+  if (!validDate(String(date), today)) throw new Error(DATE_ERR);
+  store.upsert(dir, 'body.csv', {[date]: {weight_kg: parseKg(kg)}});
+}
+
 function externalAllowed(url) {
   try { const u = new URL(url); return u.protocol === 'https:' && EXTERNAL.includes(u.hostname); } catch (e) { return false; }
 }
 
 module.exports = {saveTargets, removeTarget, savePlan, removePlan, addSupplement, stopSupplement, removeSupplement,
-                  kcalOf, externalAllowed, validDate, LIMITS};
+                  kcalOf, externalAllowed, validDate, parseKg, saveWeight, LIMITS};

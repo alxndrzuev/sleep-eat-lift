@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Профиль · SEL</title>
+<link rel="stylesheet" href="common.css">
+<style>
+.box{max-width:520px;margin:60px auto 0}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-top:18px}
+.card h2{font-size:18px;margin:0 0 6px}
+.card p{color:var(--text-secondary);margin:0 0 14px}
+.row{display:flex;gap:10px}
+.row input{flex:1;font:inherit;font-size:15px;color:var(--text-primary);background:var(--page);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
+.btn{font:inherit;border:1px solid var(--series-1);background:var(--series-1);color:#fff;font-weight:600;border-radius:8px;padding:7px 16px;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.link{background:none;border:0;padding:0;margin-top:12px;font:inherit;color:var(--text-secondary);text-decoration:underline;cursor:pointer}
+.err{color:var(--critical);margin-top:10px;min-height:1.2em}
+</style>
+</head>
+<body>
+<div class="viz-root"><div class="wrap"><div class="box">
+<div id="logo"></div>
+<div class="card">
+  <h2>Как назвать профиль?</h2>
+  <p id="why"></p>
+  <form class="row" id="form"><input id="name" maxlength="40" autocomplete="off" placeholder="Например, Александр" autofocus>
+    <button class="btn" id="go">Создать</button></form>
+  <div class="err" id="err"></div>
+  <button class="link" id="skip" hidden>Не переносить — открыть профили</button>
+</div>
+</div></div></div>
+<script src="nav.js"></script>     <!-- меню на этой странице нет: только логотип -->
+<script>
+(function () {
+  try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  const $ = s => document.querySelector(s);
+  const mode = new URLSearchParams(location.search).get('first') || 'new';
+  const WHY = {
+    migrate: 'Теперь в SEL можно вести несколько человек — у каждого свой профиль. Ваши данные (питание, сон, тренировки, фото, подключения) перенесём в этот профиль. Обычно это ваше имя.',
+    new: 'В SEL у каждого человека свой профиль: питание, сон, тренировки и фото. Обычно это ваше имя; клиентов или близких можно добавить потом в «Настройках».',
+    adopt: 'В папке данных, вне профилей, лежат старые данные. Перенесём их в новый профиль — назовите его.',
+  };
+  $('#logo').innerHTML = Nav.logo(56);
+  $('#why').textContent = WHY[mode] || WHY.new;
+  $('#skip').hidden = mode !== 'adopt';
+  if (!window.health) { $('#err').textContent = 'Профили есть только в приложении SEL'; $('#go').disabled = true; return; }
+  $('#form').onsubmit = async e => {
+    e.preventDefault();
+    $('#go').disabled = true; $('#err').textContent = '';
+    const r = await window.health.createProfile($('#name').value);
+    if (!r.ok) { $('#err').textContent = r.error; $('#go').disabled = false; }   // при успехе приложение откроет сводку
+  };
+  $('#skip').onclick = () => window.health.skipAdopt();
+})();
+</script>
+</body>
+</html>
