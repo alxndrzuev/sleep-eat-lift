@@ -33,9 +33,9 @@ svg text{fill:var(--text-muted);font-size:11px}
 <header>
   <div>
     <h1>Сводка</h1>
-    <div class="sub" id="updated"></div>
   </div>
   <div class="controls">
+    <span class="period" id="period"></span>
     <div class="seg" id="range">
       <button data-d="90">3 мес</button><button data-d="182" class="on">6 мес</button><button data-d="400">Год</button>
     </div>
@@ -138,6 +138,7 @@ let RANGE = 182;
 function render(){
   $('#charts').innerHTML=''; JOBS.length=0;
   const to = today.getTime()+DAY, from = today.getTime()-RANGE*DAY;
+  $('#period').textContent = `${fmtDY(new Date(from))} — ${fmtDY(today)}`;   // даты окна графиков — у кнопок периода
   const c1=css('--series-1'), c1s=css('--series-1-soft'), c2=css('--series-2'), c3=css('--series-3');
   const T={sleep: G.sleep_h};
 
@@ -224,7 +225,6 @@ function render(){
 }
 
 function staticParts(){
-  $('#updated').textContent = Nav.syncText(DATA.sync, DATA.modules);   // настоящее время загрузки, не дата сборки data.js
   const show = (id, on)=>{ const c=$(id); c.hidden=!on; const two=c.parentElement; if(two.classList.contains('two')) two.hidden=[...two.children].every(x=>x.hidden); };
   const pl = DATA.plan_now;
   show('#card-plan', !!pl); show('#card-supps', DATA.supplements.length);

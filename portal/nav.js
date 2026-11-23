@@ -102,17 +102,6 @@ var Nav = (function () {
     return {text: last ? "обновлено " + when(last) : "", err: false};
   }
 
-  /** Сводка: когда данные подключённых сервисов на самом деле загружены (data/sync.json → DATA.sync), а не когда собран data.js.
-      Один день у всех — одно (последнее) время; иначе — по сервисам. */
-  function syncText(sync, modules) {
-    const on = ["fatsecret", "whoop"].filter(n => (modules || []).includes(n));
-    if (!on.length) return "";
-    const at = on.map(n => (sync || {})[n] || null);
-    const day = iso => iso && new Date(iso).toDateString();
-    if (at.every(Boolean) && at.every(x => day(x) === day(at[0]))) return "Обновлено " + when(at.slice().sort().pop());
-    return "Обновлено: " + on.map((n, i) => NAMES[n] + " — " + (at[i] ? when(at[i]) : "ещё не загружен")).join(" · ");
-  }
-
   const UPDATE_PAGES = ["nutrition.html", "training.html", "recovery.html"];   // «Обновить» — на профильных страницах сервисов; ещё — в «Настройках» у FatSecret и Whoop
 
   /** Время обновления и «Обновить» — в конце строки под заголовком (#sub), не в верхнем меню. */
@@ -323,5 +312,5 @@ var Nav = (function () {
     render();
     if (inApp()) { profileBar(); updateLine(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, syncText, dataErrors, profileMenu, profilesTable, ask, NAMES, MARK, mark, logo, logoSvg};
+  return {items, title, render, inApp, statusText, dataErrors, profileMenu, profilesTable, ask, NAMES, MARK, mark, logo, logoSvg};
 })();

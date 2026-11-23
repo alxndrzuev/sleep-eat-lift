@@ -101,11 +101,14 @@ test('«Обновить данные» is not in the top menu: time and the but
   assert.ok(!source('nutrition.html').includes('обновлено ${fmtDY(today)}'));
 });
 
-test('period dates sit next to the period buttons, not under the heading; no «N дней»', () => {
-  for (const p of ['nutrition.html', 'training.html', 'recovery.html']) {
+test('period dates sit next to the period buttons, not under the heading; no «N дней», no «данные Whoop по», no «Обновлено» on the dashboard', () => {
+  for (const p of ['nutrition.html', 'training.html', 'recovery.html', 'dashboard.html']) {
     const h = source(p);
     assert.match(h, /<div class="controls">\s*<span class="period" id="period"><\/span>/, p);
     assert.ok(!h.includes('dni(S.n)'), p);
     assert.ok(h.includes("$('#period').textContent"), p);
+    assert.ok(!h.includes('данные Whoop по'), p);
   }
+  assert.ok(!source('dashboard.html').includes('id="updated"'));
+  assert.ok(!source('nav.js').includes('syncText'));
 });

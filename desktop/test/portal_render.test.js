@@ -207,7 +207,7 @@ test('Whoop calendars: Monday — today pale and outside the period (only comple
     const dom = d.page(page, '2026-11-23');                          // понедельник, данные Whoop за сегодня уже есть
     assert.match(dom, /<rect class="c today" data-d="2026-11-23"/, page);
     has(dom, '9 нояб. 2026 г. — 22 нояб. 2026 г.');                  // 2 недели — по вчера
-    has(dom, 'данные Whoop по 23 нояб');
+    hasNot(dom, 'данные Whoop по');                                  // под заголовком — только «обновлено … · Обновить»
   }
   const fresh = data();                                              // новичок: данные Whoop только за сегодня
   fresh.put('whoop_daily.csv', [{date: '2026-11-23', recovery: '60', hrv: '70', rhr: '55', sleep_h: '7.5'}]);

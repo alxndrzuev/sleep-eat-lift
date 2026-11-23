@@ -115,8 +115,7 @@ function summarize(days){
 // ---------- tiles ----------
 function tiles(){
   const cur=period(PER), S=summarize(cur.days), PS=summarize(prevPeriod(cur).days);
-  $('#period').textContent = `${fmtDY(cur.start)} — ${fmtDY(cur.end)}`;   // даты — у кнопок периода
-  $('#sub').textContent = `данные Whoop по ${fmtD(LAST)}`;
+  $('#period').textContent = `${fmtDY(cur.start)} — ${fmtDY(cur.end)}`;   // даты — у кнопок периода; под заголовком — «обновлено» (nav.js)
   const weeks=Math.max(1,S.n/7), plan=k=>PW&&PW[k]!=null?Math.round(weeks*PW[k]):null;
   const st=(ok,warn)=> ok?css('--good'):warn?css('--warning'):css('--critical');
   const vs=(a,b,dg=0)=>{ if(a==null||b==null) return ''; const d=a-b; if(Math.abs(d)<Math.pow(10,-dg)/2) return 'как в прошлый период'; return `${d>0?'↑':'↓'} ${nf(Math.abs(d),dg)} к прошлому`; };

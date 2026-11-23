@@ -64,16 +64,3 @@ test('fatsecret months: from the month of the last update (with overlap), at lea
   assert.deepStrictEqual(updater.fatsecretRange('2023-05-01', now), ['2025-12', '2026-11']);
 });
 
-test('dashboard line: real update time per connected service', () => {
-  const js = load('nav.js');
-  const when = iso => js(`(()=>{const d=new Date(${JSON.stringify(iso)}); return d.toLocaleDateString("ru-RU",{day:"numeric",month:"short"}).replace(".","")+", "+d.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})})()`);
-  const a = '2026-11-22T08:30:00.000Z', b = '2026-11-20T07:00:00.000Z';
-  assert.strictEqual(js(`Nav.syncText({}, [])`), '');
-  assert.strictEqual(js(`Nav.syncText({fatsecret: "${a}", whoop: "${a}"}, ["fatsecret", "photos", "whoop"])`), 'Обновлено ' + when(a));
-  const c = '2026-11-22T08:29:00.000Z';                                        // тот же день — одно время, последнее
-  assert.strictEqual(js(`Nav.syncText({fatsecret: "${c}", whoop: "${a}"}, ["fatsecret", "whoop"])`), 'Обновлено ' + when(a));
-  assert.strictEqual(js(`Nav.syncText({fatsecret: "${a}", whoop: "${b}"}, ["fatsecret", "photos", "whoop"])`),
-    `Обновлено: FatSecret — ${when(a)} · Whoop — ${when(b)}`);
-  assert.strictEqual(js(`Nav.syncText({fatsecret: "${a}"}, ["fatsecret", "whoop"])`), `Обновлено: FatSecret — ${when(a)} · Whoop — ещё не загружен`);
-  assert.strictEqual(js(`Nav.syncText({whoop: "${b}"}, ["photos"])`), '');   // отключённый сервис не показываем
-});
