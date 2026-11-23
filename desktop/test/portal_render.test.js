@@ -198,6 +198,26 @@ test('nutrition calendar: Monday — the new week\'s column with today (day stil
   has(dom, 'data-d="2026-11-22"');
 });
 
+test('Whoop calendars: Monday — today pale and outside the period (only complete days count)', {skip}, () => {
+  const d = data();
+  d.put('whoop_daily.csv', days(23, {recovery: '60', hrv: '70', rhr: '55', sleep_h: '7.5'}));
+  d.put('whoop_workouts.csv', [{id: '1', date: '2026-11-23', start: '2026-11-23 08:00', sport: 'squash', duration_min: '60'}]);
+  for (const page of ['training.html', 'recovery.html']) {
+    const dom = d.page(page, '2026-11-23');                          // понедельник, данные Whoop за сегодня уже есть
+    assert.match(dom, /<rect class="c today" data-d="2026-11-23"/, page);
+    has(dom, '9 нояб. 2026 г. — 22 нояб. 2026 г.');                  // 2 недели — по вчера
+    has(dom, 'данные Whoop по 23 нояб');
+  }
+  const fresh = data();                                              // новичок: данные Whoop только за сегодня
+  fresh.put('whoop_daily.csv', [{date: '2026-11-23', recovery: '60', hrv: '70', rhr: '55', sleep_h: '7.5'}]);
+  for (const page of ['training.html', 'recovery.html']) {
+    const dom = fresh.page(page, '2026-11-23');
+    assert.match(dom, /<rect class="c today" data-d="2026-11-23"/, page);
+    hasNot(dom, 'NaN');
+    assert.doesNotMatch(dom, /width="-/, page);                      // рамка пустого периода не выворачивается
+  }
+});
+
 test('empty nutrition', {skip}, () => {
   has(data().page('nutrition.html'), 'Подключите FatSecret или Whoop');
 });
@@ -229,6 +249,6 @@ test('owner data folder: workout goal, plan, all menu items', {skip}, t => {
   fs.rmSync(base, {recursive: true, force: true});
   const now = store.read(dir, 'targets.csv').filter(r => r.start <= '2026-11-21').pop() || {};
   if (now.strength_wk) has(dom, `/ ${Number(now.strength_wk) * 4}`);
-  has(dom, 'href="training.html"');
+  if (store.read(dir, 'whoop_daily.csv').length) has(dom, 'href="training.html"');   // текущим может быть пустой профиль
   if (store.read(dir, 'plans.csv').length) has(dom, '<h2>План');
 });

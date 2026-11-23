@@ -252,7 +252,7 @@ function heatmap(){
   const cs0=cur.start, ce=cur.end;
   const wA=Math.floor((cs0-gridStart)/DAY/7), wB=Math.floor((ce-gridStart)/DAY/7);
   const pad=2.5;
-  s+=`<rect x="${left+wA*st-pad}" y="${top-pad}" width="${(wB-wA+1)*st-gap+pad*2}" height="${7*st-gap+pad*2}" rx="5" fill="none" stroke="var(--text-primary)" stroke-width="1.5" pointer-events="none"/>`;
+  if(cur.days.length) s+=`<rect x="${left+wA*st-pad}" y="${top-pad}" width="${(wB-wA+1)*st-gap+pad*2}" height="${7*st-gap+pad*2}" rx="5" fill="none" stroke="var(--text-primary)" stroke-width="1.5" pointer-events="none"/>`;
   s+='</svg>';
   el.innerHTML=s;
   calTips(el, ds=>{

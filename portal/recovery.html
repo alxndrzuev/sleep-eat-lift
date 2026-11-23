@@ -164,7 +164,8 @@ if(!PAGE_EMPTY){
 // ---------- helpers ----------
 
 const today = P(DATA.updated);
-const END = (()=>{ const ds=DATA.whoop_daily.map(r=>r.date).sort(); const last=ds.length?P(ds[ds.length-1]):today; return last>today?today:last; })();
+const LAST = (()=>{ const ds=DATA.whoop_daily.map(r=>r.date).sort(); const last=ds.length?P(ds[ds.length-1]):today; return last>today?today:last; })();   // последний день Whoop
+const END = LAST<today ? LAST : addD(today,-1);   // период — только полные дни: сегодняшний ещё идёт (календарь и графики — по LAST)
 const WD = {}; DATA.whoop_daily.forEach(r=>WD[r.date]=r);
 const DAYS = Object.keys(WD).sort();
 const FIRST = DAYS.length ? P(DAYS[0]) : today;
@@ -196,7 +197,7 @@ function summarize(days){
 // ---------- tiles ----------
 function tiles(){
   const cur=period(PER), S=summarize(cur.days), prv=prevPeriod(cur), PS=summarize(prv.days);
-  $('#sub').textContent = `${fmtDY(cur.start)} — ${fmtDY(cur.end)} · ${dni(S.n)} · данные Whoop по ${fmtD(END)}`;
+  $('#sub').textContent = `${fmtDY(cur.start)} — ${fmtDY(cur.end)} · ${dni(S.n)} · данные Whoop по ${fmtD(LAST)}`;
   const st=(ok,warn)=> ok?css('--good'):warn?css('--warning'):css('--critical');
   const arrow=(a,b,dg=0,inv=false)=>{ if(a==null||b==null) return ''; const d=a-b; if(Math.abs(d)<Math.pow(10,-dg)/2) return '· как в прошлый период'; const up=d>0; return `· ${up?'↑':'↓'} ${nf(Math.abs(d),dg)} к прошлому`; };
   const items=[
@@ -215,7 +216,7 @@ function heatmap(){
   const cur=period(PER);
   const el=$('#hm'); const cs=13, gap=3, st=cs+gap, top=18, left=26;
   const first=new Date(FIRST); const gridStart=addD(first,-((first.getDay()+6)%7));
-  const weeks=Math.ceil(((END-gridStart)/DAY+1)/7);
+  const weeks=Math.ceil(((LAST-gridStart)/DAY+1)/7);
   const W=left+weeks*st+4, H=top+7*st+2;
   let s=`<svg width="${W}" height="${H}" role="img" aria-label="Календарь восстановления">`;
   ['пн','','ср','','пт','','вс'].forEach((t,i)=>{ if(t) s+=`<text x="0" y="${top+i*st+cs-2}">${t}</text>`; });
@@ -224,21 +225,22 @@ function heatmap(){
   labs.filter((l,i)=>!labs[i+1]||labs[i+1].w-l.w>=3).forEach(({w,d})=>{ const m=d.toLocaleDateString('ru-RU',{month:'short'}).replace('.',''); s+=`<text x="${left+w*st}" y="11">${d.getMonth()===0||w===0?m+' '+d.getFullYear():m}</text>`; });
   for(let w=0; w<weeks; w++){
     for(let i=0;i<7;i++){
-      const d=addD(gridStart,w*7+i); if(d<first||d>END) continue;
+      const d=addD(gridStart,w*7+i); if(d<first||d>LAST) continue;
       const ds=iso(d), r=WD[ds], z=r?RZ(r.recovery):null, x=left+w*st, y=top+i*st;
-      s+= z ? `<rect class="c" data-d="${ds}" x="${x}" y="${y}" width="${cs}" height="${cs}" rx="3" fill="${RZC[z]()}"/>`
-            : `<rect class="c" data-d="${ds}" x="${x+.75}" y="${y+.75}" width="${cs-1.5}" height="${cs-1.5}" rx="3" fill="var(--page)" stroke="var(--text-muted)" stroke-width="1" stroke-opacity=".35"/>`;
+      const c=d>END?'c today':'c', op=d>END?' fill-opacity=".5"':'';   // сегодня — день ещё идёт: бледнее, в период не входит
+      s+= z ? `<rect class="${c}" data-d="${ds}" x="${x}" y="${y}" width="${cs}" height="${cs}" rx="3" fill="${RZC[z]()}"${op}/>`
+            : `<rect class="${c}" data-d="${ds}" x="${x+.75}" y="${y+.75}" width="${cs-1.5}" height="${cs-1.5}" rx="3" fill="var(--page)" stroke="var(--text-muted)" stroke-width="1" stroke-opacity=".35"/>`;
       if(isAlco(ds)) s+=`<circle cx="${x+cs/2}" cy="${y+cs/2}" r="3" fill="var(--text-primary)" pointer-events="none"/>`;
       else if(isSusp(ds)) s+=`<circle cx="${x+cs/2}" cy="${y+cs/2}" r="2.6" fill="none" stroke="var(--text-primary)" stroke-width="1.3" pointer-events="none"/>`;
     }
   }
   const wA=Math.floor((cur.start-gridStart)/DAY/7), wB=Math.floor((cur.end-gridStart)/DAY/7), pad=2.5;
-  s+=`<rect x="${left+wA*st-pad}" y="${top-pad}" width="${(wB-wA+1)*st-gap+pad*2}" height="${7*st-gap+pad*2}" rx="5" fill="none" stroke="var(--text-primary)" stroke-width="1.5" pointer-events="none"/>`;
+  if(cur.days.length) s+=`<rect x="${left+wA*st-pad}" y="${top-pad}" width="${(wB-wA+1)*st-gap+pad*2}" height="${7*st-gap+pad*2}" rx="5" fill="none" stroke="var(--text-primary)" stroke-width="1.5" pointer-events="none"/>`;
   s+='</svg>';
   el.innerHTML=s;
   calTips(el, ds=>{
     const r=WD[ds], d=P(ds), b=BASE[ds], a=AC[ds];
-    let h=`<div class="t">${fmtW(d)}, ${fmtDY(d)}</div>`;
+    let h=`<div class="t">${fmtW(d)}, ${fmtDY(d)}${d>END?' · сегодня, день ещё идёт':''}</div>`;
     if(r&&r.recovery!=null) h+=`Recovery <b>${r.recovery}%</b> · HRV <b>${nf(r.hrv)}</b>${b?` <span class="muted">(норма ${nf(b.hrv)})</span>`:''}<br>Пульс <b>${r.rhr}</b>${b?` <span class="muted">(норма ${nf(b.rhr)})</span>`:''} · сон <b>${nf(r.sleep_h,1)} ч</b>`;
     else h+='<span class="muted">нет данных Whoop</span>';
     if(a) h+=`<br>${a.status==='да'?'● <b>алкоголь</b> накануне':a.status==='?'?`○ похоже на ${a.kind==='болезнь?'?'болезнь':'алкоголь'} — <b>подтвердить</b>`:'○ проверено: не алкоголь'}${a.hrv_dev_pct?` <span class="muted">(HRV ${a.hrv_dev_pct}%, пульс +${a.rhr_dev})</span>`:''}`;
@@ -255,7 +257,7 @@ function heatmap(){
 function charts(){
   $('#charts').innerHTML=''; JOBS.length=0;
   const cur=period(PER);
-  const from=Math.min(cur.start.getTime(), END.getTime()-27*DAY), to=END.getTime()+DAY;
+  const from=Math.min(cur.start.getTime(), LAST.getTime()-27*DAY), to=LAST.getTime()+DAY;
   const span=(to-from)/DAY;
   const c1=css('--series-1'), c1s=css('--series-1-soft');
   const note=cur.days.length<28?' · показано минимум 4 недели':'';
