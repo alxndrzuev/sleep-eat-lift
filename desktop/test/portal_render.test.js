@@ -166,7 +166,8 @@ test('target set today, diary kept long ago — history not cut', {skip}, () => 
   const dom = d.page('nutrition.html');
   hasNot(dom, '0 дней');
   hasNot(dom, 'NaN');
-  has(dom, '14 дней');
+  has(dom, '14 дней с полными записями');                             // история не обрезана — все 14 дней периода
+  assert.match(dom, /id="period"[^>]*>\d+ \S+ 20\d\d г\. — \d+ \S+ 20\d\d г\./);
 });
 
 test('targets of the last 2 weeks under the calendar', {skip}, () => {

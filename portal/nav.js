@@ -124,7 +124,7 @@ var Nav = (function () {
     sub.style.display = "inline";                       // текст периода страница пишет в #sub; строка обновления — сразу за ним
     const line = document.createElement("span");
     line.className = "sub updl";
-    line.innerHTML = ' · <span id="upd"></span> · <button class="lnk" id="updbtn" title="Загрузить свежие данные из FatSecret и Whoop">Обновить</button>';
+    line.innerHTML = '<span class="sep"> · </span><span id="upd"></span> · <button class="lnk" id="updbtn" title="Загрузить свежие данные из FatSecret и Whoop">Обновить</button>';
     sub.insertAdjacentElement("afterend", line);
     const show = s => {
       const t = statusText(s), u = document.getElementById("upd"), b = document.getElementById("updbtn");
@@ -160,7 +160,8 @@ var Nav = (function () {
     ".lnk{all:unset;cursor:pointer;color:var(--text-secondary);text-decoration:underline}.lnk:disabled{opacity:.45;cursor:default}" +
     ".profs-new{display:flex;gap:8px;margin-top:14px}.profs-new input{flex:1}.profs-new button{font:inherit;padding:5px 14px;border-radius:8px;" +
     "border:1px solid var(--series-1);background:var(--series-1);color:#fff;font-weight:600;cursor:pointer}.profs-new button:disabled{opacity:.5}" +
-    ".profs-err{color:var(--critical);margin-top:8px;min-height:1em;font-size:13px}";
+    ".profs-err{color:var(--critical);margin-top:8px;min-height:1em;font-size:13px}" +
+    "#sub:empty+.updl>.sep{display:none}";   // строка под заголовком пустая — «обновлено …» без точки впереди
   function profStyle() {
     if (document.getElementById("profstyle")) return;
     const st = document.createElement("style"); st.id = "profstyle"; st.textContent = PROF_CSS; document.head.appendChild(st);

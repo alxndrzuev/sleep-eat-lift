@@ -100,3 +100,12 @@ test('«Обновить данные» is not in the top menu: time and the but
   // на «Питании» «обновлено» было датой открытия страницы, а не загрузки — теперь настоящее время из строки обновления
   assert.ok(!source('nutrition.html').includes('обновлено ${fmtDY(today)}'));
 });
+
+test('period dates sit next to the period buttons, not under the heading; no «N дней»', () => {
+  for (const p of ['nutrition.html', 'training.html', 'recovery.html']) {
+    const h = source(p);
+    assert.match(h, /<div class="controls">\s*<span class="period" id="period"><\/span>/, p);
+    assert.ok(!h.includes('dni(S.n)'), p);
+    assert.ok(h.includes("$('#period').textContent"), p);
+  }
+});
