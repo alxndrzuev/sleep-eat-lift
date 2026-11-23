@@ -36,8 +36,8 @@ let ROOT = TEST ? store.dataDir(process.env.HEALTH_DOCUMENTS) : null;
 let DATA = null, PROFILE = null;
 let firstRun = null;                             // экран имени профиля: 'migrate' (данные 1.x), 'new', 'adopt' (старое в корне)
 let signingIn = 0;                               // идёт вход в FatSecret или Whoop (окно и обмен кодом) — профиль не переключаем
-let removing = false;
-const firstOpen = profiles.firstOpen();          // данные профиля обновляем при первом открытии за запуск, не при каждом переключении                            // профиль уезжает в Корзину — не обновлять и не переключать
+let removing = false;                            // профиль уезжает в Корзину — не обновлять и не переключать
+const firstOpen = profiles.firstOpen();          // данные профиля обновляем при первом открытии за запуск, не при каждом переключении
 const secretsDir = () => path.join(DATA, 'secrets');
 const START = 'app://h/portal/' + (process.env.HEALTH_PAGE || 'dashboard.html');
 let win = null;
@@ -130,7 +130,7 @@ function reload() { if (win && !win.isDestroyed()) win.webContents.reload(); }
 /** Спросить, где хранить данные (первый запуск, папка пропала или «Сменить папку»). → путь папки data или null. */
 async function askDataDir({missing = null, change = false} = {}) {
   const def = datadir.defaultDir(app.getPath('documents'));
-  const defHas = datadir.hasCsv(def);
+  const defHas = datadir.hasData(def);              // данные 1.x (CSV) или 2.0 (профили)
   for (;;) {
     const {response} = await dialog.showMessageBox(win && !win.isDestroyed() ? win : undefined, {
       type: 'question', title: 'SEL',
@@ -227,7 +227,10 @@ function useProfile(id) {
   const wasFirst = !DATA || firstRun;
   firstRun = null;
   openProfile(id);
-  if (wasFirst || win.webContents.getURL().includes('/profile.html')) win.loadURL(START); else reload();
+  if (wasFirst || win.webContents.getURL().includes('/profile.html')) {
+    win.webContents.once('did-finish-load', () => win.webContents.navigationHistory.clear());   // «Назад» — не на экран имени
+    win.loadURL(START);
+  } else reload();
   if (firstOpen(id)) updateAll();
   return {id};
 }

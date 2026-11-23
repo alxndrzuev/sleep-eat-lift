@@ -125,3 +125,8 @@ test('theme is chosen in «Настройки» (light / dark / auto), not by a 
   assert.match(s, /<div class="seg" id="themes">\s*<button data-t="light">Светлая<\/button><button data-t="dark">Тёмная<\/button><button data-t="auto">Авто<\/button>/);
   assert.ok(source('photos.html').includes(':root[data-theme="dark"] .viz-root'), '«Фото» — и выбранная тёмная тема');
 });
+
+test('name screen opened again (e.g. «Назад» after the first launch) with a profile already open → goes to the dashboard', () => {
+  const h = source('profile.html');
+  assert.match(h, /health\.profiles\(\)\.then\(i => \{ if \(i\.current\) location\.replace\('dashboard\.html'\)/);
+});

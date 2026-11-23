@@ -47,4 +47,12 @@ function check(appDir, values) {
   }
 }
 
-module.exports = {secretValues, check, files};
+/** Секреты всей папки данных: корневой secrets/ и secrets/ каждого профиля (с 2.0 токены людей — в profiles/<id>/secrets). */
+function dataSecretValues(root, appFields) {
+  if (!root) return [];
+  const {list, dir} = require('../profiles');
+  const dirs = [path.join(root, 'secrets'), ...list(root).map(p => path.join(dir(root, p.id), 'secrets'))];
+  return [...new Set(dirs.filter(d => fs.existsSync(d)).flatMap(d => secretValues(d, appFields)))];
+}
+
+module.exports = {secretValues, dataSecretValues, check, files};

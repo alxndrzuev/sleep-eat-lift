@@ -518,7 +518,8 @@ $("view").addEventListener("click", async e => {
   const b = e.target.closest("[data-w]");
   if (!b) return;
   e.preventDefault();
-  const d = b.dataset.w, v = await Nav.ask(`Вес на ${fmt(d)}, кг`, weightFor(d));
+  // в поле — вес, что показан под снимком (если взвешивания ровно в эту дату нет — ближайшее); сохранится на дату серии
+  const d = b.dataset.w, shown = kgOf(S(d)), v = await Nav.ask(`Вес на ${fmt(d)}, кг`, weightFor(d) || (shown ? String(shown).replace(".", ",") : ""));
   if (v === null || !v.trim()) return;
   const failed = [];
   if (await saveWeight(d, v, failed)) setIndex(window.PHOTOS_INDEX); else alert(failed[0].error);

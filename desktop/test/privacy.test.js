@@ -50,3 +50,17 @@ test('check: planted token or personal path fails', () => {
   for (const bad of ['data/body.csv', 'portal/data.js', 'docs/x.md', 'CLAUDE.md', '.git/HEAD', 'tests/t.py', 'data/photos/a.jpg'])
     assert.throws(() => privacy.check(app({[bad]: 'x'}), []), /личное/, bad);
 });
+
+test('dataSecretValues: tokens of every profile (2.0 keeps them in profiles/<id>/secrets), app keys in the root skipped', () => {
+  const profiles = require('../profiles');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'health-root-'));
+  fs.mkdirSync(path.join(root, 'secrets'));
+  fs.writeFileSync(path.join(root, 'secrets', 'whoop_app.json'), JSON.stringify({client_id: 'wid-12345678', client_secret: 'wsec-12345678'}));
+  const a = profiles.create(root, 'Анна', '2026-11-23'), b = profiles.create(root, 'Борис', '2026-11-23');
+  fs.writeFileSync(path.join(a.dir, 'secrets', 'whoop.json'), JSON.stringify({refresh_token: 'rt-anna-12345678'}));
+  fs.writeFileSync(path.join(b.dir, 'secrets', 'fatsecret.json'), JSON.stringify({access_token: 'at-boris-12345678', access_secret: 'as-boris-12345678'}));
+  const fields = {fatsecret: ['consumer_key', 'consumer_secret'], whoop: ['client_id', 'client_secret', 'redirect_uri']};
+  const v = privacy.dataSecretValues(root, fields).sort();
+  assert.deepStrictEqual(v, ['as-boris-12345678', 'at-boris-12345678', 'rt-anna-12345678']);
+  assert.deepStrictEqual(privacy.dataSecretValues(null, fields), []);
+});

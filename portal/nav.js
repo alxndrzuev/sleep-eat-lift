@@ -224,7 +224,10 @@ var Nav = (function () {
         if (name === null || name === cur) return;
         r = await H.renameProfile(b.dataset.ren, name);
       } else if (b.dataset.del) {
-        const p = await H.profileInfo(b.dataset.del);
+        const busy = pageBusy();
+        if (busy) { err("Сейчас нельзя удалить профиль: " + busy); return; }
+        let p;
+        try { p = await H.profileInfo(b.dataset.del); } catch (x) { err("Профиль не найден — возможно, его папку убрали вне SEL"); draw(); return; }
         if (!confirm(`Удалить профиль «${p.name}»?\n\nПапка с его данными и фото (снимков: ${p.photos}) уйдёт в Корзину — оттуда её ещё можно вернуть.`)) return;
         r = await H.removeProfile(b.dataset.del);
       }
@@ -316,11 +319,10 @@ var Nav = (function () {
     const a = themeAttr(m), r = document.documentElement;
     if (a) r.dataset.theme = a; else delete r.dataset.theme;
   }
-  /** Выбрать тему (из «Настроек»): запомнить и применить; onTheme — перерисовать графики страницы. */
+  /** Выбрать тему (из «Настроек»): запомнить и применить. Графики других страниц возьмут её при открытии. */
   function setTheme(m) {
     try { if (themeAttr(m)) localStorage.setItem("theme", m); else localStorage.removeItem("theme"); } catch (e) {}
     applyTheme(m);
-    if (typeof window.onTheme === "function") window.onTheme();
   }
 
   if (typeof document !== "undefined") {

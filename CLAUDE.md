@@ -39,7 +39,7 @@ portal/                  ← страницы приложения: dashboard.ht
                            Ещё в common.js: периоды кнопок #range — periodDays/prevDays, плитки #tiles — tileCards.
                            **Текст из CSV и от сервисов (заметки, вид спорта, описания) — в innerHTML только через esc()** (тест RENDER=1);
                            RAW (сырые таблицы) — app://h/data/data.js: main.js собирает из CSV при открытии страницы (store.dataJs),
-                           на диске файла нет; dataset.js — расчёт DATA из RAW; nav.js — меню по данным, «Обновить данные», статус, подвалы fatsecret/Whoop
+                           на диске файла нет; dataset.js — расчёт DATA из RAW; nav.js — меню по данным, профили (меню, окно «Профили…», Nav.ask вместо prompt), тема, «обновлено · Обновить» под заголовком, подвалы fatsecret/Whoop
                            photos_core.js (логика, тесты в Node) + photos_app.js (загрузка, HEIC, поиск фигуры, выравнивание)
                            photos_fs.js — папка фото в приложении · vendor/ — библиотеки «Фото» (MediaPipe, libheif, exifr; в git, ~35 МБ)
 scripts/                 ← Node без зависимостей (берёт модули из desktop/) — служебное

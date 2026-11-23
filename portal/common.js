@@ -171,5 +171,4 @@ function boot(render, onRange, init){
   if(init) init();
   render();
   let rz; addEventListener('resize',()=>{clearTimeout(rz); rz=setTimeout(render,150)});
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>render()); // цвета графиков берутся из темы при отрисовке
 }

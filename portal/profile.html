@@ -44,6 +44,8 @@
   $('#why').textContent = WHY[mode] || WHY.new;
   $('#skip').hidden = mode !== 'adopt';
   if (!window.health) { $('#err').textContent = 'Профили есть только в приложении SEL'; $('#go').disabled = true; return; }
+  // профиль уже открыт (вернулись сюда «Назад» после первого запуска) — этот экран не нужен: иначе «Создать» заведёт пустой профиль
+  window.health.profiles().then(i => { if (i.current) location.replace('dashboard.html'); });
   $('#form').onsubmit = async e => {
     e.preventDefault();
     $('#go').disabled = true; $('#err').textContent = '';

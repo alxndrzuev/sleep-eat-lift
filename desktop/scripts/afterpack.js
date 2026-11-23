@@ -18,7 +18,7 @@ exports.default = async function (ctx) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'health-asar-'));
   asar.extractAll(path.join(res, 'app.asar'), path.join(tmp, 'app'));
   fs.cpSync(path.join(res, 'portal'), path.join(tmp, 'portal'), {recursive: true});
-  const values = privacy.secretValues(require('../keys').dataSecrets(), FIELDS);
+  const values = privacy.dataSecretValues(require('../datadir').configured(), FIELDS);   // корень и все профили
   privacy.check(tmp, values);
   fs.rmSync(tmp, {recursive: true, force: true});
   // macOS вешает на файлы в «Документах» служебные атрибуты — codesign их не принимает («detritus not allowed»)
