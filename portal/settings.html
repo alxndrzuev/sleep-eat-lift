@@ -31,7 +31,7 @@
   .goals{grid-template-columns:repeat(2,minmax(0,1fr))}
   .g-body,.g-train{grid-column:1/-1}
 }
-.form input,.goals input,.code input,#profName{font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-0,transparent);color:var(--text-primary)}
+.form input,.goals input,.code input{font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-0,transparent);color:var(--text-primary)}
 .btn{border:1px solid var(--border);background:var(--series-1);color:#fff;border-radius:8px;padding:6px 14px;font:inherit;cursor:pointer}
 .btn.plain{background:var(--surface-1);color:var(--text-secondary)}
 .btn:disabled{opacity:.5;cursor:default}
@@ -58,13 +58,6 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
 <div id="outside" class="card" hidden><h2>Настройки есть только в приложении SEL</h2></div>
 
 <div id="app" hidden>
-  <div class="card" id="profiles">
-    <h2>Профили</h2>
-    <div class="desc">Один профиль — один человек: у каждого свои питание, сон, тренировки, фото и подключения FatSecret и Whoop. Переключаться — в меню справа вверху; всё на этой странице относится к открытому профилю.</div>
-    <table class="hist" id="profList"></table>
-    <div class="svc" style="margin-top:12px"><input id="profName" maxlength="40" placeholder="Имя нового профиля"><button class="btn" id="profAdd">Создать профиль</button></div>
-    <div class="err" id="profErr" hidden></div>
-  </div>
   <div class="card" id="fatsecret">
     <h2>FatSecret</h2>
     <div class="desc">Питание и вес — из вашего дневника FatSecret. Нажмите «Подключить», войдите в FatSecret и разрешите доступ.</div>
@@ -200,42 +193,6 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
   }
   H.status().then(show); H.onStatus(show);
 
-  // ---------- профили ----------
-  const profErr = t => { const e = $('#profErr'); e.hidden = !t; e.textContent = t || ''; };
-  async function profilesCard() {
-    const info = await H.profiles();
-    $('#profList').innerHTML = info.list.map(p => `<tr${p.id === info.current ? ' class="now"' : ''}><td>${esc(p.name)}</td>
-      <td>${p.id === info.current ? 'открыт' : `<button class="linkbtn" data-open="${esc(p.id)}"${info.locked ? ' disabled' : ''}>открыть</button>`}</td>
-      <td><button class="linkbtn" data-ren="${esc(p.id)}">переименовать</button></td>
-      <td>${info.list.length > 1 ? `<button class="linkbtn" data-del="${esc(p.id)}"${info.locked ? ' disabled' : ''}>удалить</button>` : ''}</td></tr>`).join('');
-    if (info.locked) profErr(info.locked);
-  }
-  profilesCard(); H.onStatus(() => profilesCard());
-  $('#profList').onclick = async e => {
-    const b = e.target.closest('button'); if (!b || b.disabled) return;
-    profErr('');
-    let r;
-    if (b.dataset.open) r = await H.switchProfile(b.dataset.open);
-    else if (b.dataset.ren) {
-      const cur = b.closest('tr').cells[0].textContent, name = await Nav.ask('Новое имя профиля', cur);
-      if (name === null || name === cur) return;
-      r = await H.renameProfile(b.dataset.ren, name);
-      if (r.ok) { location.reload(); return; }                         // имя — и в меню вверху
-    } else if (b.dataset.del) {
-      const p = await H.profileInfo(b.dataset.del);
-      if (!confirm(`Удалить профиль «${p.name}»?\n\nПапка с его данными и фото (снимков: ${p.photos}) уйдёт в Корзину — оттуда её ещё можно вернуть.`)) return;
-      r = await H.removeProfile(b.dataset.del);
-      if (r.ok) { location.reload(); return; }
-    }
-    if (r && !r.ok) profErr(r.error);
-  };
-  $('#profAdd').onclick = async () => {
-    profErr('');
-    $('#profAdd').disabled = true;                                    // двойной клик не создаёт два профиля
-    const r = await H.createProfile($('#profName').value);           // получилось — приложение откроет новый профиль
-    $('#profAdd').disabled = false;
-    if (!r.ok) profErr(r.error);
-  };
   for (const name of ['fatsecret', 'whoop']) {
     $('#' + name + ' .connect').onclick = async () => err(name, await H.connect(name));
     $('#' + name + ' .disconnect').onclick = () => H.disconnect(name);

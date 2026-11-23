@@ -77,11 +77,12 @@ test('profile.html — the name screen: no menu, name field up to 40, creates th
   for (const m of ['migrate', 'new', 'adopt']) assert.ok(h.includes(`${m}:`), m);
 });
 
-test('settings: «Профили» is the first card of the app part; photos page reports when it is writing', () => {
+test('settings are only about the open profile: no profiles card there (it is a window from the menu); photos report writing', () => {
   const h = source('settings.html');
-  const app = h.slice(h.indexOf('<div id="app"'));
-  assert.match(app.slice(0, 400), /<div class="card" id="profiles">/);
-  for (const call of ['H.renameProfile(', 'H.removeProfile(', 'H.profileInfo(', 'H.createProfile(']) assert.ok(h.includes(call), call);
+  assert.ok(!h.includes('id="profiles"'));
+  for (const call of ['renameProfile(', 'removeProfile(', 'createProfile(']) assert.ok(!h.includes(call), call);
+  const nav = source('nav.js');
+  for (const call of ['renameProfile(', 'removeProfile(', 'profileInfo(', 'createProfile(']) assert.ok(nav.includes(call), call);
   assert.ok(source('photos.html').includes('window.pageBusy'));
 });
 

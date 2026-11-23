@@ -77,7 +77,8 @@ test('profile menu: names escaped, current marked, new and «Профили…»
   assert.match(h, /data-prof="a"[^>]*aria-current="true"/);
   assert.ok(!/data-prof="b"[^>]*aria-current/.test(h));
   assert.ok(h.includes('data-prof-new'));
-  assert.ok(h.includes('href="settings.html#profiles"'));
+  assert.ok(h.includes('data-prof-manage'));                         // «Профили…» — окно управления, не «Настройки»
+  assert.ok(!h.includes('settings.html'));
   assert.ok(!h.includes('disabled'));
 });
 
@@ -106,4 +107,18 @@ test('ask dialog lives inside .viz-root (theme colours and font are defined ther
   const src = require('node:fs').readFileSync(require('node:path').join(ROOT, 'portal', 'nav.js'), 'utf8');
   const ask = src.slice(src.indexOf('function ask('), src.indexOf('function profileMenu('));
   assert.match(ask, /document\.querySelector\("\.viz-root"\) \|\| document\.body\)\.appendChild\(d\)/);
+});
+
+test('profiles window table: names escaped, current «открыт», delete only when more than one, locked → disabled', () => {
+  const h = js(`Nav.profilesTable({list: [{id: 'a', name: '<i>Ив</i>'}, {id: 'b', name: 'Мария'}], current: 'a', locked: null})`);
+  assert.ok(h.includes('&lt;i&gt;Ив&lt;/i&gt;') && !h.includes('<i>Ив'));
+  assert.ok(h.includes('открыт'));
+  assert.ok(!h.includes('data-open="a"') && h.includes('data-open="b"'));
+  assert.ok(h.includes('data-ren="a"') && h.includes('data-ren="b"'));
+  assert.ok(h.includes('data-del="a"') && h.includes('data-del="b"'));
+  const one = js(`Nav.profilesTable({list: [{id: 'a', name: 'Ив'}], current: 'a', locked: null})`);
+  assert.ok(!one.includes('data-del'));
+  const locked = js(`Nav.profilesTable({list: [{id: 'a', name: 'Ив'}, {id: 'b', name: 'М'}], current: 'a', locked: 'Идёт обновление'})`);
+  assert.match(locked, /data-open="b"[^>]*disabled/);
+  assert.match(locked, /data-del="b"[^>]*disabled/);
 });

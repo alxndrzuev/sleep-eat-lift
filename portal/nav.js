@@ -151,7 +151,15 @@ var Nav = (function () {
     "dialog.ask input{font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--page);color:var(--text-primary)}" +
     ".ask-b{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}.ask-b button{font:inherit;padding:5px 14px;border-radius:8px;" +
     "border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);cursor:pointer}" +
-    ".ask-b button[value=ok]{background:var(--series-1);border-color:var(--series-1);color:#fff;font-weight:600}";
+    ".ask-b button[value=ok]{background:var(--series-1);border-color:var(--series-1);color:#fff;font-weight:600}" +
+    "dialog.profs{width:min(600px,92vw)}.profs-h{display:flex;justify-content:space-between;align-items:center;font-size:17px;margin-bottom:6px}" +
+    ".profs-x{all:unset;cursor:pointer;width:28px;height:28px;text-align:center;line-height:28px;border-radius:50%;border:1px solid var(--border);color:var(--text-secondary)}" +
+    ".profs-d{color:var(--text-secondary);font-size:13px;margin-bottom:10px}.profs-t{border-collapse:collapse;width:100%}" +
+    ".profs-t td{padding:8px 14px 8px 0;border-bottom:1px solid var(--border)}.profs-t tr.now td:first-child{font-weight:600}" +
+    ".lnk{all:unset;cursor:pointer;color:var(--text-secondary);text-decoration:underline}.lnk:disabled{opacity:.45;cursor:default}" +
+    ".profs-new{display:flex;gap:8px;margin-top:14px}.profs-new input{flex:1}.profs-new button{font:inherit;padding:5px 14px;border-radius:8px;" +
+    "border:1px solid var(--series-1);background:var(--series-1);color:#fff;font-weight:600;cursor:pointer}.profs-new button:disabled{opacity:.5}" +
+    ".profs-err{color:var(--critical);margin-top:8px;min-height:1em;font-size:13px}";
   function profStyle() {
     if (document.getElementById("profstyle")) return;
     const st = document.createElement("style"); st.id = "profstyle"; st.textContent = PROF_CSS; document.head.appendChild(st);
@@ -183,7 +191,66 @@ var Nav = (function () {
       (info.locked ? `<div class="prof-lock">${escH(info.locked)}</div>` : "") +
       list.map(p => `<button data-prof="${escH(p.id)}"${p.id === info.current ? ' aria-current="true"' : ""}${p.id === info.current ? "" : off}>` +
         `${p.id === info.current ? "✓ " : ""}${escH(p.name)}</button>`).join("") +
-      `<hr><button data-prof-new${off}>Новый профиль…</button><a href="settings.html#profiles">Профили…</a></div></details>`;
+      `<hr><button data-prof-new${off}>Новый профиль…</button><button data-prof-manage>Профили…</button></div></details>`;
+  }
+
+  /** Строки таблицы окна «Профили»: имя, открыт/открыть, переименовать, удалить (если профилей больше одного). */
+  function profilesTable(info) {
+    const list = info.list || [], off = info.locked ? " disabled" : "";
+    return list.map(p => { const id = escH(p.id), cur = p.id === info.current;
+      return `<tr${cur ? ' class="now"' : ""}><td>${escH(p.name)}</td>` +
+        `<td>${cur ? "открыт" : `<button class="lnk" data-open="${id}"${off}>открыть</button>`}</td>` +
+        `<td><button class="lnk" data-ren="${id}">переименовать</button></td>` +
+        `<td>${list.length > 1 ? `<button class="lnk" data-del="${id}"${off}>удалить</button>` : ""}</td></tr>`; }).join("");
+  }
+
+  /** Окно «Профили» (из меню справа сверху): список, открыть, переименовать, удалить, создать. changed() — обновить меню. */
+  function profilesWindow(changed) {
+    profStyle();
+    const H = window.health, d = document.createElement("dialog");
+    d.className = "ask profs";
+    d.innerHTML = `<div class="profs-h"><b>Профили</b><button type="button" class="profs-x" data-close aria-label="Закрыть" title="Закрыть (Esc)">✕</button></div>
+      <div class="profs-d">Один профиль — один человек: у каждого свои питание, сон, тренировки, фото и подключения FatSecret и Whoop.</div>
+      <table class="profs-t"></table>
+      <form class="profs-new"><input maxlength="40" placeholder="Имя нового профиля" autocomplete="off"><button>Создать профиль</button></form>
+      <div class="profs-err"></div>`;
+    const $ = q => d.querySelector(q), err = t => { $(".profs-err").textContent = t || ""; };
+    const draw = () => H.profiles().then(info => { $(".profs-t").innerHTML = profilesTable(info); if (info.locked) err(info.locked); });
+    d.addEventListener("click", async e => {
+      if (e.target === d || e.target.closest("[data-close]")) { d.close(); return; }   // клик по затемнению или ✕
+      const b = e.target.closest("button.lnk");
+      if (!b || b.disabled) return;
+      err("");
+      let r;
+      if (b.dataset.open) {
+        const busy = pageBusy();
+        if (busy) { err("Сейчас нельзя сменить профиль: " + busy); return; }
+        r = await H.switchProfile(b.dataset.open);                       // получилось — приложение перезагрузит страницу
+      } else if (b.dataset.ren) {
+        const cur = b.closest("tr").cells[0].textContent, name = await ask("Новое имя профиля", cur);
+        if (name === null || name === cur) return;
+        r = await H.renameProfile(b.dataset.ren, name);
+      } else if (b.dataset.del) {
+        const p = await H.profileInfo(b.dataset.del);
+        if (!confirm(`Удалить профиль «${p.name}»?\n\nПапка с его данными и фото (снимков: ${p.photos}) уйдёт в Корзину — оттуда её ещё можно вернуть.`)) return;
+        r = await H.removeProfile(b.dataset.del);
+      }
+      if (r && !r.ok) err(r.error); else { draw(); changed(); }
+    });
+    $(".profs-new").onsubmit = async e => {
+      e.preventDefault();
+      const busy = pageBusy();
+      if (busy) { err("Сейчас нельзя сменить профиль: " + busy); return; }
+      const btn = $(".profs-new button");
+      btn.disabled = true; err("");                                      // двойной клик не создаёт два профиля
+      const r = await H.createProfile($(".profs-new input").value);    // получилось — приложение откроет новый профиль
+      btn.disabled = false;
+      if (!r.ok) err(r.error);
+    };
+    d.addEventListener("close", () => d.remove());
+    (document.querySelector(".viz-root") || document.body).appendChild(d);   // цвета темы и шрифт заданы на .viz-root
+    draw();
+    d.showModal();
   }
 
   /** Страница сейчас что-то пишет (например, «Фото» — снимки) → причина, иначе "": тогда профиль не переключаем. */
@@ -216,6 +283,7 @@ var Nav = (function () {
     box.addEventListener("click", async e => {
       const b = e.target.closest("button");
       if (!b || b.disabled) return;
+      if (b.hasAttribute("data-prof-manage")) { box.querySelector("details").open = false; profilesWindow(refresh); return; }
       const busy = pageBusy();
       if (busy) { alert("Сейчас нельзя сменить профиль: " + busy); return; }
       let r;
@@ -251,5 +319,5 @@ var Nav = (function () {
     render();
     if (inApp()) { appBar(); profileBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, syncText, dataErrors, profileMenu, ask, NAMES, MARK, mark, logo, logoSvg};
+  return {items, title, render, inApp, statusText, syncText, dataErrors, profileMenu, profilesTable, ask, NAMES, MARK, mark, logo, logoSvg};
 })();
