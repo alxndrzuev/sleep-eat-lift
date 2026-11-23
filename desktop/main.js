@@ -114,14 +114,29 @@ async function connect(name) {
   } catch (e) { return {ok: false, error: e.message}; }
 }
 
+/** Ключи по коду: вход в окне SEL (token — с адреса возврата; код — если окно «по коду») или ссылка профиля для другого человека. */
 async function finishFatSecret(verifier, token) {
-  const t = pending.fatsecret, save = keys.saver('fatsecret');
+  const dir = DATA, save = keys.saver('fatsecret');
+  const byLink = !token && !(pending.fatsecret && pending.fatsecret.oob) && fatsecret.link.read(dir);
+  const t = byLink || pending.fatsecret;
   if (!t || (token && token !== t.token)) return {ok: false, error: 'Вход устарел — нажмите «Подключить» ещё раз'};
-  const user = await fatsecret.accessToken(appKey('fatsecret', {packaged: app.isPackaged}), t.token, t.secret, verifier);
-  delete pending.fatsecret;
+  let user;
+  try { user = await fatsecret.accessToken(appKey('fatsecret', {packaged: app.isPackaged}), t.token, t.secret, verifier); }
+  catch (e) { throw token ? e : fatsecret.codeError(e); }            // код ввели руками — неверный или ссылка устарела
+  if (byLink) fatsecret.link.clear(dir); else delete pending.fatsecret;
   if (!save(user)) return {ok: false, cancelled: true};               // пока шёл вход, нажали «Отключить»
   const r = await updateAll('fatsecret');
   return {ok: true, update: r.fatsecret};
+}
+
+/** Ссылка для входа другого человека в свой FatSecret: он пришлёт код, код вводится в этом профиле (новая заменяет прежнюю). */
+async function makeFatSecretLink() {
+  const key = appKey('fatsecret', {packaged: app.isPackaged}), dir = need();
+  if (!key) return {ok: false, error: 'В приложении нет ключа FatSecret'};
+  const t = await fatsecret.requestToken(key, 'oob');
+  delete pending.fatsecret;                                           // код теперь — к ссылке
+  fatsecret.link.save(dir, Object.assign(t, {url: fatsecret.authorizeUrl(t.token)}));
+  return {ok: true};
 }
 
 function reload() { if (win && !win.isDestroyed()) win.webContents.reload(); }
@@ -166,14 +181,15 @@ async function resolveDataDir() {
 
 // ---------- статус и IPC для страниц ----------
 function status() {
-  if (!DATA) return {version: app.getVersion(), dataDir: ROOT, profile: null, modules: [], updating: false, services: {}, oob: false};
+  if (!DATA) return {version: app.getVersion(), dataDir: ROOT, profile: null, modules: [], updating: false, services: {}, oob: false, fatsecretLink: null};
   const svc = {};
   for (const name of Object.keys(services))
     svc[name] = Object.assign({connected: services[name].connected(), hasKey: !!appKey(name, {packaged: app.isPackaged})},
                               updater.status[name], {lastUpdate: updater.status[name].lastUpdate || store.readSync(DATA)[name] || null});
   return {version: app.getVersion(), dataDir: DATA, profile: {id: PROFILE, name: (profiles.readMeta(ROOT, PROFILE) || {}).name || PROFILE}, modules: store.modules(DATA), updating: updater.busy, services: svc,
-          oob: !!(pending.fatsecret && pending.fatsecret.oob)};
+          oob: !!(pending.fatsecret && pending.fatsecret.oob), fatsecretLink: fsLinkStatus()};
 }
+function fsLinkStatus() { const l = fatsecret.link.read(DATA); return l ? {url: l.url, created: l.created} : null; }
 function pushStatus() { if (win && !win.isDestroyed()) win.webContents.send('health:status', status()); }
 
 async function updateAll(first) {
@@ -276,6 +292,10 @@ function setupIpc() {
   ipc('health:code', async v => {
     try { const r = await signIn(() => finishFatSecret(String(v || ''))); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
   });
+  ipc('health:fsLink', async () => {
+    try { const r = await signIn(makeFatSecretLink); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
+  });
+  ipc('health:fsLinkCancel', () => { fatsecret.link.clear(need()); pushStatus(); return {ok: true}; });
   ipc('health:disconnect', s => { if (s in services) keys.clear(s); pushStatus(); reload(); return {ok: true}; });
   ipc('health:targets', v => settings.saveTargets(need(), v || {}, today()));
   ipc('health:removeTarget', (kind, date) => settings.removeTarget(need(), String(kind), String(date)));

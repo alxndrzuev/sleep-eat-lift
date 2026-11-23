@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld('health', {
   update: () => ipcRenderer.invoke('health:update'),
   connect: service => ipcRenderer.invoke('health:connect', service),
   codeEntered: verifier => ipcRenderer.invoke('health:code', verifier),
+  // FatSecret другого человека: ссылка для входа у него (код он пришлёт — вводится тем же codeEntered), отменить ссылку
+  fatsecretLink: () => ipcRenderer.invoke('health:fsLink'),
+  fatsecretLinkCancel: () => ipcRenderer.invoke('health:fsLinkCancel'),
   disconnect: service => ipcRenderer.invoke('health:disconnect', service),
   saveTargets: vals => ipcRenderer.invoke('health:targets', vals),
   removeTarget: (kind, date) => ipcRenderer.invoke('health:removeTarget', kind, date),

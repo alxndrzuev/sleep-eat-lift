@@ -1,6 +1,8 @@
 // FatSecret в приложении: OAuth 1.0 (подпись HMAC-SHA1, три шага) и выгрузка питания и веса (прежде — scripts/fatsecret_api.py; эталоны — test/fixtures).
 // Ключ приложения (consumer) — внутри приложения; ключ доступа пользователя — data/secrets/fatsecret.json.
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const store = require('./store');
 const {pyRound} = require('./pyround');
 
@@ -9,7 +11,8 @@ const AUTH = 'https://authentication.fatsecret.com/oauth';
 const CALLBACK = 'https://health.local/fatsecret';
 const TIMEOUT = 30000;              // мс на запрос вместе с ответом: зависшая сеть — ошибка «нет связи», а не вечное «обновляю…»
 const TEXTS = {network: 'Нет связи с FatSecret — попробуйте позже',
-               token: 'Доступ к FatSecret пропал — подключите заново'};
+               token: 'Доступ к FatSecret пропал — подключите заново',
+               code: 'Код не подошёл или ссылка устарела — проверьте код или сделайте новую ссылку'};
 
 class FatSecretError extends Error {
   constructor(kind, detail) { super(TEXTS[kind] || `FatSecret ответил ошибкой: ${detail}`); this.kind = kind; }
@@ -62,6 +65,32 @@ async function accessToken(app, token, secret, verifier, deps) {
   if (!a.oauth_token) throw new FatSecretError('api', 'нет access_token');
   return {access_token: a.oauth_token, access_secret: a.oauth_token_secret};
 }
+
+/** Ошибка обмена кода на ключи: ответ FatSecret с ошибкой — неверный код или устаревшая ссылка; нет связи — как есть. */
+const codeError = e => (e instanceof FatSecretError && e.kind === 'api' ? new FatSecretError('code') : e);
+
+// ---------- ссылка для другого человека ----------
+// Вход «по коду» (oob), начатый ссылкой: человек входит в свой FatSecret у себя и присылает код, а он может прийти через
+// часы — поэтому незаконченный вход лежит в папке профиля (secrets/fatsecret_link.json), а не в памяти.
+const linkFile = dir => path.join(dir, 'secrets', 'fatsecret_link.json');
+const link = {
+  save(dir, {token, secret, url}, now = new Date()) {
+    const f = linkFile(dir);
+    fs.mkdirSync(path.dirname(f), {recursive: true, mode: 0o700});
+    fs.writeFileSync(f + '.tmp', JSON.stringify({token, secret, url, created: now.toISOString()}, null, 2), {mode: 0o600});
+    fs.renameSync(f + '.tmp', f);
+    fs.chmodSync(f, 0o600);
+  },
+  /** {token, secret, url, created} или null (нет, битый). */
+  read(dir) {
+    if (!dir) return null;
+    try {
+      const j = JSON.parse(fs.readFileSync(linkFile(dir), 'utf8'));
+      return j && typeof j.token === 'string' && typeof j.secret === 'string' && j.token && j.secret ? j : null;
+    } catch (e) { return null; }
+  },
+  clear(dir) { fs.rmSync(linkFile(dir), {force: true}); },
+};
 
 // ---------- выгрузка ----------
 const EPOCH = Date.UTC(1970, 0, 1);
@@ -119,4 +148,4 @@ async function update({dir, app, user, months: [a, b], fetch, timeout}) {
   return {ok: true, days: Object.keys(food).length, weights: Object.keys(wt).length};
 }
 
-module.exports = {FatSecretError, signedUrl, enc, call, requestToken, authorizeUrl, accessToken, month, weights, months, update, CALLBACK, TEXTS};
+module.exports = {FatSecretError, signedUrl, enc, call, requestToken, authorizeUrl, accessToken, codeError, link, month, weights, months, update, CALLBACK, TEXTS};

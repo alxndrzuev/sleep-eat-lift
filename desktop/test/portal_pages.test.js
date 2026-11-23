@@ -130,3 +130,14 @@ test('name screen opened again (e.g. «Назад» after the first launch) with
   const h = source('profile.html');
   assert.match(h, /health\.profiles\(\)\.then\(i => \{ if \(i\.current\) location\.replace\('dashboard\.html'\)/);
 });
+
+test('FatSecret of another person: link and its code on «Настройки», link URL only as a field value', () => {
+  const s = source('settings.html');
+  for (const call of ['H.fatsecretLink()', 'H.fatsecretLinkCancel()', 'H.codeEntered(']) assert.ok(s.includes(call), call);
+  assert.ok(s.includes("$('#fslinkurl').value = link.url"), 'ссылка — в value поля, не в innerHTML');
+  assert.ok(!/innerHTML[^;]*link\./.test(s));
+  const pre = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
+  for (const ch of ["'health:fsLink'", "'health:fsLinkCancel'"]) assert.ok(pre.includes(ch), ch);
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  for (const ch of ["ipc('health:fsLink'", "ipc('health:fsLinkCancel'", 'fatsecretLink: fsLinkStatus()']) assert.ok(main.includes(ch), ch);
+});

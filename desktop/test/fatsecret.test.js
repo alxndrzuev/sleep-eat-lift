@@ -118,3 +118,24 @@ test('hung request or body → network error after the timeout, files untouched'
     assert.strictEqual(fs.readFileSync(path.join(dir, 'nutrition_daily.csv'), 'utf8'), before);
   }
 });
+
+test('link for another person: saved in the profile secrets (600), read back, broken file → none, cleared', () => {
+  const dir = tmp();
+  assert.strictEqual(fs_.link.read(dir), null);
+  fs_.link.save(dir, {token: 'rt', secret: 'rs', url: fs_.authorizeUrl('rt')}, new Date('2026-11-24T10:00:00Z'));
+  const f = path.join(dir, 'secrets', 'fatsecret_link.json');
+  assert.strictEqual(fs.statSync(f).mode & 0o777, 0o600);
+  assert.deepStrictEqual(fs_.link.read(dir), {token: 'rt', secret: 'rs', url: 'https://authentication.fatsecret.com/oauth/authorize?oauth_token=rt',
+                                               created: '2026-11-24T10:00:00.000Z'});
+  for (const bad of ['{', '{"token":"rt"}', '[]']) { fs.writeFileSync(f, bad); assert.strictEqual(fs_.link.read(dir), null, bad); }
+  fs_.link.clear(dir);
+  assert.ok(!fs.existsSync(f));
+  fs_.link.clear(dir);                                         // нет файла — не ошибка
+});
+
+test('wrong code or stale link → plain text; network error stays as is', () => {
+  const api = fs_.codeError(new fs_.FatSecretError('api', 'HTTP 401: Invalid token'));
+  assert.strictEqual(api.message, 'Код не подошёл или ссылка устарела — проверьте код или сделайте новую ссылку');
+  const net = new fs_.FatSecretError('network');
+  assert.strictEqual(fs_.codeError(net), net);
+});

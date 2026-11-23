@@ -36,6 +36,9 @@
 .btn.plain{background:var(--surface-1);color:var(--text-secondary)}
 .btn:disabled{opacity:.5;cursor:default}
 .ok{color:var(--good)}
+.fslink{margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px}
+.fslink .row{display:flex;gap:8px;align-items:center;margin:8px 0 4px}
+.fslink input{flex:1;min-width:0;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface-0,transparent);color:var(--text-primary)}
 table.hist{border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
 table.hist th,table.hist td{text-align:left;padding:5px 14px 5px 0;border-bottom:1px solid var(--border)}
 table.hist th{font-weight:500;color:var(--text-secondary);font-size:13px}
@@ -61,8 +64,14 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
   <div class="card" id="fatsecret">
     <h2>FatSecret</h2>
     <div class="desc">Питание и вес — из вашего дневника FatSecret. Нажмите «Подключить», войдите в FatSecret и разрешите доступ.</div>
-    <div class="svc"><span class="state"></span><button class="btn connect">Подключить FatSecret</button><button class="btn plain refresh" hidden>Обновить данные</button><button class="btn plain disconnect">Отключить</button><span class="muted last"></span></div>
-    <div class="code" hidden style="margin-top:8px">Код со страницы FatSecret: <input id="fscode" size="12"> <button class="btn" id="fscodebtn">Готово</button></div>
+    <div class="svc"><span class="state"></span><button class="btn connect">Подключить FatSecret</button><button class="btn plain" id="fslinkbtn">Ссылка для другого человека</button><button class="btn plain refresh" hidden>Обновить данные</button><button class="btn plain disconnect">Отключить</button><span class="muted last"></span></div>
+    <div class="fslink" hidden>
+      <div class="muted">Отправьте ссылку человеку, чей FatSecret подключаете: он откроет её у себя, войдёт в свой FatSecret,
+        разрешит доступ и пришлёт код со страницы — введите его ниже. Питание и вес лягут в этот профиль<span id="fslinkwho"></span>.</div>
+      <div class="row"><input id="fslinkurl" readonly> <button class="btn" id="fslinkcopy">Скопировать</button> <button class="btn plain" id="fslinkcancel">Отменить</button></div>
+      <div class="muted" id="fslinkwhen"></div>
+    </div>
+    <div class="code" hidden style="margin-top:8px"><span id="fscodelabel">Код со страницы FatSecret:</span> <input id="fscode" size="12"> <button class="btn" id="fscodebtn">Готово</button></div>
     <div class="err" hidden></div>
   </div>
 
@@ -189,7 +198,19 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
   function show(s) {
     showService('fatsecret', s.services.fatsecret, s);
     showService('whoop', s.services.whoop, s);
-    $('#fatsecret .code').hidden = !s.oob;
+    // ссылка для другого человека (пока FatSecret не подключён); код — к входу в окне SEL или к ссылке
+    const fsv = s.services.fatsecret || {}, link = !fsv.connected && s.fatsecretLink;
+    $('#fslinkbtn').hidden = fsv.connected || !fsv.hasKey;
+    $('#fslinkbtn').disabled = s.updating;
+    $('#fslinkbtn').textContent = link ? 'Новая ссылка' : 'Ссылка для другого человека';
+    $('#fatsecret .fslink').hidden = !link;
+    if (link) {
+      if ($('#fslinkurl').value !== link.url) $('#fslinkurl').value = link.url;
+      $('#fslinkwho').textContent = s.profile ? ' — «' + s.profile.name + '»' : '';
+      $('#fslinkwhen').textContent = 'Ссылка сделана ' + when(link.created) + '. Если код не подойдёт — сделайте новую.';
+    }
+    $('#fscodelabel').textContent = !s.oob && link ? 'Код от человека:' : 'Код со страницы FatSecret:';
+    $('#fatsecret .code').hidden = fsv.connected || !(s.oob || link);
     $('#about').innerHTML = Nav.logo(48);
     $('#version').textContent = 'Версия ' + s.version;
     $('#datadir').textContent = s.dataDir || '';
@@ -210,7 +231,21 @@ table.hist input[type=date]{font:inherit;font-size:13px;padding:2px 4px;border:1
     $('#' + name + ' .disconnect').onclick = () => H.disconnect(name);
     const rf = $('#' + name + ' .refresh'); if (rf) rf.onclick = () => H.update();
   }
-  $('#fscodebtn').onclick = async () => err('fatsecret', await H.codeEntered($('#fscode').value));
+  $('#fscodebtn').onclick = async () => {
+    const r = await H.codeEntered($('#fscode').value);
+    if (r && r.ok) $('#fscode').value = '';
+    err('fatsecret', r);
+  };
+  $('#fslinkbtn').onclick = async () => {
+    $('#fatsecret .err').hidden = true;
+    err('fatsecret', await H.fatsecretLink());
+  };
+  $('#fslinkcopy').onclick = async () => {
+    try { await navigator.clipboard.writeText($('#fslinkurl').value); $('#fslinkcopy').textContent = 'Скопировано'; }
+    catch (e) { $('#fslinkurl').select(); }                     // не скопировалось — выделить, ⌘C
+    setTimeout(() => { $('#fslinkcopy').textContent = 'Скопировать'; }, 1500);
+  };
+  $('#fslinkcancel').onclick = () => H.fatsecretLinkCancel();
 
   // цели: текущие значения — из последних строк targets.csv и goal_weight.csv
   const last = (rows, k) => rows.slice().sort((a, b) => (a[k] < b[k] ? -1 : 1)).pop();
