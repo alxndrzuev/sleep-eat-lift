@@ -42,6 +42,7 @@
       "pyround.js",
       "keys.js",
       "datadir.js",
+      "profiles.js",
       "alcohol.js",
       "secrets.js",
       "changelog.js",
