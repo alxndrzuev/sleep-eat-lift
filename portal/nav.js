@@ -197,10 +197,12 @@ var Nav = (function () {
     const box = document.createElement("span");
     box.style.marginLeft = nav.querySelector(".app") ? "12px" : "auto";
     nav.appendChild(box);
+    // обновить список, не трогая сам <details>: заменить его или поставить open заново — это снова «toggle» → refresh →
+    // бесконечная перерисовка, кнопки всё время новые, и клик по ним не срабатывает
     const draw = info => {
-      const open = box.querySelector("details[open]");
-      box.innerHTML = profileMenu(info);
-      if (open) box.querySelector("details").open = true;
+      const t = document.createElement("span"), old = box.querySelector("details");
+      t.innerHTML = profileMenu(info);
+      if (old) old.replaceChildren(...t.firstChild.childNodes); else box.appendChild(t.firstChild);
     };
     const refresh = () => window.health.profiles().then(draw);
     refresh();

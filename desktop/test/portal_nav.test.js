@@ -94,3 +94,10 @@ test('profile menu closes on a click outside it and on Esc (not only on its own 
   assert.match(bar, /addEventListener\("click", e => \{ if \(!box\.contains\(e\.target\)\) close\(\)/);
   assert.match(bar, /e\.key === "Escape"/);
 });
+
+test('profile menu refresh keeps its <details> (re-creating or re-opening it fires «toggle» again — an endless redraw)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(ROOT, 'portal', 'nav.js'), 'utf8');
+  const draw = src.slice(src.indexOf('const draw = info =>'), src.indexOf('const refresh ='));
+  assert.ok(draw.includes('replaceChildren('), draw);
+  assert.ok(!/\.open = true/.test(draw) && !/box\.innerHTML =/.test(draw), draw);
+});
