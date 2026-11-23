@@ -93,4 +93,89 @@ async function remove(root, id, trash) {
   await trash(dir(root, id));
 }
 
-module.exports = {slug, cleanName, dir, list, create, rename, pick, photoCount, remove, readMeta, writeMeta, PROFILES};
+// ---------- перенос 1.x: данные лежали прямо в корне ----------
+const CSV = Object.keys(store.SCHEMA.schema);
+/** Что приложение знает и переносит в профиль; всё остальное в корне не трогает. */
+const KNOWN = [...CSV, 'sync.json', 'photos', 'docs', 'README.md', path.join('secrets', 'fatsecret.json'), path.join('secrets', 'whoop.json')];
+const APP_FIELDS = {fatsecret: ['consumer_key', 'consumer_secret'], whoop: ['client_id', 'client_secret', 'redirect_uri']};
+
+const readJson = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (e) { return null; } };
+
+/** Строк в CSV корня (без заголовка); испорченный — по числу непустых строк. */
+function rowsIn(f) {
+  if (!fs.existsSync(f)) return 0;
+  return fs.readFileSync(f, 'utf8').split('\n').slice(1).filter(l => l.trim()).length;
+}
+
+/** Обновление с 1.x: в корне CSV из схемы, а профилей нет. */
+function needsMigration(root) {
+  return CSV.some(f => fs.existsSync(path.join(root, f))) && list(root).length === 0;
+}
+
+/** Ключи приложений из старых файлов с токенами → корневой secrets/<name>_app.json (если его ещё нет). */
+function splitAppKeys(root) {
+  for (const [name, fields] of Object.entries(APP_FIELDS)) {
+    const out = path.join(root, 'secrets', `${name}_app.json`), src = readJson(path.join(root, 'secrets', `${name}.json`));
+    if (fs.existsSync(out) || !src) continue;
+    const k = {};
+    for (const f of fields) if (typeof src[f] === 'string' && src[f].trim()) k[f] = src[f];
+    if (!k[fields[0]] || !k[fields[1]]) continue;
+    fs.writeFileSync(out + '.tmp', JSON.stringify(k, null, 2) + '\n');
+    fs.renameSync(out + '.tmp', out);
+  }
+}
+
+/** Переместить знакомое из корня в папку профиля (rename); нет источника или цель уже есть — пропуск. */
+function moveKnown(root, d) {
+  splitAppKeys(root);
+  for (const rel of KNOWN) {
+    const from = path.join(root, rel), to = path.join(d, rel);
+    if (!fs.existsSync(from) || fs.existsSync(to)) continue;
+    fs.mkdirSync(path.dirname(to), {recursive: true});
+    fs.renameSync(from, to);
+  }
+}
+
+/** Перенос в профиль id, отмеченный migrating: довести и снять отметку. */
+function finish(root, id) {
+  const d = dir(root, id);
+  moveKnown(root, d);
+  store.init(d);
+  const m = readMeta(root, id);
+  delete m.migrating;
+  writeMeta(root, id, m);
+  return {id, dir: d};
+}
+
+/** Новый профиль из данных корня: отметка migrating → перенос → снять отметку. */
+function intoNew(root, name, today) {
+  const n = cleanName(name);
+  const base = path.join(root, PROFILES);
+  const id = slug(n, new Set(fs.existsSync(base) ? fs.readdirSync(base) : []));
+  fs.mkdirSync(dir(root, id), {recursive: true});
+  writeMeta(root, id, {name: n, created: today, migrating: true});
+  return finish(root, id);
+}
+
+/** Обновление с 1.x: данные корня → новый профиль name. */
+function migrate(root, name, today) { return intoNew(root, name, today); }
+
+/** Прерванный перенос (профиль с migrating) — довести; → id или null. */
+function resume(root) {
+  const p = list(root).find(x => x.migrating);
+  return p ? finish(root, p.id).id : null;
+}
+
+/** Профили уже есть, а в корне CSV со строками (запускали 1.x, вернули копию) → {rows, sig} или null. */
+function oldRootData(root) {
+  if (!list(root).length) return null;
+  const withRows = CSV.map(f => [f, rowsIn(path.join(root, f))]).filter(([, n]) => n > 0);
+  if (!withRows.length) return null;
+  const sig = JSON.stringify(withRows.map(([f]) => { const st = fs.statSync(path.join(root, f)); return [f, st.size, st.mtimeMs]; }));
+  return {rows: withRows.reduce((a, [, n]) => a + n, 0), sig};
+}
+
+/** Старые данные корня → новый профиль (пустые CSV корня, созданные 1.x, переезжают вместе с ними). */
+function adoptOld(root, name, today) { return intoNew(root, name, today); }
+
+module.exports = {needsMigration, migrate, resume, oldRootData, adoptOld, KNOWN, slug, cleanName, dir, list, create, rename, pick, photoCount, remove, readMeta, writeMeta, PROFILES};
