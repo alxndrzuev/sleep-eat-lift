@@ -33,7 +33,7 @@ docs/                    ← 06 фото: как снимать и разбир�
 desktop/                 ← ПРИЛОЖЕНИЕ SEL (Electron) — основной интерфейс, см. «Приложение»
 portal/                  ← страницы приложения: dashboard.html (сводка), nutrition.html, training.html, recovery.html, photos.html, settings.html,
                            whatsnew.html (вся история версий) + whatsnew.js (окно «Что нового» после обновления, на всех страницах)
-                           common.css + common.js — тема, каркас, движок графиков; пустая страница (data-needs) → «Подключите…»
+                           common.css + common.js — цвета темы, каркас, движок графиков (тему светлая/тёмная/авто применяет nav.js, выбор — «Настройки» → «Оформление»); пустая страница (data-needs) → «Подключите…»
                            Календарь (.hm: SVG-ячейки <rect class="c" data-d>) — типовой элемент: подсказка только через
                            calTips(el, ds=>html) из common.js (живёт вне прокрутки, у нижних ячеек — над ячейкой); свою не писать (тест)
                            Ещё в common.js: периоды кнопок #range — periodDays/prevDays, плитки #tiles — tileCards.
