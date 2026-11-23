@@ -5,10 +5,10 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 const store = require('../store');
-const {dataDir} = require('../../scripts/csv');
+const {profileDir} = require('../../scripts/csv');
 const {ROOT} = require('./_portal');
 
-const DIR = dataDir();
+const DIR = profileDir();                                       // текущий профиль (у 1.x — сам корень)
 const skip = !(DIR && fs.existsSync(DIR)) && 'нет папки данных на этом компьютере';
 const SCHEMA = store.SCHEMA;
 const TEXT = new Set(SCHEMA.text);

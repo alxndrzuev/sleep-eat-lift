@@ -9,7 +9,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
-const {dataDir} = require('./csv');
+const {rootDir, allDirs} = require('./csv');
 
 const ROOT = path.join(__dirname, '..');
 const DATE = /^\d{4}-\d{2}-\d{2}([T ][\d:.]+)?(Z|[+-]\d{2}:?\d{2})?$/;
@@ -72,9 +72,10 @@ function contents(root, p) {
   return out;
 }
 
-/** [[файл, вид]] — что из папки данных нашлось в файлах (в рабочей копии или в индексе). */
+/** [[файл, вид]] — что из папки данных нашлось в файлах (в рабочей копии или в индексе).
+ *  data — папка или список папок (корень и все профили: csv.allDirs). */
 function leaks(root, files, data) {
-  const ns = [...needles(data)].map(([s, kind]) => [Buffer.from(s), kind]);
+  const ns = [].concat(data).flatMap(d => [...needles(d)]).map(([s, kind]) => [Buffer.from(s), kind]);
   const out = [];
   for (const p of files) {
     const bufs = contents(root, p);
@@ -96,13 +97,13 @@ function authorOk(root) {
 }
 
 function main() {
-  const data = dataDir();
+  const data = rootDir();
   if (!data || (!fs.existsSync(path.join(data, 'secrets')) && !list(data, '.csv').length)) {
     console.log(`Папка данных не найдена (${data || 'не выбрана в SEL'}) — сверять не с чем`);
     return 0;
   }
   const files = publicFiles(ROOT);
-  const found = leaks(ROOT, files, data);
+  const found = leaks(ROOT, files, allDirs(data));
   for (const [p, kind] of found) console.log(`ЛИЧНОЕ: ${p} — ${kind}`);
   for (const p of symlinks(ROOT)) {
     console.log(`ЛИЧНОЕ: ${p} — ссылка в git (путь этого компьютера): git rm --cached ${p}`);

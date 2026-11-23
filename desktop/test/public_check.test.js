@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const pc = require('../../scripts/public_check');
-const {dataDir} = require('../../scripts/csv');
+const {rootDir, allDirs: csvAll} = require('../../scripts/csv');
 
 function fixture() {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-data-')), repo = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-repo-'));
@@ -34,9 +34,21 @@ test('dates and clean text pass', () => {
   assert.deepStrictEqual(fixture()('2026-11-22T10:00:00Z · date,weight_kg · обычный код'), []);
 });
 
-const data = dataDir();
+const data = rootDir();
 test('project has no personal data from the data folder', {skip: !(data && fs.existsSync(path.join(data, 'secrets'))) && 'нет папки данных на этом компьютере'}, () => {
-  assert.deepStrictEqual(pc.leaks(pc.ROOT, pc.publicFiles(pc.ROOT), data), []);
+  assert.deepStrictEqual(pc.leaks(pc.ROOT, pc.publicFiles(pc.ROOT), csvAll(data)), []);
+});
+
+test('leaks: values from every profile of the data folder are looked for', () => {
+  const profiles = require('../profiles');
+  const store = require('../store');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-prof-')), repo = fs.mkdtempSync(path.join(os.tmpdir(), 'pc-prof-repo-'));
+  profiles.create(root, 'Анна', '2026-11-23');
+  const b = profiles.create(root, 'Борис', '2026-11-23');
+  store.upsert(b.dir, 'body.csv', {'2026-11-21': {weight_kg: 70, note: 'секретная заметка Бориса'}});
+  fs.writeFileSync(path.join(repo, 'x.md'), 'тут 2026-11-21,70,секретная заметка Бориса');
+  const found = pc.leaks(repo, ['x.md'], csvAll(root));
+  assert.deepStrictEqual(found.map(f => f[0]), ['x.md']);
 });
 
 test('tracked symlinks are reported (a link carries a local path into the public repo)', () => {

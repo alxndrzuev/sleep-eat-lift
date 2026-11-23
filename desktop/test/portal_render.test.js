@@ -8,7 +8,7 @@ const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const {spawnSync} = require('node:child_process');
 const store = require('../store');
-const {dataDir} = require('../../scripts/csv');
+const {profileDir} = require('../../scripts/csv');
 const {PORTAL, source} = require('./_portal');
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -213,7 +213,7 @@ test('escaped: sport name on «Тренировки»', {skip}, () => {
 });
 
 test('owner data folder: workout goal, plan, all menu items', {skip}, t => {
-  const dir = dataDir();
+  const dir = profileDir();
   if (!dir || !fs.existsSync(path.join(dir, 'targets.csv'))) return t.skip('нет папки данных');
   const base = site(dir);                                            // настоящие данные — только читаем
   const dom = render(base, 'dashboard.html');
