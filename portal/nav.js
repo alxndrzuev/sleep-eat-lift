@@ -221,7 +221,7 @@ var Nav = (function () {
       let r;
       if (b.hasAttribute("data-prof-new")) {
         box.querySelector("details").open = false;
-        const name = await ask("Имя нового профиля (например, имя клиента)");
+        const name = await ask("Имя нового профиля");
         if (name === null) return;
         r = await window.health.createProfile(name);
       } else if (b.getAttribute("aria-current")) { box.querySelector("details").open = false; return; }
