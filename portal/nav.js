@@ -136,6 +136,64 @@ var Nav = (function () {
     document.getElementById("updbtn").onclick = () => window.health.update();
   }
 
+  // ---------- профили (только в приложении): имя текущего ▾ справа в меню ----------
+  const escH = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"})[c]);
+  const PROF_CSS = ".prof{position:relative;font-size:13px}.prof summary{list-style:none;cursor:pointer;padding:3px 10px;border-radius:6px;" +
+    "border:1px solid var(--border);color:var(--text-primary);background:var(--surface-1);white-space:nowrap}.prof summary::-webkit-details-marker{display:none}" +
+    ".prof-list{position:absolute;right:0;top:calc(100% + 4px);z-index:40;min-width:220px;background:var(--surface-1);border:1px solid var(--border);" +
+    "border-radius:10px;padding:6px;box-shadow:0 6px 24px rgba(0,0,0,.15);display:flex;flex-direction:column}" +
+    ".prof-list button,.prof-list a{all:unset;cursor:pointer;padding:6px 10px;border-radius:6px;color:var(--text-primary)}" +
+    ".prof-list button:hover:not(:disabled),.prof-list a:hover{background:var(--page)}.prof-list button:disabled{opacity:.45;cursor:default}" +
+    ".prof-list [aria-current]{font-weight:600}.prof-list hr{border:0;border-top:1px solid var(--border);margin:4px 0}" +
+    ".prof-lock{padding:4px 10px 6px;color:var(--text-secondary);font-size:12px;max-width:240px}";
+
+  /** Меню профилей: {list: [{id, name}], current, locked: причина или null} → HTML (имена — только через escH). */
+  function profileMenu(info) {
+    const list = info.list || [], cur = list.find(p => p.id === info.current), off = info.locked ? " disabled" : "";
+    return `<details class="prof"><summary title="Профиль — чьи данные открыты">${escH(cur ? cur.name : "Профиль")} ▾</summary><div class="prof-list">` +
+      (info.locked ? `<div class="prof-lock">${escH(info.locked)}</div>` : "") +
+      list.map(p => `<button data-prof="${escH(p.id)}"${p.id === info.current ? ' aria-current="true"' : ""}${p.id === info.current ? "" : off}>` +
+        `${p.id === info.current ? "✓ " : ""}${escH(p.name)}</button>`).join("") +
+      `<hr><button data-prof-new${off}>Новый профиль…</button><a href="settings.html#profiles">Профили…</a></div></details>`;
+  }
+
+  /** Страница сейчас что-то пишет (например, «Фото» — снимки) → причина, иначе "": тогда профиль не переключаем. */
+  const pageBusy = () => (typeof window.pageBusy === "function" && window.pageBusy()) || "";
+
+  function profileBar() {
+    const nav = document.getElementById("nav");
+    if (!nav || !inApp() || !window.health.profiles) return;
+    if (!document.getElementById("profstyle")) {
+      const st = document.createElement("style"); st.id = "profstyle"; st.textContent = PROF_CSS; document.head.appendChild(st);
+    }
+    nav.style.alignItems = "center";
+    const box = document.createElement("span");
+    box.style.marginLeft = nav.querySelector(".app") ? "12px" : "auto";
+    nav.appendChild(box);
+    const draw = info => {
+      const open = box.querySelector("details[open]");
+      box.innerHTML = profileMenu(info);
+      if (open) box.querySelector("details").open = true;
+    };
+    const refresh = () => window.health.profiles().then(draw);
+    refresh();
+    box.addEventListener("toggle", e => { if (e.target.open) refresh(); }, true);
+    box.addEventListener("click", async e => {
+      const b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      const busy = pageBusy();
+      if (busy) { alert("Сейчас нельзя сменить профиль: " + busy); return; }
+      let r;
+      if (b.hasAttribute("data-prof-new")) {
+        const name = prompt("Имя нового профиля (например, имя клиента)");
+        if (name === null) return;
+        r = await window.health.createProfile(name);
+      } else if (b.getAttribute("aria-current")) { box.querySelector("details").open = false; return; }
+      else r = await window.health.switchProfile(b.dataset.prof);
+      if (r && !r.ok) { alert(r.error); refresh(); }
+    });
+  }
+
   function footer() {
     if (!inApp() || typeof DATA === "undefined") return;
     const cur = location.pathname.split("/").pop() || "dashboard.html", m = DATA.modules || [];
@@ -155,7 +213,7 @@ var Nav = (function () {
 
   if (typeof document !== "undefined") {
     render();
-    if (inApp()) { appBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
+    if (inApp()) { appBar(); profileBar(); if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", footer); else footer(); }
   }
-  return {items, title, render, inApp, statusText, syncText, dataErrors, NAMES, MARK, mark, logo, logoSvg};
+  return {items, title, render, inApp, statusText, syncText, dataErrors, profileMenu, NAMES, MARK, mark, logo, logoSvg};
 })();

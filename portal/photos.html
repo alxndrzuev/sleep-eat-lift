@@ -267,6 +267,8 @@ function message(title, html) {
 }
 const failText = e => esc(e && e.message || e);
 window.addEventListener("beforeunload", e => { if (busy) { e.preventDefault(); e.returnValue = ""; } });
+/** Пока снимки пишутся в папку профиля, меню (nav.js) не переключает профиль. */
+window.pageBusy = () => busy ? "идёт запись фото — дождитесь конца" : "";
 
 $("uploadBtn").onclick = () => $("fileInput").click();
 $("fileInput").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) openUpload(f); };

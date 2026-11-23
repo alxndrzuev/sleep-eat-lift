@@ -76,3 +76,11 @@ test('profile.html — the name screen: no menu, name field up to 40, creates th
   assert.ok(h.includes('health.skipAdopt('));
   for (const m of ['migrate', 'new', 'adopt']) assert.ok(h.includes(`${m}:`), m);
 });
+
+test('settings: «Профили» is the first card of the app part; photos page reports when it is writing', () => {
+  const h = source('settings.html');
+  const app = h.slice(h.indexOf('<div id="app"'));
+  assert.match(app.slice(0, 400), /<div class="card" id="profiles">/);
+  for (const call of ['H.renameProfile(', 'H.removeProfile(', 'H.profileInfo(', 'H.createProfile(']) assert.ok(h.includes(call), call);
+  assert.ok(source('photos.html').includes('window.pageBusy'));
+});

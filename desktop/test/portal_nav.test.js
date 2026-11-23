@@ -69,3 +69,21 @@ test('broken data file: one line for every page, file and line named', () => {
   assert.strictEqual(js('Nav.dataErrors(["nutrition_daily.csv, строка 3: «kcal» = «abc» — не число"])'),
     'Не читается файл в папке данных — эти данные не показаны, пока его не поправить: nutrition_daily.csv, строка 3: «kcal» = «abc» — не число');
 });
+
+test('profile menu: names escaped, current marked, new and «Профили…» links', () => {
+  const h = js(`Nav.profileMenu({list: [{id: 'a', name: '<b>Ив</b>'}, {id: 'b', name: 'Мария'}], current: 'a', locked: null})`);
+  assert.ok(h.includes('&lt;b&gt;Ив&lt;/b&gt;'));
+  assert.ok(!h.includes('<b>Ив'));
+  assert.match(h, /data-prof="a"[^>]*aria-current="true"/);
+  assert.ok(!/data-prof="b"[^>]*aria-current/.test(h));
+  assert.ok(h.includes('data-prof-new'));
+  assert.ok(h.includes('href="settings.html#profiles"'));
+  assert.ok(!h.includes('disabled'));
+});
+
+test('profile menu while locked: items disabled, the reason is shown', () => {
+  const h = js(`Nav.profileMenu({list: [{id: 'a', name: 'Ив'}, {id: 'b', name: 'Мария'}], current: 'a', locked: 'Идёт обновление данных'})`);
+  assert.ok(h.includes('Идёт обновление данных'));
+  assert.match(h, /data-prof="b"[^>]*disabled/);
+  assert.match(h, /data-prof-new[^>]*disabled/);
+});
