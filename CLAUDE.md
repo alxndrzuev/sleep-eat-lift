@@ -50,6 +50,8 @@ scripts/                 ← Node без зависимостей (берёт м
                            (папка и список профилей); пишет в текущий профиль, другой — `--profile <id>`
   vendor_fetch.js        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
   public_check.js        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
+  photos_bench.js        ← проверочный набор фото (распознавание позы, выравнивание): fetch · detect · eval → отчёт;
+                           набор вне проекта (~/Documents/SEL/photo-bench), поиск фигуры — desktop/bench/ (не часть приложения) — docs/06
 dist/                    ← собранные приложения (не в git): dist/<версия>/ — release-notes.md + zip Mac + exe Windows;
                            dist/dev/ — проверочная сборка, пока есть «Не выпущено» (scripts/dist.js, тест)
 ```
