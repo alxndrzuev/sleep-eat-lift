@@ -18,6 +18,17 @@ test('pages load data, dataset and common in order', () => {
   }
 });
 
+test('nutrition loads the food week after common', () => {
+  order(source('nutrition.html'), ['<script src="common.js"></script>', '<script src="foodweek.js"></script>']);
+});
+
+test('food week dialog sits inside .viz-root (theme colours and font live there)', () => {
+  const h = source('nutrition.html'), i = h.indexOf('<div class="viz-root">'), j = h.indexOf('id="foodweek"');
+  assert.ok(i >= 0 && j > i);
+  const seg = h.slice(i, j);
+  assert.ok((seg.match(/<div\b/g) || []).length > (seg.match(/<\/div>/g) || []).length, 'диалог вне .viz-root');
+});
+
 test('photos page scripts: data, photo index, logic, processing — in order', () => {
   const h = source('photos.html');
   order(h, ['<script src="../data/data.js"></script>', '<script src="dataset.js"></script>', '<script src="../data/photos/photos.js"></script>',

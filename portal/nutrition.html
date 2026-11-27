@@ -84,6 +84,33 @@
 .tl .v{font-size:15px;font-weight:600;margin:1px 0;font-variant-numeric:tabular-nums}
 .tl .v span{font-weight:500;color:var(--text-secondary)}
 .tl .n{font-size:13px;color:var(--text-secondary)}
+/* окно недели с продуктами (кнопка «Подробно» у «Последних 2 недель») — одна неделя таблицей: скрин для тренера */
+.last2 h3{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.fw-more{border:1px solid var(--border);background:none;color:var(--text-secondary);border-radius:7px;padding:2px 10px;font:inherit;font-size:12px;cursor:pointer}
+.fw-more:hover{color:var(--text-primary)}
+.last2 .d[data-d]:not(.future){cursor:pointer}
+.fw-dialog{border:1px solid var(--border);border-radius:14px;padding:14px 16px;width:min(1400px,96vw);max-width:96vw;max-height:92vh;
+  background:var(--surface-1);color:var(--text-primary);display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.25)}
+.fw-dialog:not([open]){display:none}
+.fw-dialog::backdrop{background:rgba(0,0,0,.35)}
+.fw-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.fw-close{border:1px solid var(--border);background:none;color:var(--text-secondary);border-radius:8px;padding:5px 14px;font:inherit;cursor:pointer}
+.fw-body{overflow:auto;min-height:0}
+.fw-sheet h2{font-size:17px;margin:0 0 10px}
+.fw-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.fw-day{border:1px solid var(--border);border-radius:10px;padding:7px 8px;font-size:12px;line-height:1.3;overflow-wrap:anywhere;min-width:0}
+.fw-day.future{opacity:.35}
+.fw-dh{display:flex;gap:7px;margin-bottom:2px}
+.fw-dh .sw{width:5px;border-radius:3px;flex:none;min-height:34px}
+.fw-dh .dt{color:var(--text-secondary)}
+.fw-dh .dt b{color:var(--text-primary);font-weight:600}
+.fw-day .k{font-weight:650;font-size:14px;font-variant-numeric:tabular-nums}
+.fw-day .k small{font-weight:400;color:var(--text-muted);font-size:11px}
+.fw-day .m{color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.fw-ml{color:var(--text-muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 2px}
+.fw-it{padding:1px 0}
+.fw-it span{color:var(--text-muted)}
+.fw-note{color:var(--text-muted);margin-top:6px}
 .badge{font-size:11.5px;border-radius:6px;padding:1px 7px;border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap;margin-left:6px;font-weight:500}
 </style>
 </head>
@@ -139,6 +166,13 @@
 
 <footer>Данные: FatSecret (через API, обновляется ежедневно). «Полный день» — записано от 1200 ккал. Цвет дня — по белкам, жирам и углеводам (калории не влияют), решает самый далёкий от цели: все в пределах ±15% — «выполнил», до ±30% — «рядом с целью», дальше — «мимо цели». Файл автономный: все данные внутри, в интернет ничего не отправляется.</footer>
 </div>
+<dialog class="fw-dialog" id="foodweek" aria-label="Питание по неделям">
+  <div class="fw-head">
+    <div class="seg" id="fwseg"><button data-w="0">прошлая неделя</button><button data-w="1" class="on">эта неделя</button></div>
+    <button class="fw-close" type="button">Закрыть</button>
+  </div>
+  <div class="fw-body" id="fwbody"></div>
+</dialog>
 </div>
 
 <script src="../data/data.js"></script>
@@ -146,6 +180,7 @@
 <script src="nav.js"></script>
 <script src="whatsnew.js"></script>
 <script src="common.js"></script>
+<script src="foodweek.js"></script>
 <script>
 if(!PAGE_EMPTY){
 
@@ -340,18 +375,49 @@ function last2(){
   const now=today, wk0=addD(now,-((now.getDay()+6)%7)), starts=[addD(wk0,-7), wk0];
   const cell=d=>{ const ds=iso(d), r=ROWS[ds], k=status(ds), fut=d>now, isToday=ds===iso(now);
     const dt=`<div class="dt"><b>${fmtW(d)}</b><br>${fmtD(d)}</div>`;
-    if(fut) return `<div class="d future"><span class="sw"></span>${dt}</div>`;
+    if(fut) return `<div class="d future" data-d="${ds}"><span class="sw"></span>${dt}</div>`;
     const sw=`<span class="sw" style="${k==='empty'?'box-shadow:inset 0 0 0 1.5px var(--text-muted)':'background:'+ST[k].col()}"></span>`;
-    if(!r||!r.k) return `<div class="d empty" title="${ST.empty.lab}">${sw}${dt}<div class="k">${isToday?'сегодня — пока пусто':'не записывал'}</div></div>`;
+    if(!r||!r.k) return `<div class="d empty" data-d="${ds}" title="${ST.empty.lab}">${sw}${dt}<div class="k">${isToday?'сегодня — пока пусто':'не записывал'}</div></div>`;
     const w=why(ds);
-    return `<div class="d" title="${ST[k].lab}${w?' — '+w:''}${isToday?' · день ещё идёт':''}">${sw}${dt}<div><div class="k">${nf(r.k)}<small> ккал</small></div>
+    return `<div class="d" data-d="${ds}" title="${ST[k].lab}${w?' — '+w:''}${isToday?' · день ещё идёт':''}">${sw}${dt}<div><div class="k">${nf(r.k)}<small> ккал</small></div>
       <div class="m">Б ${nf(r.p)} · Ж ${nf(r.f)} · У ${nf(r.c)}</div></div></div>`; };
-  $('#last2').innerHTML = `<h3>Последние 2 недели</h3><div class="cols">`+
+  $('#last2').innerHTML = `<h3>Последние 2 недели <button class="fw-more" type="button">Подробно</button></h3><div class="cols">`+
     starts.map(s=>`<div class="wk">${s.getTime()===wk0.getTime()?'эта неделя':'прошлая неделя'} · с ${fmtD(s)}</div>`).join('')+
     [0,1,2,3,4,5,6].map(i=>starts.map(s=>cell(addD(s,i))).join('')).join('')+`</div>`;
 }
 
-function render(){ hero(); heatmap(); goals2(); last2(); charts(); streaks(); }
+// ---------- окно недели: продукты по дням и приёмам пищи (FoodWeek — portal/foodweek.js) ----------
+const FW = FoodWeek.byDay(DATA.food_entries);
+let FWI = 1;                                  // 0 — прошлая неделя, 1 — эта
+function fwDay(d){
+  const ds=iso(d), r=ROWS[ds], k=status(ds), list=FW[ds], isToday=ds===iso(today);
+  const dt=`<div class="dt"><b>${fmtW(d)}</b> ${fmtD(d)}</div>`;
+  if(d>today) return `<div class="fw-day future" data-d="${ds}"><div class="fw-dh"><span class="sw"></span>${dt}</div></div>`;
+  const sw=`<span class="sw" style="${k==='empty'?'box-shadow:inset 0 0 0 1.5px var(--text-muted)':'background:'+ST[k].col()}"></span>`;
+  const tot=r&&r.k ? `<div class="k">${nf(r.k)}<small> ккал</small></div><div class="m">Б ${nf(r.p)} · Ж ${nf(r.f)} · У ${nf(r.c)}</div>` : '';
+  const body=list ? list.map(([,label,items])=>`<div class="fw-ml">${label}</div>`+
+      items.map(x=>`<div class="fw-it">${esc(x.name)}${x.amount?` <span>${esc(x.amount)}</span>`:''}</div>`).join('')).join('')
+    : `<div class="fw-note">${r&&r.k?'продукты не загружены':isToday?'сегодня — пока пусто':'не записывал'}</div>`;
+  return `<div class="fw-day" data-d="${ds}"><div class="fw-dh">${sw}<div>${dt}${tot}</div></div>${body}</div>`;
+}
+function foodweek(){
+  const wk0=addD(today,-((today.getDay()+6)%7)), starts=[addD(wk0,-7), wk0];
+  $('#fwbody').innerHTML = starts.map((s,i)=>`<div class="fw-sheet" data-w="${i}"${i===FWI?'':' hidden'}><h2>Питание · неделя с ${fmtD(s)}</h2>
+    <div class="fw-grid">${[0,1,2,3,4,5,6].map(j=>fwDay(addD(s,j))).join('')}</div></div>`).join('');
+  document.querySelectorAll('#fwseg button').forEach(b=>b.classList.toggle('on', +b.dataset.w===FWI));
+}
+function fwShow(i){ FWI=i; document.querySelectorAll('#fwbody .fw-sheet').forEach(x=>x.hidden= +x.dataset.w!==i);
+  document.querySelectorAll('#fwseg button').forEach(b=>b.classList.toggle('on', +b.dataset.w===i)); }
+$('#last2').addEventListener('click', e=>{
+  const dlg=$('#foodweek'), wk0=iso(addD(today,-((today.getDay()+6)%7)));
+  if(e.target.closest('.fw-more')) fwShow(1);
+  else { const c=e.target.closest('.d[data-d]'); if(!c||c.classList.contains('future')) return; fwShow(c.dataset.d>=wk0?1:0); }
+  dlg.showModal(); $('#fwbody').scrollTop=0;
+});
+$('#fwseg').addEventListener('click', e=>{ const b=e.target.closest('button[data-w]'); if(b) fwShow(+b.dataset.w); });
+document.querySelector('#foodweek .fw-close').addEventListener('click', ()=>$('#foodweek').close());
+
+function render(){ hero(); heatmap(); goals2(); last2(); foodweek(); charts(); streaks(); }
 boot(render, b=>{ PER=b.dataset.p; });
 }
 </script>

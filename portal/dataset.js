@@ -84,6 +84,7 @@ var Dataset = (function () {
     const nut = T("nutrition_daily");
     d.kcal = nut.filter(n => n.kcal != null).map(n => [n.date, n.kcal]);
     d.nutrition = nut.filter(n => n.protein != null).map(n => [n.date, n.kcal, n.protein, n.fat, n.carbs]);
+    d.food_entries = T("food_entries");   // продукты из дневника — окно недели на «Питании» (foodweek.js)
     const byM = {};
     for (const [dt, k, p, f, c] of d.nutrition)
       if ((k || 0) >= FULL_DAY_KCAL) (byM[dt.slice(0, 7)] ||= []).push([p || 0, f || 0, c || 0]);

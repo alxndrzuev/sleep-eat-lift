@@ -219,6 +219,44 @@ test('Whoop calendars: Monday — today pale and outside the period (only comple
   }
 });
 
+// окно недели с продуктами: обе недели рисуются в <dialog id="foodweek"> сразу (открывается кнопкой «Подробно»)
+function foodweek() {
+  const d = fatsecret(data());
+  d.put('nutrition_daily.csv', Array.from({length: 27}, (_, i) => `2026-11-${String(i + 1).padStart(2, '0')}`)
+    .filter(ds => ds !== '2026-11-18').map(date => ({date, kcal: '2100', protein: '120', fat: '60', carbs: '250'})));
+  const fe = (id, date, meal, name, amount) => ({id, date, meal, name, amount, kcal: '100'});
+  d.put('food_entries.csv', [fe('1', '2026-11-24', 'dinner', 'Лосось', '130 г'), fe('2', '2026-11-24', 'breakfast', 'Каша овсяная', '50 г'),
+                             fe('3', '2026-11-25', 'lunch', 'Сыр "Лёгкий", 20%', '20 г'), fe('4', '2026-11-26', 'lunch', TAG, '1 шт')]);
+  const dom = d.page('nutrition.html', '2026-11-27');
+  return {dom, fw: dom.slice(dom.indexOf('id="foodweek"'), dom.indexOf('</dialog>', dom.indexOf('id="foodweek"')))};
+}
+
+test('food week: both weeks in the dialog, meals in order, escaped', {skip}, () => {
+  const {dom, fw} = foodweek();
+  has(fw, 'эта неделя');
+  has(fw, 'прошлая неделя');
+  assert.ok(fw.indexOf('Каша овсяная') < fw.indexOf('Лосось'), 'завтрак раньше ужина');
+  has(fw, 'Завтрак');
+  has(fw, 'Сыр "Лёгкий", 20%');                               // в тексте Chrome пишет кавычки как есть
+  has(fw, '20 г');
+  hasNot(dom, TAG);
+  has(fw, '&lt;img');
+});
+
+test('food week: day with total but no products, empty and future days', {skip}, () => {
+  const {fw} = foodweek();
+  assert.match(fw, /data-d="2026-11-17"[\s\S]*?продукты не загружены/);
+  assert.match(fw, /data-d="2026-11-18"[^>]*>[\s\S]*?не записывал/);
+  assert.match(fw, /class="fw-day future" data-d="2026-11-28"/);
+});
+
+test('food week: «Подробно» on the two-week block, day cards carry their date', {skip}, () => {
+  const {dom} = foodweek();
+  const l2 = dom.slice(dom.indexOf('id="last2"'));
+  assert.match(l2, /<button[^>]*>Подробно<\/button>/);
+  assert.match(l2, /class="d"[^>]*data-d="2026-11-24"/);
+});
+
 test('empty nutrition', {skip}, () => {
   has(data().page('nutrition.html'), 'Подключите FatSecret или Whoop');
 });
