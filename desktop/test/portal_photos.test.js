@@ -470,3 +470,14 @@ test('validatePlan: a wrong weight of a series is an error; empty — fine', () 
   assert.deepStrictEqual(js(`PhotosCore.validatePlan([{date: '2026-11-01', weight: 'abc', rows: ${J(rows)}}])`),
     ['2026-11-01: Вес: число от 20 до 300']);
 });
+
+test('drop zone: files dragged in from outside — overlay and upload; a photo dragged on the page itself — neither', () => {
+  const run = steps => js(`(() => { const t = PhotosCore.dropTracker(); return ${J(steps)}.map(([m, a]) => t[m](a)); })()`);
+  const F = ['Files'], IMG = ['text/uri-list', 'text/html', 'Files'];   // Chrome: картинку со страницы тоже помечает «Files»
+  // снаружи: вход — показать, вложенный элемент — всё ещё показывать, выход из обоих — спрятать
+  assert.deepStrictEqual(run([['enter', F], ['enter', F], ['leave', F], ['leave', F]]), [true, true, true, false]);
+  assert.deepStrictEqual(run([['enter', F], ['drop', F]]), [true, true]);           // бросили — принять
+  // снимок со страницы: dragstart → ни подсветки, ни загрузки; после dragend снаружи — снова как обычно
+  assert.deepStrictEqual(run([['start'], ['enter', IMG], ['drop', IMG], ['end'], ['enter', F]]), [null, false, false, null, true]);   // start/end ничего не возвращают (null — после JSON)
+  assert.deepStrictEqual(run([['enter', ['text/plain']]]), [false]);              // не файлы — не наше
+});

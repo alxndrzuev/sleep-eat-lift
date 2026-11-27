@@ -422,6 +422,24 @@
     return res;
   }
 
+  /**
+   * Перетаскивание снимков на страницу: подсветка «Отпустите — загрузить» и приём — только для файлов снаружи. Chrome
+   * помечает «Files» и картинку, которую тащат по самой странице (клик по снимку с лёгким сдвигом), — такое перетаскивание
+   * начинается с dragstart на странице и загрузкой не считается. enter/leave → показывать ли подсветку (вложенные
+   * элементы — счётчиком), drop → принять ли файлы; start/end — dragstart/dragend на странице.
+   */
+  function dropTracker() {
+    let depth = 0, inner = false;
+    const files = types => !inner && [...(types || [])].includes("Files");
+    return {
+      start() { inner = true; depth = 0; },
+      end() { inner = false; depth = 0; },
+      enter(types) { if (files(types)) depth++; return depth > 0; },
+      leave(types) { if (files(types)) depth = Math.max(0, depth - 1); return depth > 0; },
+      drop(types) { const ok = files(types); depth = 0; inner = false; return ok; },
+    };
+  }
+
   /** Вес на дату — ближайшее взвешивание не дальше 14 дней. */
   function nearestWeight(weights, date) {
     let best = null;
@@ -465,5 +483,5 @@
   }
 
   root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FIT, DETECT, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
-                     keypointsFromLandmarks, guessPose, silhouette, detectSize, unpadDetection, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
+                     dropTracker, keypointsFromLandmarks, guessPose, silhouette, detectSize, unpadDetection, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
 })(globalThis);

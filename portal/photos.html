@@ -75,6 +75,7 @@ h2{font-size:15px;margin:0 0 10px}
 .drop-hint{display:none;position:fixed;inset:12px;border:3px dashed var(--series-1);border-radius:16px;background:rgba(42,120,214,.08);z-index:20;
   align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--series-1);pointer-events:none}
 .dragging .drop-hint{display:flex}
+img{-webkit-user-drag:none;user-select:none}   /* клик по снимку не начинает перетаскивание картинки */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;z-index:30;overflow:auto;padding:30px 12px}
 .modal[hidden]{display:none}
 .mbox{background:var(--surface-1);color:var(--text-primary);border:1px solid var(--border);border-radius:14px;width:min(960px,100%);padding:18px 18px 14px}
@@ -304,14 +305,18 @@ function showGuide() {
 }
 $("uploadBtn").onclick = showGuide;
 $("fileInput").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) openUpload(f); };
-let dragDepth = 0;
-const hasFiles = e => [...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files");
-document.addEventListener("dragenter", e => { if (hasFiles(e)) { dragDepth++; document.body.classList.add("dragging"); } });
-document.addEventListener("dragleave", e => { if (hasFiles(e) && --dragDepth <= 0) { dragDepth = 0; document.body.classList.remove("dragging"); } });
-document.addEventListener("dragover", e => { if (hasFiles(e)) e.preventDefault(); });
+// перетаскивание снимков снаружи; то, что тащат по самой странице (снимок), — не загрузка (PhotosCore.dropTracker)
+const drops = P.dropTracker(), types = e => e.dataTransfer && e.dataTransfer.types;
+const hint = on => document.body.classList.toggle("dragging", on);
+document.addEventListener("dragstart", () => { drops.start(); hint(false); });
+document.addEventListener("dragend", () => { drops.end(); hint(false); });
+document.addEventListener("dragenter", e => hint(drops.enter(types(e))));
+document.addEventListener("dragleave", e => hint(drops.leave(types(e))));
+document.addEventListener("dragover", e => { if (document.body.classList.contains("dragging")) e.preventDefault(); });
 document.addEventListener("drop", e => {
-  if (!hasFiles(e)) return;
-  e.preventDefault(); dragDepth = 0; document.body.classList.remove("dragging");
+  hint(false);
+  if (!drops.drop(types(e))) return;
+  e.preventDefault();
   openUpload([...e.dataTransfer.files]);
 });
 
