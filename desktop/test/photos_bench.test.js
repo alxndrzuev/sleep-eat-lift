@@ -246,3 +246,18 @@ test('retry like the app: a variant without a figure is taken from the padded ru
   assert.strictEqual(m[0].ms, 40 + 70);                  // время — обе попытки
   assert.strictEqual(m[1], a[1]);                        // нашли с первой попытки — повтора нет
 });
+
+test('bench location: public photos and their cache in the project (not in git), anything from own photos — outside it', () => {
+  const root = path.join(__dirname, '..', '..');
+  const env = Object.assign({}, process.env);
+  delete env.PHOTO_BENCH; delete env.PHOTO_BENCH_OWN;
+  const out = require('node:child_process').execFileSync(process.execPath, ['-e',
+    'const b = require("./scripts/photos_bench.js"); console.log(JSON.stringify({pub: b.BENCH, own: b.PRIVATE, dirs: b.params({}).dirs}))'],
+    {cwd: root, env, encoding: 'utf8'});
+  const r = JSON.parse(out);
+  assert.strictEqual(r.pub, path.join(root, 'photo-bench'));
+  assert.ok(!r.own.startsWith(root + path.sep), r.own);
+  assert.ok(r.dirs.coco.startsWith(r.pub + path.sep));
+  for (const s of ['own', 'extra']) assert.ok(r.dirs[s].startsWith(r.own + path.sep), s);
+  assert.match(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), /^\/photo-bench\/$/m);
+});

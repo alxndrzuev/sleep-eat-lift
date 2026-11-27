@@ -1,8 +1,8 @@
 // Проверочный набор фото, шаг 1 — поиск фигуры (медленно, результат в кэш). Запускает scripts/photos_bench.js detect:
 //   electron desktop/bench/photos_detect.js <jobs.json>
-// jobs.json = {cacheDir, params, jobs: [{source, id, file, pose, sha, crops | null, gt?}]}; crops null — свои снимки:
+// jobs.json = {cacheDirs: {источник: папка}, params, jobs: [{source, id, file, pose, sha, crops | null, gt?}]}; crops null — свои снимки:
 // варианты кадра (scripts/photos_bench_lib.js VARIANTS) режутся по точкам, найденным на целом снимке. Каждый вариант — ещё и
-// зеркально. Кэш: <cacheDir>/<source>/<id>__<variant>.json (точки MediaPipe как есть, маска RLE, рамка среза, правильная поза).
+// зеркально. Кэш: <cacheDirs[source]>/<id>__<variant>.json (точки MediaPipe как есть, маска RLE, рамка среза, правильная поза).
 // Не часть приложения: main.js это не подключает, в сборку не входит.
 'use strict';
 const {app, BrowserWindow} = require('electron');
@@ -11,7 +11,7 @@ const path = require('node:path');
 const B = require('../../scripts/photos_bench_lib.js');
 
 const cfg = JSON.parse(fs.readFileSync(process.argv[process.argv.length - 1], 'utf8'));
-const out = (job, variant) => path.join(cfg.cacheDir, job.source, `${job.id}__${variant}.json`);
+const out = (job, variant) => path.join(cfg.cacheDirs[job.source], `${job.id}__${variant}.json`);
 
 async function main() {
   const win = new BrowserWindow({show: false, webPreferences: {backgroundThrottling: false}});
@@ -20,7 +20,7 @@ async function main() {
   let fresh = 0, n = 0;
   for (const job of cfg.jobs) {
     n++;
-    fs.mkdirSync(path.join(cfg.cacheDir, job.source), {recursive: true});
+    fs.mkdirSync(cfg.cacheDirs[job.source], {recursive: true});
     const wanted = (job.crops ? job.crops.map(c => c.variant) : B.VARIANTS).flatMap(v => [v, v + '_mirror']);
     if (wanted.every(v => fs.existsSync(out(job, v)))) continue;
     try {

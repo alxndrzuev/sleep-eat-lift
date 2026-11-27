@@ -51,7 +51,9 @@ scripts/                 ← Node без зависимостей (берёт м
   vendor_fetch.js        ← библиотеки страницы «Фото» → portal/vendor/ (фиксированные версии, хэши; `--check`)
   public_check.js        ← перед коммитом: в репозитории нет личного из папки данных, почта автора — noreply
   photos_bench.js        ← проверочный набор фото (распознавание позы, выравнивание): fetch · detect · eval → отчёт;
-                           набор вне проекта (~/Documents/SEL/photo-bench), поиск фигуры — desktop/bench/ (не часть приложения) — docs/06
+                           поиск фигуры — desktop/bench/ (не часть приложения) — docs/06
+photo-bench/             ← публичные фото COCO и кэш по ним для photos_bench.js (не в git; на новом компьютере — fetch --yes);
+                           всё из своих снимков — только вне проекта (~/Documents/SEL/photo-bench-own)
 dist/                    ← собранные приложения (не в git): dist/<версия>/ — release-notes.md + zip Mac + exe Windows;
                            dist/dev/ — проверочная сборка, пока есть «Не выпущено» (scripts/dist.js, тест)
 ```
