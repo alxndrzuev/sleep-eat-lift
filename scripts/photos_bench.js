@@ -4,6 +4,9 @@
 //
 //   node scripts/photos_bench.js detect [--source own|extra|coco|all] [--profile <id>] [--limit N] [--min-detect X] [--side N]
 //        поиск фигуры (Electron без окна, библиотеки приложения) → кэш; уже посчитанное не повторяет
+//   node scripts/photos_bench.js fetch [--yes] [--max N]
+//        публичные фото COCO 2017 val: без --yes — только что и откуда скачает; с --yes — разметка (архив 241 МБ, из него
+//        остаётся person_keypoints_val2017.json) и подходящие снимки поштучно → photo-bench/public/
 'use strict';
 const fs = require('node:fs');
 const os = require('node:os');
@@ -46,7 +49,50 @@ function jobs(o) {
   }
   if (src === 'extra' || src === 'all')
     out.push(...B.extraJobs(path.join(BENCH, 'own'), console.warn).slice(0, limit).map(j => Object.assign(j, {source: 'extra', crops: null})));
+  if (src === 'coco' || src === 'all') {
+    const f = path.join(BENCH, 'public', 'coco.json');
+    if (fs.existsSync(f)) out.push(...JSON.parse(fs.readFileSync(f, 'utf8')).slice(0, limit)
+      .map(c => ({source: 'coco', id: c.id, file: path.join(BENCH, 'public', 'coco', c.file), pose: c.truth.pose, sha: c.id,
+                  crops: B.cocoCrops(c), gt: c.kps})).filter(j => fs.existsSync(j.file)));
+  }
   return out;
+}
+
+const ANN_URL = 'http://images.cocodataset.org/annotations/annotations_trainval2017.zip';
+const ANN_FILE = 'annotations/person_keypoints_val2017.json';
+
+function fetchCoco(o) {
+  const pub = path.join(BENCH, 'public'), ann = path.join(pub, 'person_keypoints_val2017.json');
+  if (!o.yes) {
+    console.log(`Скачает:\n  ${ANN_URL} — архив разметки, 241 МБ (останется только ${path.basename(ANN_FILE)}, ~10 МБ)` +
+      `\n  подходящие снимки COCO val2017 поштучно с images.cocodataset.org (несколько сотен, ~150 КБ каждый)\n  → ${pub}` +
+      `\nЗапуск: node scripts/photos_bench.js fetch --yes`);
+    return 0;
+  }
+  fs.mkdirSync(path.join(pub, 'coco'), {recursive: true});
+  const curl = (url, out) => spawnSync('curl', ['-fsSL', '--retry', '2', '-o', out, url], {stdio: 'inherit'}).status === 0;
+  if (!fs.existsSync(ann)) {
+    const zip = path.join(pub, 'annotations.zip');
+    console.log('разметка…');
+    if (!curl(ANN_URL, zip)) throw new Error('не скачался ' + ANN_URL);
+    const r = spawnSync('unzip', ['-o', '-j', zip, ANN_FILE, '-d', pub], {stdio: 'inherit'});
+    fs.rmSync(zip, {force: true});
+    if (r.status !== 0) throw new Error('не распаковался ' + ANN_FILE);
+  }
+  let sel = B.cocoSelect(JSON.parse(fs.readFileSync(ann, 'utf8')));
+  if (o.max) sel = sel.slice(0, Number(o.max));
+  const by = {};
+  for (const c of sel) by[c.truth.pose || 'unclear'] = (by[c.truth.pose || 'unclear'] || 0) + 1;
+  console.log(`отобрано людей: ${sel.length}`, by);
+  let n = 0;
+  for (const c of sel) {
+    const f = path.join(pub, 'coco', c.file);
+    if (!fs.existsSync(f) && !curl(c.url, f)) { console.log('не скачался ' + c.url); continue; }
+    if (++n % 50 === 0) console.log(`${n}/${sel.length}`);
+  }
+  fs.writeFileSync(path.join(pub, 'coco.json'), JSON.stringify(sel));
+  console.log(`снимков: ${n} → ${path.join(pub, 'coco')}`);
+  return 0;
 }
 
 function detect(o) {
@@ -64,7 +110,7 @@ function detect(o) {
 
 if (require.main === module) {
   const o = parseArgs(process.argv.slice(2));
-  const cmds = {detect};
+  const cmds = {detect, fetch: fetchCoco};
   if (!cmds[o.cmd]) { console.error('Команды: ' + Object.keys(cmds).join(', ') + ' (см. начало scripts/photos_bench.js)'); process.exit(1); }
   try { process.exit(cmds[o.cmd](o)); } catch (e) { console.error('ОШИБКА: ' + e.message); process.exit(1); }
 }
