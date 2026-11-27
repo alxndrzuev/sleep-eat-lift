@@ -111,6 +111,19 @@ h2{font-size:15px;margin:0 0 10px}
 .errs{color:var(--bad);margin:8px 0 0;padding-left:18px}
 .mfoot{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px;margin-top:4px}
 .mfoot .muted{margin-right:auto}
+/* окно «Как снимать» (photos_guide.js) */
+.g-poses{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:12px 0 16px}
+.g-pose{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;font-size:13px;color:var(--text-primary)}
+.g-pose svg{width:100%;max-width:88px;height:auto;margin-bottom:4px}
+.g-pose .muted{font-size:12px;line-height:1.3}
+.g-opt{opacity:.7}
+.g-row{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:16px;align-items:start;margin-bottom:12px}
+.g-frame{display:flex;gap:10px;align-items:flex-start;font-size:13px}
+.g-frame svg{height:150px;width:auto;flex:none}
+.g-frame b,.g-frame .muted{display:block}
+.g-frame .muted{font-size:12px;margin-top:2px}
+.g-rules{margin:0;padding-left:18px;font-size:13px;line-height:1.55}
+@media (max-width:760px){.g-poses{grid-template-columns:repeat(3,1fr)}.g-row{grid-template-columns:1fr}}
 .progress{padding:24px 0;font-size:15px}
 .bar-p{height:6px;border-radius:3px;background:var(--grid);overflow:hidden;margin-top:10px}
 .bar-p i{display:block;height:100%;background:var(--series-1);width:0;transition:width .2s}
@@ -128,7 +141,7 @@ h2{font-size:15px;margin:0 0 10px}
 
 <div class="card" id="empty" hidden>
   <h2>Фото пока нет</h2>
-  <p>Нажмите «Загрузить фото» и выберите снимки серии — или перетащите их на страницу. Снимать удобно 5 поз: спереди, сбоку, сзади, спина-бицепс, бицепс.</p>
+  <p>Нажмите «Загрузить фото» — там же подсказки, какие позы снимать и как, — или перетащите снимки серии на страницу.</p>
   <p class="muted">Фото сохраняются в папку <b>data/photos</b> внутри папки проекта: оригинал как есть и версия, выровненная под один масштаб фигуры. В первый раз Chrome попросит один раз выбрать папку — выберите папку проекта <b>sleep-eat-lift</b> (в ней лежат portal и data): страница сама найдёт или создаст в ней data/photos. Так устроена защита в браузере: страница с диска может писать только туда, куда вы разрешили.</p>
 </div>
 
@@ -164,6 +177,7 @@ h2{font-size:15px;margin:0 0 10px}
 <script src="whatsnew.js"></script>
 <script src="../data/photos/photos.js"></script>
 <script src="photos_core.js"></script>
+<script src="photos_guide.js"></script>
 <script src="photos_fs.js"></script>
 <script src="photos_app.js"></script>
 <script>
@@ -280,7 +294,15 @@ window.addEventListener("beforeunload", e => { if (busy) { e.preventDefault(); e
 /** Пока снимки пишутся в папку профиля, меню (nav.js) не переключает профиль. */
 window.pageBusy = () => busy ? "идёт запись фото — дождитесь конца" : "";
 
-$("uploadBtn").onclick = () => $("fileInput").click();
+/** «Загрузить фото» → окно «Как снимать» (photos_guide.js) → «Выбрать файлы». Перетаскивание снимков — сразу, без окна. */
+function showGuide() {
+  if (busy) return;
+  mbox.innerHTML = PhotosGuide.html();
+  modal.hidden = false;
+  $("gCancel").onclick = closeModal;
+  $("gChoose").onclick = () => { closeModal(); $("fileInput").click(); };
+}
+$("uploadBtn").onclick = showGuide;
 $("fileInput").onchange = e => { const f = [...e.target.files]; e.target.value = ""; if (f.length) openUpload(f); };
 let dragDepth = 0;
 const hasFiles = e => [...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files");
