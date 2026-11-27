@@ -26,6 +26,7 @@ test('versions valid, unique, newest first; sections allowed and in order', () =
   for (const secs of [unreleased, ...releases.map(r => r.sections)]) {
     const t = secs.map(s => s.title);
     for (const x of t) assert.ok(SECTIONS.includes(x), `раздел «${x}»`);
+    assert.strictEqual(new Set(t).size, t.length, `раздел повторяется: ${t}`);   // два «Новое» подряд — так и покажет «Что нового»
     assert.deepStrictEqual(t, t.slice().sort((a, b) => SECTIONS.indexOf(a) - SECTIONS.indexOf(b)));
   }
 });

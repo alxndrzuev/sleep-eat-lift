@@ -211,6 +211,18 @@ test('entry days: 14 until last week has products, then 7', () => {
   assert.deepStrictEqual(fs_.entryDays(dir, today), ['2026-11-21', '2026-11-22', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27']);
 });
 
+test('entry days after a break in updates: from the last update, at most 14 days', () => {
+  const dir = tmp(), today = new Date(2026, 10, 27);
+  store.upsert(dir, 'food_entries.csv', Object.fromEntries(['2026-11-16', '2026-11-17', '2026-11-18'].map((date, i) => [String(i + 1), {date, meal: 'lunch', name: 'Гречка', kcal: 220}])));
+  store.saveSync(dir, 'fatsecret', '2026-11-18T10:00:00.000Z');            // последнее обновление — в среду 18.11
+  const days = fs_.entryDays(dir, today);
+  assert.deepStrictEqual([days[0], days[days.length - 1], days.length], ['2026-11-17', '2026-11-27', 11]);   // 19–20.11 не теряются
+  store.saveSync(dir, 'fatsecret', '2026-10-01T10:00:00.000Z');            // давно — не больше 14 дней
+  assert.strictEqual(fs_.entryDays(dir, today)[0], '2026-11-14');
+  store.saveSync(dir, 'fatsecret', '2026-11-26T20:00:00.000Z');            // вчера — обычные 7 дней
+  assert.strictEqual(fs_.entryDays(dir, today).length, 7);
+});
+
 test('update writes entries: text with commas and quotes, entries gone from a day are removed, days outside kept', async () => {
   const dir = tmp(), today = new Date(2026, 10, 27);
   store.upsert(dir, 'food_entries.csv', {'5': {date: '2026-11-25', meal: 'dinner', name: 'Удалённый', kcal: 100},

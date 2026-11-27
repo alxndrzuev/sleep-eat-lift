@@ -171,11 +171,15 @@ async function entries(app, user, ds, deps) {
   });
 }
 
-/** Какие дни скачать: последние 7 (дневник дописывают задним числом), а пока за прошлую неделю продуктов нет — 14. */
+/** Какие дни скачать: последние 7 (дневник дописывают задним числом); после перерыва в обновлениях — от дня перед
+ *  последним обновлением, чтобы между ними не осталось дней без продуктов; пока за прошлую неделю продуктов нет — 14.
+ *  Не больше 14 дней (обе недели окна). */
 function entryDays(dir, today) {
   const wk0 = addDays(today, -((today.getDay() + 6) % 7)), from = isoLocal(addDays(wk0, -7)), to = isoLocal(addDays(wk0, -1));
   const have = store.read(dir, 'food_entries.csv').some(r => r.date >= from && r.date <= to);
-  const n = have ? 7 : 14;
+  const last = (store.readSync(dir).fatsecret || '').slice(0, 10);
+  const gap = last ? Math.round((Date.parse(isoLocal(today) + 'T00:00:00Z') - Date.parse(last + 'T00:00:00Z')) / 864e5) + 2 : 7;
+  const n = have ? Math.min(14, Math.max(7, gap)) : 14;
   return Array.from({length: n}, (_, i) => isoLocal(addDays(today, i - n + 1)));
 }
 
