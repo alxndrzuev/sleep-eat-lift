@@ -2,12 +2,13 @@
 // Проверочный набор фото (docs/superpowers/specs/2026-11-27-photo-recognition-design.md, docs/06 → «Проверочный набор»).
 // Набор и кэш — вне проекта и папки данных: PHOTO_BENCH, по умолчанию ~/Documents/SEL/photo-bench. В git ничего не попадает.
 //
-//   node scripts/photos_bench.js detect [--source own|extra|coco|all] [--profile <id>] [--limit N] [--min-detect X] [--side N]
-//        поиск фигуры (Electron без окна, библиотеки приложения) → кэш; уже посчитанное не повторяет
+//   node scripts/photos_bench.js detect [--source own|extra|coco|all] [--profile <id>] [--limit N] [--min-detect X] [--side N] [--pad P]
+//        поиск фигуры (Electron без окна, библиотеки приложения) → кэш; уже посчитанное не повторяет. Как в приложении:
+//        обычный прогон + прогон с полем (повтор там, где фигура не нашлась); --no-retry — без второго
 //   node scripts/photos_bench.js fetch [--yes] [--max N]
 //        публичные фото COCO 2017 val: без --yes — только что и откуда скачает; с --yes — разметка (архив 241 МБ, из него
 //        остаётся person_keypoints_val2017.json) и подходящие снимки поштучно → photo-bench/public/
-//   node scripts/photos_bench.js eval [--baseline] [--min-detect X] [--side N]
+//   node scripts/photos_bench.js eval [--baseline] [--no-retry] [--min-detect X] [--side N] [--pad P]
 //        оценка кэша текущим portal/photos_core.js → консоль и photo-bench/report.md; --baseline — до правок алгоритма
 //        сохранить исходную точку (позы и выровненные точки целых своих снимков) в photo-bench/baseline.json
 'use strict';
@@ -36,7 +37,9 @@ function parseArgs(argv) {
 
 /** Параметры поиска фигуры (от них зависит результат MediaPipe) и папка кэша под них. */
 function params(o) {
-  const p = {model: MODEL, side: o.side ? Number(o.side) : 1024, minDetect: o['min-detect'] ? Number(o['min-detect']) : null};
+  const D = globalThis.PhotosCore.DETECT;               // как в приложении (portal/photos_core.js)
+  const p = {model: MODEL, side: o.side ? Number(o.side) : D.side, minDetect: o['min-detect'] ? Number(o['min-detect']) : D.minDetect};
+  if (o.pad) p.pad = Number(o.pad);                     // без --pad — тот же ключ кэша, что до появления поля
   const tag = 'p' + crypto.createHash('sha1').update(JSON.stringify(p)).digest('hex').slice(0, 8);
   return {p, dir: path.join(BENCH, 'cache', tag)};
 }
@@ -98,7 +101,15 @@ function fetchCoco(o) {
   return 0;
 }
 
+/** Поиск фигуры как в приложении: обычный прогон и прогон с полем (повтор, где фигура не нашлась); --pad — только он. */
 function detect(o) {
+  const runs = o.pad || o['no-retry'] ? [o] : [o, Object.assign({}, o, {pad: globalThis.PhotosCore.DETECT.retryPad})];
+  let code = 0;
+  for (const r of runs) code = code || detectRun(r);
+  return code;
+}
+
+function detectRun(o) {
   const {p, dir} = params(o), list = jobs(o);
   fs.mkdirSync(dir, {recursive: true});
   fs.writeFileSync(path.join(dir, 'params.json'), JSON.stringify(p, null, 1));
@@ -119,6 +130,15 @@ function evalCmd(o) {
     for (const f of fs.readdirSync(d)) if (f.endsWith('.json')) entries.push(JSON.parse(fs.readFileSync(path.join(d, f), 'utf8')));
   }
   if (!entries.length) throw new Error('Кэш пуст — сначала: node scripts/photos_bench.js detect');
+  if (!o.pad && !o['no-retry']) {                       // повтор с полем, как в приложении
+    const rdir = params(Object.assign({}, o, {pad: globalThis.PhotosCore.DETECT.retryPad})).dir, retry = [];
+    for (const src of fs.existsSync(rdir) ? fs.readdirSync(rdir) : []) {
+      const d = path.join(rdir, src);
+      if (fs.statSync(d).isDirectory()) for (const f of fs.readdirSync(d)) if (f.endsWith('.json')) retry.push(JSON.parse(fs.readFileSync(path.join(d, f), 'utf8')));
+    }
+    if (retry.length) entries.splice(0, entries.length, ...B.mergeRetry(entries, retry));
+    else console.warn('нет прогона с полем — оценка без повтора (node scripts/photos_bench.js detect)');
+  }
   const bf = path.join(BENCH, 'baseline.json');
   if (o.baseline) {
     const b = B.baselineOf(entries);

@@ -237,3 +237,12 @@ test('consistency of full photos: a point left out of the fit lands at the same 
   assert.ok(c.mean < 0.5, J(c));
   assert.deepStrictEqual(Object.keys(c.points).sort(), ['ankle', 'knees', 'neck', 'root']);   // глаз в наборе нет
 });
+
+test('retry like the app: a variant without a figure is taken from the padded run, if found there', () => {
+  const a = [rec('own', 'a', 'no_head', 'front', null), rec('own', 'b', 'full', 'front', FRONT_LM), rec('own', 'c', 'tight', 'front', null)];
+  const r = [rec('own', 'a', 'no_head', 'front', FRONT_LM, {ms: 70}), rec('own', 'b', 'full', 'front', SIDE_LM), rec('own', 'c', 'tight', 'front', null)];
+  const m = B.mergeRetry(a, r);
+  assert.deepStrictEqual(m.map(e => [e.id, !!e.lm]), [['a', true], ['b', true], ['c', false]]);
+  assert.strictEqual(m[0].ms, 40 + 70);                  // время — обе попытки
+  assert.strictEqual(m[1], a[1]);                        // нашли с первой попытки — повтора нет
+});

@@ -25,6 +25,9 @@
   const FOLDER = "photos";          // папка data/photos внутри папки проекта (личные данные — в data/)
   const VIS = 0.5;                      // порог видимости точки MediaPipe
   const EDGE = 0;                       // точка за краем кадра (доля снимка) — выдумана MediaPipe (ошибка 100–200 px), не в счёт
+  // поиск фигуры (приложение и проверка): длинная сторона копии, порог уверенности (0.3 вместо 0.5 MediaPipe — без головы
+  // фигура находится чаще, выравнивание целых не хуже), нет фигуры — повтор с полем сверху и снизу (доля высоты снимка)
+  const DETECT = {side: 1024, minDetect: 0.3, retryPad: 0.25};
   const HW = 0.2, ZS = 0.15;            // боком: |hw| таза меньше HW; сторона по глубине, если |zs| ≥ ZS
   const NAME = /^(\d{4}-\d{2}-\d{2})_([a-z_]+)\.[A-Za-z0-9]+$/;
   const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -245,6 +248,21 @@
   }
 
   /**
+   * Поиск фигуры на копии с полем сверху и снизу (по pad высоты снимка — человек не упирается в край кадра, если снимок
+   * обрезан) → результат в координатах самого снимка: y точек пересчитан, у маски — только строки снимка.
+   */
+  function unpadDetection(det, pad) {
+    const k = 1 + 2 * pad;
+    const lm = det.lm && det.lm.map(q => Object.assign({}, q, {y: q.y * k - pad}));
+    let mask = null;
+    if (det.mask) {
+      const m = det.mask, r0 = Math.round(m.h * pad / k), rows = Math.round(m.h / k);
+      mask = {w: m.w, h: rows, data: m.data.slice(r0 * m.w, (r0 + rows) * m.w)};
+    }
+    return {lm, mask};
+  }
+
+  /**
    * Результат MediaPipe как есть → опорные точки в пикселях снимка w×h (+ макушка, подошвы, центр корпуса по маске) или null.
    * det = {lm: 33 точки (нормированные), mask: {w, h, data: 0…1} | null} — маска в размере уменьшенной копии снимка.
    * Один путь для приложения (PhotosApp.detect) и проверки (scripts/photos_bench.js).
@@ -446,6 +464,6 @@
     };
   }
 
-  root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FIT, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
-                     keypointsFromLandmarks, guessPose, silhouette, detectSize, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
+  root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FIT, DETECT, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
+                     keypointsFromLandmarks, guessPose, silhouette, detectSize, unpadDetection, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
 })(globalThis);

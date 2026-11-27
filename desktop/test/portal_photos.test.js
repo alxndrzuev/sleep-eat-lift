@@ -286,6 +286,21 @@ test('detect size: long side ≤ side, width a multiple of 4 (MediaPipe falls on
   assert.deepStrictEqual(js('PhotosCore.detectSize(601, 403, 1024)'), {w: 604, h: 403});     // меньше side — без уменьшения
 });
 
+test('detection settings shared by the app and the check', () => {
+  assert.deepStrictEqual(js('PhotosCore.DETECT'), {side: 1024, minDetect: 0.3, retryPad: 0.25});
+});
+
+test('detection on a padded copy → back to the photo: points and mask rows of the photo only', () => {
+  // поле сверху и снизу — по четверти высоты снимка: копия 1.5 высоты, снимок — с 1/6 до 5/6
+  const det = {lm: [{x: 0.3, y: 0.5, z: 0.1, visibility: 0.9}, {x: 0.3, y: 1 / 6, visibility: 0.8}],
+    mask: {w: 2, h: 15, data: Array.from({length: 30}, (_, i) => Math.floor(i / 2))}};
+  const r = js(`PhotosCore.unpadDetection(${J(det)}, 0.25)`);
+  near(r.lm[0].y, 0.5); near(r.lm[1].y, 0); assert.deepStrictEqual([r.lm[0].x, r.lm[0].z, r.lm[0].visibility], [0.3, 0.1, 0.9]);
+  assert.deepStrictEqual([r.mask.w, r.mask.h], [2, 10]);
+  assert.deepStrictEqual([r.mask.data[0], r.mask.data[19]], [3, 12]);    // строки 3…12 маски копии
+  assert.deepStrictEqual(js(`PhotosCore.unpadDetection({lm: null, mask: null}, 0.25)`), {lm: null, mask: null});
+});
+
 // результат MediaPipe как есть: 33 точки (нормированные) + маска в размере уменьшенной копии (здесь — вдвое меньше снимка)
 const DET_LM = {0: [0.5, 0.1], 11: [0.4, 0.16], 12: [0.6, 0.16], 23: [0.45, 0.525], 24: [0.55, 0.525], 27: [0.45, 0.86], 28: [0.55, 0.86],
   29: [0.42, 0.88], 32: [0.6, 0.89]};

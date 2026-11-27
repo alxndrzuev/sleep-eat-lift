@@ -25,7 +25,7 @@
       const ctx = c.getContext("2d");
       if (cr.mirror) ctx.setTransform(-1, 0, 0, 1, cr.w, 0);
       ctx.drawImage(img, -cr.x, -cr.y);
-      const r = await PhotosApp.detectRaw(c, {side: params.side, minDetect: params.minDetect});
+      const r = await PhotosApp.detectRaw(c, {side: params.side, minDetect: params.minDetect, pad: params.pad || 0});
       c.width = 0; c.height = 0;
       let mask = null;
       if (r.mask) {

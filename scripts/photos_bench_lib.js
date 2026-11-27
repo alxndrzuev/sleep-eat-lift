@@ -287,6 +287,16 @@ function consistency(entries) {
   return {points, mean: v.length ? r1(v.reduce((a, b) => a + b, 0) / v.length) : null};
 }
 
+/** Как в приложении: вариант без фигуры — из прогона с полем (retry), если там нашлась; время — обе попытки. */
+function mergeRetry(primary, retry) {
+  const by = new Map(retry.map(e => [`${e.source}|${e.id}|${e.variant}`, e]));
+  return primary.map(e => {
+    if (figure(e)) return e;
+    const r = by.get(`${e.source}|${e.id}|${e.variant}`);
+    return r && figure(r) ? Object.assign({}, r, {ms: e.ms + r.ms}) : e;
+  });
+}
+
 /** Исходная точка: поза и выровненные точки целых своих снимков по нынешнему коду + их согласованность. */
 function baselineOf(entries) {
   const fulls = ownFulls(entries), al = alignedFull(fulls), photos = {};
@@ -389,4 +399,4 @@ function report(s, {date, params} = {}) {
 
 module.exports = {VARIANTS, cropBox, truthMirror, rleEncode, rleDecode, cacheKey, readIndex, ownJobs, extraJobs,
   cocoTruth, cocoSelect, cocoAsLm, cocoCrops, gtInCrop, lrSwapped,
-  figure, evaluate, baselineOf, consistency, report};
+  figure, mergeRetry, evaluate, baselineOf, consistency, report};

@@ -7,7 +7,6 @@
   const SELF = document.currentScript && document.currentScript.src;
   const VENDOR_BASE = SELF ? SELF.replace(/[^/]*$/, "vendor/") : "vendor/";
   const VENDOR = ["mediapipe_vision.js", "mediapipe_wasm_loader.js", "mediapipe_wasm.b64.js", "pose_model.b64.js", "libheif.js", "exifr.js"];
-  const DETECT_SIDE = 1024;
   let vendorReady = null, heif = null, heifDecoder = null, landmarker = null, minDetect = null;
 
   const b64bytes = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
@@ -28,7 +27,8 @@
       const wasm = URL.createObjectURL(new Blob([b64bytes(root.VENDOR_B64.vision_wasm)], {type: "application/wasm"}));
       landmarker = await root.Vision.PoseLandmarker.createFromOptions({wasmLoaderPath: "", wasmBinaryPath: wasm}, {
         baseOptions: {modelAssetBuffer: b64bytes(root.VENDOR_B64.pose_model), delegate: "CPU"}, runningMode: "IMAGE", numPoses: 1,
-        outputSegmentationMasks: true});
+        outputSegmentationMasks: true, minPoseDetectionConfidence: C.DETECT.minDetect});
+      minDetect = C.DETECT.minDetect;
       URL.revokeObjectURL(wasm);
       delete root.VENDOR_B64.vision_wasm; delete root.VENDOR_B64.pose_model;   // ~30 МБ строк больше не нужны
     })().catch(e => { vendorReady = null; throw e; });
@@ -71,7 +71,8 @@
 
   /**
    * Поиск фигуры, результат MediaPipe как есть: {lm — 33 точки (нормированные), mask — {w, h, data: Float32Array} | null,
-   * ms — время}. opts.side — длинная сторона копии для поиска (DETECT_SIDE), opts.minDetect — порог уверенности поиска.
+   * ms — время}. opts.side — длинная сторона копии для поиска (DETECT.side), opts.minDetect — порог уверенности поиска,
+   * opts.pad — поле сверху и снизу (доля высоты снимка; точки и маска возвращаются в координатах снимка).
    */
   async function detectRaw(img, opts = {}) {
     await loadVendor();
@@ -80,22 +81,29 @@
       minDetect = opts.minDetect;
     }
     const t0 = performance.now();
-    const size = C.detectSize(img.width, img.height, opts.side || DETECT_SIDE);
-    const c = canvas(size.w, size.h);
-    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const pad = opts.pad || 0, kp = 1 + 2 * pad;
+    const size = C.detectSize(img.width, Math.round(img.height * kp), opts.side || C.DETECT.side);
+    const c = canvas(size.w, size.h), ctx = c.getContext("2d"), ih = size.h / kp;
+    if (pad) { ctx.fillStyle = C.FRAME.BG; ctx.fillRect(0, 0, c.width, c.height); }
+    ctx.drawImage(img, 0, ih * pad, c.width, ih);
     const res = landmarker.detect(c);
     release(c);
     const masks = (res && res.segmentationMasks) || [];
     try {
       const lm = (res && res.landmarks && res.landmarks[0]) || null, m = masks[0];
       const mask = lm && m ? {w: m.width, h: m.height, data: Float32Array.from(m.getAsFloat32Array())} : null;
-      return {lm, mask, ms: Math.round(performance.now() - t0)};
+      const det = pad ? C.unpadDetection({lm, mask}, pad) : {lm, mask};
+      return {lm: det.lm, mask: det.mask, ms: Math.round(performance.now() - t0)};
     } finally { masks.forEach(x => x.close && x.close()); }
   }
 
-  /** Опорные точки фигуры в пикселях снимка (+ макушка, подошвы, центр корпуса по маске) или null (фигура не найдена). */
+  /**
+   * Опорные точки фигуры в пикселях снимка (+ макушка, подошвы, центр корпуса по маске) или null (фигура не найдена).
+   * Не нашлась — ещё попытка с полем сверху и снизу: на обрезанном снимке (нет головы или ног) человек не упирается в край.
+   */
   async function detect(img) {
-    return C.figureFromDetection(await detectRaw(img), img.width, img.height);
+    return C.figureFromDetection(await detectRaw(img), img.width, img.height) ||
+           C.figureFromDetection(await detectRaw(img, {pad: C.DETECT.retryPad}), img.width, img.height);
   }
 
   /** Выровненный кадр FRAME.W×FRAME.H (× scale — для превью) по матрице из PhotosCore.alignAll (поворот + масштаб) → JPEG. */
