@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** SEL скачивает записи дневника FatSecret в `food_entries.csv` и показывает их в окне «неделя таблицей» на «Питании» с кнопкой «Скопировать картинкой».
+**Goal:** SEL скачивает записи дневника FatSecret в `food_entries.csv` и показывает их в окне «неделя таблицей» на «Питании». «Скопировать картинкой» отложено пользователем 27.11.2026 — в этот план не входит.
 
-**Architecture:** `fatsecret.update` после месячных итогов и веса скачивает `food_entries.get.v2` за 7 дней (14 — если прошлая неделя ещё пуста) и пишет записи по `id` с удалением пропавших. Страница «Питание» получает строки из RAW, группирует их по дням и приёмам (`portal/foodweek.js`, чистые функции) и рисует обе недели в скрытый `<dialog>` сразу при отрисовке. Картинка — снимки видимой части через новый IPC, склейка на canvas в странице, PNG в буфер через main.
+**Architecture:** `fatsecret.update` после месячных итогов и веса скачивает `food_entries.get.v2` за 7 дней (14 — если прошлая неделя ещё пуста) и пишет записи по `id` с удалением пропавших. Страница «Питание» получает строки из RAW, группирует их по дням и приёмам (`portal/foodweek.js`, чистые функции) и рисует обе недели в скрытый `<dialog>` сразу при отрисовке.
 
 **Tech Stack:** Electron, Node 26 (`node:test`), обычный JS страниц портала без сборки.
 
@@ -18,15 +18,13 @@
 - Ошибка любого запроса FatSecret — `{ok:false}`, файлы не пишутся (байт в байт как были).
 - Каждое заметное изменение — пункт в `desktop/CHANGELOG.md` → «Не выпущено» в том же коммите.
 - После кода — `cd desktop && npm test`; страницы — ещё `RENDER=1 npm test`.
-- Картинка — в текущей теме SEL; ничего не пишется на диск и не уходит в сеть.
 
 ## Review Focus
 
 1. Записи дня удалили в FatSecret полностью (в ответе нет `food_entry`) → записи этого дня исчезают из `food_entries.csv`. Тест — задача 1.
 2. Название продукта с запятой, кавычками или `<img …>` → CSV читается обратно, в окне текст, а не разметка. Тесты — задачи 1 и 3.
-3. Неделя выше окна SEL (маленький экран, 20 продуктов в день) → картинка всё равно целая неделя, без повторов и пропусков полос. Тест нарезки — задача 4.
-4. Обновление сразу после установки (продуктов ещё нет) → скачиваются 14 дней, обе недели окна заполнены. Тест — задача 1.
-5. День, где итог есть, а продуктов нет (старше 7 дней до функции) → итог дня и серое «продукты не загружены», не «не записывал». Тест — задача 3.
+3. Обновление сразу после установки (продуктов ещё нет) → скачиваются 14 дней, обе недели окна заполнены. Тест — задача 1.
+4. День, где итог есть, а продуктов нет (старше 7 дней до функции) → итог дня и серое «продукты не загружены», не «не записывал». Тест — задача 3.
 
 ---
 
@@ -133,7 +131,7 @@ git commit -m "FatSecret: продукты из дневника за после
 - [ ] **Step 4: Реализация**
   - `dataset.js`: `d.food_entries = T("food_entries")`.
   - `foodweek.js`: `const FoodWeek = {MEALS, byDay}` (глобально, как `Dataset`).
-  - `nutrition.html`: `<script src="foodweek.js">` после `common.js`; в разметке — `<dialog class="fw-dialog" id="foodweek">` с шапкой (заголовок «Питание · неделя с …», переключатель «прошлая / эта», кнопки «Скопировать картинкой» — только при `window.health` — и «Закрыть») и `.fw-sheet` (заголовок + 7 столбцов; кнопки вне `.fw-sheet`). Обе недели рисуются в `render()` (две `.fw-week`, видна одна). Столбец дня: полоска цвета `status()`/`ST` как в `last2()`, день недели и дата, ккал, Б/Ж/У, затем приёмы из `FoodWeek.byDay`: подпись, строки «`esc(name)` <span серым>`esc(amount)`</span>». Пустые/сегодня/будущее — как в спецификации («не записывал», «сегодня — пока пусто», бледный, «продукты не загружены»).
+  - `nutrition.html`: `<script src="foodweek.js">` после `common.js`; в разметке — `<dialog class="fw-dialog" id="foodweek">` с шапкой (заголовок «Питание · неделя с …», переключатель «прошлая / эта», кнопка «Закрыть») и `.fw-sheet` (заголовок + 7 столбцов; кнопки вне `.fw-sheet`). Обе недели рисуются в `render()` (две `.fw-week`, видна одна). Столбец дня: полоска цвета `status()`/`ST` как в `last2()`, день недели и дата, ккал, Б/Ж/У, затем приёмы из `FoodWeek.byDay`: подпись, строки «`esc(name)` <span серым>`esc(amount)`</span>». Пустые/сегодня/будущее — как в спецификации («не записывал», «сегодня — пока пусто», бледный, «продукты не загружены»).
   - `last2()`: кнопка «Подробно» в `<h3>` → открывает эту неделю; карточки дней получают `data-d` и по щелчку открывают неделю этого дня. `showModal()`; Esc и «Закрыть» закрывают.
   - `common.css`: `.fw-dialog` — на основе `.wn-dialog`, ширина `min(1400px, 96vw)`, `max-height: 92vh`; `.fw-body` — прокрутка по вертикали; `.fw-grid` — `grid-template-columns: repeat(7, minmax(0,1fr))`, перенос длинных названий; цвета — только переменные темы.
   - `CHANGELOG.md` → «Не выпущено» → «Новое»: «„Питание“: продукты из дневника FatSecret — кнопка „Подробно“ у „Последних 2 недель“ открывает неделю таблицей: дни рядом, что и сколько съедено по приёмам пищи; удобно отправить тренеру. Продукты обновляются за последние 7 дней — дописанное задним числом подтянется».
@@ -142,31 +140,8 @@ git commit -m "FatSecret: продукты из дневника за после
 
 ---
 
-### Task 4: «Скопировать картинкой»
-
-**Files:**
-- Modify: `desktop/preload.js`, `desktop/main.js` (рядом с `ipc('health:weight', …)`), `portal/foodweek.js`, `portal/nutrition.html`, `desktop/CHANGELOG.md` (дописать к пункту задачи 3)
-- Test: `desktop/test/portal_foodweek.test.js`
-
-**Interfaces:**
-- Produces: `window.health.capture(rect: {x,y,width,height}) → Promise<string>` (PNG data URL видимой области, CSS-пиксели окна); `window.health.copyImage(dataUrl: string) → Promise<{ok}>` (в буфер обмена).
-- Produces: `FoodWeek.slices(total: number, view: number) → Array<{y:number, h:number}>` — полосы подряд от 0 до `total`, каждая ≤ `view`, без нахлёста; `total ≤ view` → одна полоса.
-
-- [ ] **Step 1: Node-тест `slices`** — `slices(900, 1000)` → `[{y:0,h:900}]`; `slices(2000, 740)` → `[{y:0,h:740},{y:740,h:740},{y:1480,h:520}]`; сумма `h` = `total`; `slices(0, 740)` → `[]`.
-- [ ] **Step 2: Запустить — падает.** Run: `cd desktop && node --test test/portal_foodweek.test.js` — Expected: FAIL.
-- [ ] **Step 3: Реализация**
-  - `main.js`: `ipc('health:capture', async rect => (await win.webContents.capturePage(rect)).toDataURL())`; `ipc('health:copyImage', url => { clipboard.writeImage(nativeImage.createFromDataURL(url)); return {ok:true}; })` — `rect` проверить (четыре конечных неотрицательных числа), `url` — только `data:image/png;base64,`.
-  - `preload.js`: `capture`, `copyImage` (по образцу соседних).
-  - `foodweek.js`: `slices`.
-  - `nutrition.html` → `copyWeek()`: кнопка — «Копирую…» и неактивна; для видимой `.fw-sheet` внутри `.fw-body`: по `FoodWeek.slices(sheet.scrollHeight, видимая высота .fw-body)` прокрутить `.fw-body` к `y`, дождаться двух кадров, снять прямоугольник листа в видимой части `health.capture`, нарисовать на `<canvas>` (ширина листа × `devicePixelRatio`, высота `total × devicePixelRatio`) со сдвигом `y × devicePixelRatio`; вернуть прокрутку; `health.copyImage(canvas.toDataURL('image/png'))`; кнопка — «Скопировано» на 2 с. Ошибка — текст ошибки на кнопке на 3 с.
-- [ ] **Step 4: Тесты проходят** — `cd desktop && npm test && RENDER=1 npm test`, все PASS.
-- [ ] **Step 5: Проверка в приложении без клика** — `HEALTH_DOCUMENTS=<временная папка с данными из теста> HEALTH_SMOKE=1 HEALTH_PAGE=nutrition.html HEALTH_SMOKE_JS="document.querySelector('#last2 button').click(); copyWeek()" npx electron .` в `desktop/` — без ошибок в выводе (содержимое буфера смотрим вручную на шаге задачи 5).
-- [ ] **Step 6: Коммит** — `desktop/preload.js desktop/main.js portal/foodweek.js portal/nutrition.html desktop/CHANGELOG.md desktop/test/portal_foodweek.test.js` (после `public_check`): «„Питание“: неделя картинкой в буфер обмена».
-
----
-
-### Task 5: Сборка и проверка в приложении
+### Task 4: Сборка и проверка в приложении
 
 - [ ] **Step 1:** `cd desktop && npm test && RENDER=1 npm test` — все PASS; `node scripts/public_check.js` — «Чисто»; `git status` — нет чужих незакоммиченных правок.
 - [ ] **Step 2:** `cd desktop && npm run app:mac` — SEL собран, установлен в /Applications и открыт.
-- [ ] **Step 3:** Сказать пользователю, что проверить: «Обновить данные» → «Питание» → «Подробно»: обе недели с продуктами, переключатель, щелчок по дню открывает его неделю; «Скопировать картинкой» → вставить в Telegram: вся неделя целиком, в текущей теме; в папке профиля появился `food_entries.csv`.
+- [ ] **Step 3:** Сказать пользователю, что проверить: «Обновить данные» → «Питание» → «Подробно»: обе недели с продуктами, переключатель, щелчок по дню открывает его неделю; в папке профиля появился `food_entries.csv`.
