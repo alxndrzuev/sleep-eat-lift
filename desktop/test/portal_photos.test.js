@@ -44,10 +44,10 @@ function synth(k, o, {x = 2000, drop = [], shift = {}} = {}) {
 /** Матрица canvas (a…f) к точке снимка → точка кадра. */
 const apply = (t, p) => [t.a * p[0] + t.c * p[1] + t.e, t.b * p[0] + t.d * p[1] + t.f];
 
-/** 33 точки MediaPipe (нормированные, все невидимые), кроме points: {индекс: [x, y]}. */
+/** 33 точки MediaPipe (нормированные, все невидимые), кроме points: {индекс: [x, y] или [x, y, z]}. */
 function lm(points, vis = 1.0) {
   const out = Array.from({length: 33}, () => ({x: 0, y: 0, visibility: 0.0}));
-  for (const [i, [x, y]] of Object.entries(points)) out[i] = {x, y, visibility: vis};
+  for (const [i, [x, y, z]] of Object.entries(points)) out[i] = z === undefined ? {x, y, visibility: vis} : {x, y, z, visibility: vis};
   return J(out);
 }
 
@@ -177,15 +177,45 @@ test('keypoints from landmarks', () => {
     2: [0.48, 0.09], 5: [0.52, 0.09], 25: [0.45, 0.7], 26: [0.55, 0.7], 29: [0.45, 0.92], 30: [0.55, 0.92]};
   assert.deepStrictEqual(kp(pts), {w: 1000, h: 2000, head: [500, 200], neck: [500, 400], root: [500, 1000], ankle: [500, 1800],
     feet: [450, 550], pts: {eyes: [500, 180], ears: null, knees: [500, 1400], heels: [500, 1840]},
-    look: {sw: -0.33, up: null, dir: null}});
+    look: {sw: -0.33, hw: -0.17, zs: null, up: null, el: null, dir: null}});
 });
 
 test('pose features: sw — shoulders by x / torso, up — hands above shoulders / torso, dir — facing', () => {
   const pts = {11: [0.6, 0.2], 12: [0.4, 0.2], 23: [0.45, 0.5], 24: [0.55, 0.5], 15: [0.62, 0.05], 16: [0.38, 0.05]};
-  assert.deepStrictEqual(kp(pts).look, {sw: 0.33, up: 0.5, dir: null});
+  assert.deepStrictEqual(kp(pts).look, {sw: 0.33, hw: -0.17, zs: null, up: 0.5, el: null, dir: null});
   // куда смотрит: (нос − уши) + (носки − пятки) по x / корпус; > 0 — вправо на снимке (правым боком к камере)
   Object.assign(pts, {0: [0.56, 0.1], 7: [0.5, 0.11], 8: [0.5, 0.11], 29: [0.45, 0.95], 30: [0.45, 0.95], 31: [0.6, 0.96], 32: [0.6, 0.96]});
   assert.strictEqual(kp(pts).look.dir, 0.35);
+});
+
+test('pose features: hw — hips by x / torso, zs — depth left minus right (shoulders and hips), el — elbows above shoulders / torso', () => {
+  const pts = {11: [0.6, 0.2, -0.3], 12: [0.4, 0.2, 0.3], 23: [0.55, 0.5, -0.1], 24: [0.45, 0.5, 0.1], 13: [0.62, 0.22], 14: [0.38, 0.24]};
+  const L = kp(pts).look;
+  assert.deepStrictEqual([L.hw, L.zs, L.el], [0.17, -0.4, -0.1]);
+});
+
+test('points outside the frame are ignored: MediaPipe guesses them with high visibility; a little past the edge is kept', () => {
+  const k = kp({0: [0.5, -0.3], 11: [0.6, 0.2], 12: [0.4, 0.2], 23: [0.55, 0.5], 24: [0.45, 0.5], 15: [0.62, -0.25], 27: [0.45, 1.1]});
+  assert.deepStrictEqual([k.head, k.look.up, k.ankle], [null, null, [450, 2200]]);
+});
+
+test('side with arms raised forward, no head and no feet → side (by depth), mirrored → side_left', () => {
+  const pts = {11: [0.51, 0.2, 0.3], 12: [0.49, 0.2, -0.3], 23: [0.51, 0.5, 0.15], 24: [0.49, 0.5, -0.15],
+    13: [0.65, 0.21], 14: [0.64, 0.21], 15: [0.78, 0.22], 16: [0.77, 0.22], 25: [0.52, 0.75], 26: [0.5, 0.75]};
+  assert.strictEqual(js(`PhotosCore.guessPose(PhotosCore.keypointsFromLandmarks(${lm(pts)}, 1000, 2000))`), 'side');
+  // зеркало: x отражён, глубина та же, левое и правое меняются местами (так их и называет MediaPipe на отражённом снимке)
+  const swap = {11: 12, 12: 11, 13: 14, 14: 13, 15: 16, 16: 15, 23: 24, 24: 23, 25: 26, 26: 25};
+  const m = Object.fromEntries(Object.entries(pts).map(([i, [x, y, z]]) => [swap[i], [1 - x, y, z]]));
+  assert.strictEqual(js(`PhotosCore.guessPose(PhotosCore.keypointsFromLandmarks(${lm(m)}, 1000, 2000))`), 'side_left');
+});
+
+test('guess pose: depth decides the side, arms do not matter sideways, wide hips are not side, elbows when wrists are cut', () => {
+  for (const [look, pose] of [
+    [{sw: 0.05, hw: 0.02, up: -0.05, zs: 0.5, dir: null}, 'side'], [{sw: 0.05, hw: 0.02, up: 0.4, zs: -0.5, dir: null}, 'side_left'],
+    [{sw: 0.05, hw: 0.02, zs: 0.4, dir: -0.2}, 'side'], [{sw: 0.05, hw: 0.02, zs: 0.05, dir: -0.3}, 'side_left'],
+    [{sw: 0.3, hw: 0.3, up: -1}, 'front'],
+    [{sw: 0.6, hw: 0.3, up: null, el: 0.05}, 'front_flex'], [{sw: -0.6, hw: -0.3, up: null, el: -0.6}, 'back']])
+    assert.strictEqual(js(`PhotosCore.guessPose(${J({look})})`), pose, J(look));
 });
 
 test('guess pose (thresholds from 65 photos)', () => {

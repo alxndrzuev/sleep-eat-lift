@@ -22,6 +22,8 @@
   const TRIM_FLOOR = 25;                                              // для отбраковки выбросов (волосы, таз) σ не меньше 5 px; выброс — дальше 4σ
   const FOLDER = "photos";          // папка data/photos внутри папки проекта (личные данные — в data/)
   const VIS = 0.5;                      // порог видимости точки MediaPipe
+  const EDGE = 0.2;                     // точка дальше этого за краем кадра (доля снимка) — выдумана MediaPipe, не в счёт
+  const HW = 0.2, ZS = 0.15;            // боком: |hw| таза меньше HW; сторона по глубине, если |zs| ≥ ZS
   const NAME = /^(\d{4}-\d{2}-\d{2})_([a-z_]+)\.[A-Za-z0-9]+$/;
   const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -135,10 +137,14 @@
   }
 
 
-  /** 33 точки MediaPipe (нормированные) → опорные точки в пикселях снимка; без плеч или таза — null. */
+  /**
+   * 33 точки MediaPipe (нормированные) → опорные точки в пикселях снимка; без плеч или таза — null. Точка за краем кадра
+   * (дальше EDGE) не в счёт: MediaPipe дорисовывает обрезанные голову и кисти с высокой «видимостью».
+   */
   function keypointsFromLandmarks(lm, w, h) {
     if (!lm || lm.length < 29) return null;
-    const p = i => (lm[i] && (lm[i].visibility ?? 1) >= VIS) ? [r1(lm[i].x * w), r1(lm[i].y * h)] : null;
+    const inside = q => q.x >= -EDGE && q.x <= 1 + EDGE && q.y >= -EDGE && q.y <= 1 + EDGE;
+    const p = i => (lm[i] && (lm[i].visibility ?? 1) >= VIS && inside(lm[i])) ? [r1(lm[i].x * w), r1(lm[i].y * h)] : null;
     const mid = (a, b) => a && b ? [r1((a[0] + b[0]) / 2), r1((a[1] + b[1]) / 2)] : null;
     const neck = mid(p(11), p(12)), rootP = mid(p(23), p(24));
     if (!neck || !rootP) return null;
@@ -148,28 +154,39 @@
     };
     const ankle = avg(27, 28);
     const foot = [27, 28, 29, 30, 31, 32].map(p).filter(Boolean).map(a => a[0]);   // щиколотки, пятки, носки — по x
-    // признаки позы: sw — (левое плечо − правое) по x / корпус: лицом > 0, спиной < 0, боком ≈ 0; up — кисти выше плеч / корпус
+    // признаки позы (на корпус T): sw, hw — (левое − правое) по x у плеч и таза: лицом > 0, спиной < 0, боком ≈ 0;
+    // up — кисти выше плеч, el — локти выше плеч (кисти обрезаны — руки вверх видно по локтям);
+    // zs — глубина левых минус правых (плечи и таз; меньше — ближе к камере): > 0 — ближе правый бок
     const T = dist(neck, rootP), r2 = v => Math.round(v * 100) / 100;
-    const ups = [[15, 11], [16, 12]].filter(([wr]) => p(wr)).map(([wr, sh]) => (p(sh)[1] - p(wr)[1]) / T);
+    const mean = a => a.length ? r2(a.reduce((x, y) => x + y, 0) / a.length) : null;
+    const above = pairs => mean(pairs.filter(([j]) => p(j)).map(([j, sh]) => (p(sh)[1] - p(j)[1]) / T));
+    const z = i => typeof lm[i].z === "number" ? lm[i].z : null;
+    const zs = [[11, 12], [23, 24]].filter(([a, b]) => z(a) !== null && z(b) !== null).map(([a, b]) => z(a) - z(b));
     // куда смотрит (для «сбоку»): (нос − середина ушей) + (носки − пятки) по x / корпус; > 0 — вправо на снимке = правым боком
     const ears = avg(7, 8), heels = avg(29, 30), toes = avg(31, 32);
     const dirs = [p(0) && ears && p(0)[0] - ears[0], toes && heels && toes[0] - heels[0]].filter(v => typeof v === "number");
     return {w, h, head: p(0) || p(7) || p(8), neck, root: rootP, ankle,
             feet: ankle && foot.length ? [Math.min(...foot), Math.max(...foot)] : null,
             pts: {eyes: avg(2, 5), ears: avg(7, 8), knees: avg(25, 26), heels: avg(29, 30)},
-            look: {sw: r2((p(11)[0] - p(12)[0]) / T), up: ups.length ? r2(ups.reduce((a, b) => a + b, 0) / ups.length) : null,
+            look: {sw: r2((p(11)[0] - p(12)[0]) / T), hw: r2((p(23)[0] - p(24)[0]) / T), zs: mean(zs),
+                   up: above([[15, 11], [16, 12]]), el: above([[13, 11], [14, 12]]),
                    dir: dirs.length ? r2(dirs.reduce((a, b) => a + b, 0) / T) : null}};
   }
 
   /**
-   * Поза по точкам тела (kp.look) или null. Пороги — по 65 реальным снимкам (11.2026), запас большой: боком |sw| ≤ 0.12,
-   * остальные ≥ 0.58; руки вверх up +0.35…+0.55, вниз ≈ −1.
+   * Поза по точкам тела (kp.look) или null. Пороги — по 65 снимкам и их вариантам (без стоп, без головы, только
+   * плечи–колени, зеркально; проверочный набор, 11.2026): боком — узкие плечи (|sw| < 0.35) и таз (|hw| < HW); сторона —
+   * по глубине (|zs| ≥ ZS: ближнее плечо и бедро), иначе по носу и носкам; руки боком не смотрятся (вперёд, вверх — всё
+   * «Сбоку»). Руки вверх: кисти выше плеч (up > −0.3: вверх +0.35…+0.55, вниз ≈ −1), кистей нет — локти (el > −0.3).
    */
   function guessPose(kp) {
     const L = kp && kp.look;
     if (!L || L.sw == null) return null;
-    if (Math.abs(L.sw) < 0.35) return L.dir != null && L.dir < 0 ? "side_left" : "side";
-    const flex = L.up != null && L.up > -0.3;
+    if (Math.abs(L.sw) < 0.35 && (L.hw == null || Math.abs(L.hw) < HW)) {
+      const d = L.zs != null && Math.abs(L.zs) >= ZS ? L.zs : L.dir;
+      return d != null && d < 0 ? "side_left" : "side";
+    }
+    const flex = L.up != null ? L.up > -0.3 : L.el != null && L.el > -0.3;
     return L.sw > 0 ? (flex ? "front_flex" : "front") : (flex ? "back_flex" : "back");
   }
 
