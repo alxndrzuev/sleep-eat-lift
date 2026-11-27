@@ -194,9 +194,9 @@ test('pose features: hw — hips by x / torso, zs — depth left minus right (sh
   assert.deepStrictEqual([L.hw, L.zs, L.el], [0.17, -0.4, -0.1]);
 });
 
-test('points outside the frame are ignored: MediaPipe guesses them with high visibility; a little past the edge is kept', () => {
-  const k = kp({0: [0.5, -0.3], 11: [0.6, 0.2], 12: [0.4, 0.2], 23: [0.55, 0.5], 24: [0.45, 0.5], 15: [0.62, -0.25], 27: [0.45, 1.1]});
-  assert.deepStrictEqual([k.head, k.look.up, k.ankle], [null, null, [450, 2200]]);
+test('points outside the frame are ignored: MediaPipe guesses them with high visibility (off by 100–200 px on cut photos)', () => {
+  const k = kp({0: [0.5, -0.3], 11: [0.6, 0.2], 12: [0.4, 0.2], 23: [0.55, 0.5], 24: [0.45, 0.5], 15: [0.62, -0.25], 27: [0.45, 1.01], 28: [0.55, 0.99]});
+  assert.deepStrictEqual([k.head, k.look.up, k.ankle], [null, null, [550, 1980]]);
 });
 
 test('side with arms raised forward, no head and no feet → side (by depth), mirrored → side_left', () => {
@@ -214,7 +214,8 @@ test('guess pose: depth decides the side, arms do not matter sideways, wide hips
     [{sw: 0.05, hw: 0.02, up: -0.05, zs: 0.5, dir: null}, 'side'], [{sw: 0.05, hw: 0.02, up: 0.4, zs: -0.5, dir: null}, 'side_left'],
     [{sw: 0.05, hw: 0.02, zs: 0.4, dir: -0.2}, 'side'], [{sw: 0.05, hw: 0.02, zs: 0.05, dir: -0.3}, 'side_left'],
     [{sw: 0.3, hw: 0.3, up: -1}, 'front'],
-    [{sw: 0.6, hw: 0.3, up: null, el: 0.05}, 'front_flex'], [{sw: -0.6, hw: -0.3, up: null, el: -0.6}, 'back']])
+    [{sw: 0.6, hw: 0.3, up: null, el: 0.05}, 'front_flex'], [{sw: -0.6, hw: -0.3, up: null, el: -0.6}, 'back'],
+    [{sw: 0.6, hw: 0.3, up: -0.2}, 'front'], [{sw: 0.6, hw: 0.3, up: 0.05}, 'front_flex']])   // кисти у груди — не «Бицепс»
     assert.strictEqual(js(`PhotosCore.guessPose(${J({look})})`), pose, J(look));
 });
 
@@ -262,6 +263,16 @@ test('silhouette: head touches the top edge', () => {
   const r = sil([[45, 0, 55, 30], ...BODY.slice(1)]);
   assert.strictEqual(r.crown, null);
   assert.strictEqual(r.sole[1], 180);
+});
+
+test('silhouette: head or feet cut by the frame with a blurred mask edge — no crown, no sole', () => {
+  const r = sil([[45, 2, 55, 30], BODY[1], [44, 110, 56, 197]]);
+  assert.deepStrictEqual([r.crown, r.sole], [null, null]);
+});
+
+test('silhouette: arms raised forward at shoulder height do not move the torso centre', () => {
+  const r = sil([...BODY.slice(0, 4), [60, 32, 95, 40]]);
+  assert.ok(Math.abs(r.cx - 50) <= 2, String(r.cx));
 });
 
 test('silhouette: empty mask', () => {
@@ -314,6 +325,33 @@ test('align: soles found, crown not', () => {
   assert.strictEqual(t.feet_cut, false);
 });
 
+const MED_K = Object.assign({}, MED, {rK: {front: 2}, offK: {front: 0.25}, all: Object.assign({}, MED.all, {rK: 1.93, offK: 0.27})});
+
+test('align fallback: shoulders–knees (no head, no feet)', () => {
+  const k = {w: 1000, h: 3000, head: null, neck: [520, 800], root: [520, 1800], ankle: null, feet: null, pts: {knees: [520, 2800]}};
+  const t = js(`PhotosCore.alignTransform(${J(k)}, "front", ${J(MED_K)})`);
+  assert.strictEqual(t.by, 'колени');
+  near(t.s, 4300 / 4000);                                  // силуэт = (колени − плечи) · rK = 2000 · 2
+  near(apply(t, [520, 3800])[1], 5470 - 420, {delta: 1e-6});   // пол = колени + offK · силуэт
+});
+
+test('tilt by knees when there are no ankles', () => {
+  const k = {neck: [520, 800], root: [500, 1800], ankle: null, pts: {knees: [470, 3000], heels: null}};
+  near(js(`PhotosCore.bodyAngle(${J(k)})`), Math.atan((520 - 470) / (800 - 3000)));
+});
+
+test('pose with only cut photos (no head, no feet): fitted by points, one scale for all', () => {
+  const ks = [0.9, 1.0, 1.1, 0.95, 1.05];
+  const entries = ks.map((k, i) => ({name: `p${i}`, pose: 'front',
+    kp: Object.assign(synth(k, 100 * i, {drop: ['crown', 'sole', 'ankle', 'heels', 'eyes', 'ears']}), {head: null, feet: null})}));
+  const res = js(`PhotosCore.alignAll(${J(entries)})`);
+  const sk = ks.map((k, i) => res[`p${i}`].s * k);
+  for (let i = 0; i < ks.length; i++) {
+    assert.strictEqual(res[`p${i}`].by, 'точки');
+    near(sk[i], sk[0], {delta: 0.01 * sk[0]});
+  }
+});
+
 test('align fallback: torso', () => {
   const k = {...NOSIL, head: null};                      // корпус 1000 × 3.3 = 3300
   const t = align(k);
@@ -361,8 +399,11 @@ test('few photos — by silhouette; without keypoints — skipped', () => {
 
 test('pose medians', () => {
   assert.deepStrictEqual(js('PhotosCore.poseMedians([])'),
-    {rN: {}, rT: {}, offA: {}, offR: {}, all: {rN: 1.12, rT: 3.4, offA: 0.04, offR: 0.5}});
-  const m = js(`PhotosCore.poseMedians(${J([{pose: 'front', kp: KP}, {pose: 'front', kp: NOSIL}])})`);   // без силуэта — не в счёт
+    {rN: {}, rT: {}, offA: {}, offR: {}, rK: {}, offK: {}, all: {rN: 1.12, rT: 3.4, offA: 0.04, offR: 0.5, rK: 1.93, offK: 0.27}});
+  const kn = Object.assign({}, KP, {pts: {knees: [520, 3000]}});     // колени: силуэт / «плечи–колени» = 4300 / 2200
+  const m = js(`PhotosCore.poseMedians(${J([{pose: 'front', kp: kn}, {pose: 'front', kp: NOSIL}])})`);   // без силуэта — не в счёт
+  near(m.rK.front, 4300 / 2200);
+  near(m.offK.front, 1400 / 4300);
   near(m.rN.front, 4300 / 3900);
   near(m.rT.front, 4.3);
   near(m.offA.front, 200 / 4300);

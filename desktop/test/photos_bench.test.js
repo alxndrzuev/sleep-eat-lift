@@ -209,10 +209,10 @@ test('evaluate on a synthetic cache: found, pose, confusion, alignment shift, le
 test('baseline: pose and aligned points of full photos; later runs compare against it', () => {
   const entries = [rec('own', 'a', 'full', 'front', FRONT_LM), rec('own', 'c', 'full', 'back', FRONT_LM)];
   const base = B.baselineOf(entries);
-  assert.deepStrictEqual(Object.keys(base).sort(), ['a', 'c']);
-  assert.strictEqual(base.a.pose, 'front');
-  assert.deepStrictEqual(B.evaluate(entries, {baseline: base}).base, {n: 2, poseChanged: [], maxShift: 0});
-  base.a.pose = 'side';
+  assert.deepStrictEqual(Object.keys(base.photos).sort(), ['a', 'c']);
+  assert.strictEqual(base.photos.a.pose, 'front');
+  assert.deepStrictEqual(B.evaluate(entries, {baseline: base}).base, {n: 2, poseChanged: [], maxShift: 0, consistency: base.consistency});
+  base.photos.a.pose = 'side';
   assert.deepStrictEqual(B.evaluate(entries, {baseline: base}).base.poseChanged, ['a']);
 });
 
@@ -225,4 +225,15 @@ test('report: tables and the bar with ✅/❌, no user coordinates', () => {
   assert.match(r, /✅ свои: поза верна во всех найденных/);
   assert.match(r, /❌|✅/);
   assert.doesNotMatch(r, /612|0\.612/);
+});
+
+test('consistency of full photos: a point left out of the fit lands at the same height on every photo of a pose', () => {
+  // пять снимков позы — один человек в разном масштабе и сдвиге: идеальное выравнивание, разброс 0
+  const entries = [0.9, 1.0, 1.1, 0.95, 1.05].map((k, i) => {
+    const P = Object.fromEntries(Object.entries(FRONT_LM).map(([j, [x, y]]) => [j, [x, (y * k * 2000 + 50 * i) / 2400]]));
+    return Object.assign(rec('own', `a${i}`, 'full', 'front', P), {h: 2400});
+  });
+  const c = B.consistency(entries);
+  assert.ok(c.mean < 0.5, J(c));
+  assert.deepStrictEqual(Object.keys(c.points).sort(), ['ankle', 'knees', 'neck', 'root']);   // глаз в наборе нет
 });

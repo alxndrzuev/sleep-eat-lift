@@ -258,12 +258,40 @@ function alignedFull(fulls) {
 
 const meanDist = (a, b) => { const n = Math.min(a.length, b.length); let s = 0; for (let i = 0; i < n; i++) s += Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1]); return n ? s / n : 0; };
 
-/** Исходная точка: поза и выровненные точки целых своих снимков по нынешнему коду. */
+const ownFulls = entries => entries.filter(e => e.source === 'own' && e.variant === 'full' && e.truth).map(e => ({e, kp: figure(e)})).filter(f => f.kp);
+
+/**
+ * Согласованность выравнивания целых своих снимков (правды о «верном» выравнивании нет — есть постоянство тела): точка
+ * исключается из подгонки, и смотрим, насколько по-разному она легла по высоте на снимках одной позы (1.4826 · MAD, px).
+ * → {points: {точка: px — среднее по позам}, mean}. Меньше — лучше; сравнивать с исходной точкой.
+ */
+function consistency(entries) {
+  const fulls = ownFulls(entries), points = {};
+  for (const n of ['eyes', 'neck', 'root', 'knees', 'ankle']) {
+    const sds = [];
+    for (const pose of new Set(fulls.map(f => f.e.truth))) {
+      const list = fulls.filter(f => f.e.truth === pose);
+      if (list.length < 3) continue;
+      const tf = C.alignAll(list.map(f => ({name: f.e.id, pose, kp: f.kp})), {fit: C.FIT.filter(x => x !== n)}), ys = [];
+      for (const f of list) {
+        const p = Object.assign({neck: f.kp.neck, root: f.kp.root, ankle: f.kp.ankle}, f.kp.pts)[n], t = tf[f.e.id];
+        if (p && t) ys.push(apply(t, p)[1]);
+      }
+      if (ys.length < 3) continue;
+      const m = median(ys);
+      sds.push(1.4826 * median(ys.map(y => Math.abs(y - m))));
+    }
+    if (sds.length) points[n] = r1(sds.reduce((a, b) => a + b, 0) / sds.length);
+  }
+  const v = Object.values(points);
+  return {points, mean: v.length ? r1(v.reduce((a, b) => a + b, 0) / v.length) : null};
+}
+
+/** Исходная точка: поза и выровненные точки целых своих снимков по нынешнему коду + их согласованность. */
 function baselineOf(entries) {
-  const fulls = entries.filter(e => e.source === 'own' && e.variant === 'full').map(e => ({e, kp: figure(e)})).filter(f => f.kp);
-  const al = alignedFull(fulls), out = {};
-  for (const f of fulls) out[f.e.id] = {pose: C.guessPose(f.kp), pts: al[f.e.id] ? al[f.e.id].pts.map(p => p.map(r1)) : []};
-  return out;
+  const fulls = ownFulls(entries), al = alignedFull(fulls), photos = {};
+  for (const f of fulls) photos[f.e.id] = {pose: C.guessPose(f.kp), pts: al[f.e.id] ? al[f.e.id].pts.map(p => p.map(r1)) : []};
+  return {photos, consistency: consistency(entries).mean};
 }
 
 /**
@@ -308,11 +336,12 @@ function evaluate(entries, opts = {}) {
     [v, {n: s.d.length, median: r1(median(s.d)), p90: r1(pct(s.d, 0.9)), dth: r1(median(s.th))}]));
   let base = null;
   if (opts.baseline) {
-    const now = baselineOf(entries), ids = Object.keys(opts.baseline);
-    base = {n: ids.length, poseChanged: ids.filter(id => now[id] && now[id].pose !== opts.baseline[id].pose),
-            maxShift: r1(Math.max(0, ...ids.filter(id => now[id]).map(id => meanDist(now[id].pts, opts.baseline[id].pts))))};
+    const now = baselineOf(entries).photos, was = opts.baseline.photos, ids = Object.keys(was);
+    base = {n: ids.length, poseChanged: ids.filter(id => now[id] && now[id].pose !== was[id].pose),
+            maxShift: r1(Math.max(0, ...ids.filter(id => now[id]).map(id => meanDist(now[id].pts, was[id].pts)))),
+            consistency: opts.baseline.consistency};
   }
-  return {rows, lr, align, base, unclear};
+  return {rows, lr, align, base, unclear, consistency: consistency(entries)};
 }
 
 /** Цифры → отчёт (markdown): таблицы и планка «готово» из дизайна. Только сводные цифры — без координат точек. */
@@ -332,6 +361,9 @@ function report(s, {date, params} = {}) {
   L.push('', '## Сдвиг выравнивания (свои, вариант против целого)', '', '| вариант | снимков | медиана, px | p90, px | наклон, ° |', '|---|---|---|---|---|');
   for (const v of VARIANTS) if (s.align[v]) L.push(`| ${v} | ${s.align[v].n} | ${s.align[v].median} | ${s.align[v].p90} | ${s.align[v].dth} |`);
   if (s.base) L.push('', '## Против исходного кода', '', `Снимков: ${s.base.n}; поза изменилась: ${s.base.poseChanged.length ? s.base.poseChanged.join(', ') : 'нет'}; наибольший сдвиг: ${s.base.maxShift} px`);
+  if (s.consistency && s.consistency.mean !== null) L.push('', '## Согласованность целых (точка вне подгонки, разброс по высоте, px)', '',
+    Object.entries(s.consistency.points).map(([n, v]) => `${n} ${v}`).join(' · ') + ` — среднее ${s.consistency.mean}` +
+    (s.base && s.base.consistency != null ? ` (исходный код: ${s.base.consistency})` : ''));
   // планка
   const sum = (src, pred) => rows.filter(r => r.source === src && pred(baseVariant(r.variant)))
     .reduce((a, r) => ({n: a.n + r.n, found: a.found + r.found, correct: a.correct + r.correct}), {n: 0, found: 0, correct: 0});
@@ -343,6 +375,8 @@ function report(s, {date, params} = {}) {
       for (const v of vs) { const x = sum('own', w => w === v); if (x.n) ok(x.found / x.n >= need, `свои, ${v}: фигура найдена ${P(x.found, x.n)} (нужно ≥ ${need * 100} %)`); }
     for (const v of VARIANTS) if (s.align[v]) ok(s.align[v].median <= 25 && s.align[v].p90 <= 50, `свои, ${v}: сдвиг медиана ${s.align[v].median} ≤ 25, p90 ${s.align[v].p90} ≤ 50`);
     if (s.base) ok(!s.base.poseChanged.length && s.base.maxShift <= 5, `65 целых: поза та же, сдвиг ${s.base.maxShift} ≤ 5 px`);
+    if (s.base && s.base.consistency != null && s.consistency.mean !== null)
+      ok(s.consistency.mean <= s.base.consistency + 1, `целые выровнены не хуже: согласованность ${s.consistency.mean} ≤ ${s.base.consistency} + 1 px`);
   }
   const coco = sum('coco', () => true);
   if (coco.n) ok(coco.correct / (coco.found || 1) >= 0.9, `COCO: поза верна ${P(coco.correct, coco.found)} найденных (нужно ≥ 90 %)`);
@@ -355,4 +389,4 @@ function report(s, {date, params} = {}) {
 
 module.exports = {VARIANTS, cropBox, truthMirror, rleEncode, rleDecode, cacheKey, readIndex, ownJobs, extraJobs,
   cocoTruth, cocoSelect, cocoAsLm, cocoCrops, gtInCrop, lrSwapped,
-  figure, evaluate, baselineOf, report};
+  figure, evaluate, baselineOf, consistency, report};

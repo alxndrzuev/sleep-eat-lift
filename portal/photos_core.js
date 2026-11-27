@@ -14,7 +14,9 @@
                       front_flex: "Бицепс"};
   const PROTOCOL = ["front", "side", "back", "back_flex", "front_flex"];   // 5 снимков по порядку съёмки (docs/06); side — правым боком
   const FRAME = {W: 3330, H: 5470, HS: 4300, SOLE_Y: 420, BG: "rgb(232,230,224)"};   // HS — макушка–подошвы, SOLE_Y — подошвы от низа
-  const DEFAULT_MED = {rN: 1.12, rT: 3.4, offA: 0.04, offR: 0.5};   // силуэт/«нос–щиколотки», силуэт/корпус, (подошвы−щиколотки)/силуэт, (подошвы−таз)/силуэт
+  // силуэт/«нос–щиколотки», силуэт/корпус, (подошвы−щиколотки)/силуэт, (подошвы−таз)/силуэт, силуэт/«плечи–колени»,
+  // (подошвы−колени)/силуэт; rK и offK — медианы по 53 полным снимкам (11.2026)
+  const DEFAULT_MED = {rN: 1.12, rT: 3.4, offA: 0.04, offR: 0.5, rK: 1.93, offK: 0.27};
   const MAX_TILT = 5 * Math.PI / 180;                                 // больший наклон — скорее ошибка точек
   const FIT = ["crown", "eyes", "ears", "neck", "root", "knees", "ankle", "heels", "sole"];   // точки подгонки (по высоте)
   const MIN_FIT = 3;                                                  // столько снимков позы нужно для подгонки по точкам
@@ -22,7 +24,7 @@
   const TRIM_FLOOR = 25;                                              // для отбраковки выбросов (волосы, таз) σ не меньше 5 px; выброс — дальше 4σ
   const FOLDER = "photos";          // папка data/photos внутри папки проекта (личные данные — в data/)
   const VIS = 0.5;                      // порог видимости точки MediaPipe
-  const EDGE = 0.2;                     // точка дальше этого за краем кадра (доля снимка) — выдумана MediaPipe, не в счёт
+  const EDGE = 0;                       // точка за краем кадра (доля снимка) — выдумана MediaPipe (ошибка 100–200 px), не в счёт
   const HW = 0.2, ZS = 0.15;            // боком: |hw| таза меньше HW; сторона по глубине, если |zs| ≥ ZS
   const NAME = /^(\d{4}-\d{2}-\d{2})_([a-z_]+)\.[A-Za-z0-9]+$/;
   const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -177,7 +179,8 @@
    * Поза по точкам тела (kp.look) или null. Пороги — по 65 снимкам и их вариантам (без стоп, без головы, только
    * плечи–колени, зеркально; проверочный набор, 11.2026): боком — узкие плечи (|sw| < 0.35) и таз (|hw| < HW); сторона —
    * по глубине (|zs| ≥ ZS: ближнее плечо и бедро), иначе по носу и носкам; руки боком не смотрятся (вперёд, вверх — всё
-   * «Сбоку»). Руки вверх: кисти выше плеч (up > −0.3: вверх +0.35…+0.55, вниз ≈ −1), кистей нет — локти (el > −0.3).
+   * «Сбоку»). Руки вверх: кисти выше плеч (up > 0: «Бицепс» +0.35…+0.55, вдоль тела ≈ −1, у груди −0.1…−0.3 — не «Бицепс»,
+   * по 305 людям COCO), кистей нет — локти (el > −0.3). Итог (11.2026): свои — 519 из 538 вариантов, COCO — 91 %.
    */
   function guessPose(kp) {
     const L = kp && kp.look;
@@ -186,7 +189,7 @@
       const d = L.zs != null && Math.abs(L.zs) >= ZS ? L.zs : L.dir;
       return d != null && d < 0 ? "side_left" : "side";
     }
-    const flex = L.up != null ? L.up > -0.3 : L.el != null && L.el > -0.3;
+    const flex = L.up != null ? L.up > 0 : L.el != null && L.el > -0.3;
     return L.sw > 0 ? (flex ? "front_flex" : "front") : (flex ? "back_flex" : "back");
   }
 
@@ -205,7 +208,8 @@
     for (let x = hx - hb; x <= hx + hb; x++)
       for (let y = 0; y < kp.neck[1]; y++)
         if ([...Array(RUN).keys()].every(i => on(x, y + i))) { if (y < top) { top = y; topX = x; } break; }
-    if (top !== Infinity && top > 1) out.crown = [topX, top];
+    const EDGE_PX = Math.max(2, Math.round(0.005 * mh));        // маска размыта: у среза кадра фигура начинается не с 0
+    if (top !== Infinity && top > EDGE_PX) out.crown = [topX, top];
     // подошвы: снизу вверх в полосе стоп
     if (kp.feet && kp.ankle) {
       const fb = Math.max(2, Math.round(0.1 * torso)), stop = Math.max(0, Math.round(kp.ankle[1] - 0.1 * torso));
@@ -213,7 +217,7 @@
       for (let x = Math.round(kp.feet[0]) - fb; x <= Math.round(kp.feet[1]) + fb; x++)
         for (let y = mh - 1; y >= stop; y--)
           if ([...Array(RUN).keys()].every(i => on(x, y - i))) { if (y > bottom) { bottom = y; botX = x; } break; }
-      if (bottom >= 0 && bottom < mh - 2) out.sole = [botX, bottom];
+      if (bottom >= 0 && bottom < mh - 1 - EDGE_PX) out.sole = [botX, bottom];
     }
     // центр корпуса: середины отрезков маски, на которых лежит линия «шея–таз»
     const mids = [];
@@ -264,13 +268,15 @@
     for (const e of entries) {
       const k = e.kp;
       if (!k || !k.crown || !k.sole) continue;
-      const S = k.sole[1] - k.crown[1], b = by[e.pose] = by[e.pose] || {rN: [], rT: [], offA: [], offR: []};
+      const S = k.sole[1] - k.crown[1], b = by[e.pose] = by[e.pose] || {rN: [], rT: [], offA: [], offR: [], rK: [], offK: []};
       if (k.head && k.ankle) b.rN.push(S / (k.ankle[1] - k.head[1]));
       b.rT.push(S / dist(k.neck, k.root));
       if (k.ankle) b.offA.push((k.sole[1] - k.ankle[1]) / S);
       b.offR.push((k.sole[1] - k.root[1]) / S);
+      const kn = k.pts && k.pts.knees;
+      if (kn) { b.rK.push(S / (kn[1] - k.neck[1])); b.offK.push((k.sole[1] - kn[1]) / S); }
     }
-    const res = {rN: {}, rT: {}, offA: {}, offR: {}, all: {}};
+    const res = {rN: {}, rT: {}, offA: {}, offR: {}, rK: {}, offK: {}, all: {}};
     for (const key of Object.keys(DEFAULT_MED)) {
       for (const [pose, b] of Object.entries(by)) { const m = median(b[key]); if (m !== null) res[key][pose] = m; }
       res.all[key] = median(Object.values(res[key])) ?? DEFAULT_MED[key];
@@ -278,9 +284,9 @@
     return res;
   }
 
-  /** Наклон оси тела «щиколотки (пятки) → середина плеч» от вертикали, радианы; поворот на него ставит ось вертикально. */
+  /** Наклон оси тела «щиколотки (пятки, колени) → середина плеч» от вертикали, радианы; поворот на него ставит ось вертикально. */
   function bodyAngle(kp) {
-    const a = kp.ankle || (kp.pts && kp.pts.heels);
+    const a = kp.ankle || (kp.pts && (kp.pts.heels || kp.pts.knees));
     if (!a || !kp.neck || kp.neck[1] >= a[1]) return 0;
     const th = Math.atan((kp.neck[0] - a[0]) / (kp.neck[1] - a[1]));
     return Math.max(-MAX_TILT, Math.min(MAX_TILT, th));
@@ -288,7 +294,7 @@
 
   /** Снимок после поворота вокруг стоп: высоты точек подгонки и центр корпуса (в пикселях снимка). */
   function prepare(kp) {
-    const th = bodyAngle(kp), A = kp.ankle || (kp.pts && kp.pts.heels) || kp.root, co = Math.cos(th), si = Math.sin(th);
+    const th = bodyAngle(kp), A = kp.ankle || (kp.pts && (kp.pts.heels || kp.pts.knees)) || kp.root, co = Math.cos(th), si = Math.sin(th);
     const R = q => q && [A[0] + co * (q[0] - A[0]) - si * (q[1] - A[1]), A[1] + si * (q[0] - A[0]) + co * (q[1] - A[1])];
     const src = Object.assign({}, kp.pts || {}, {crown: kp.crown, neck: kp.neck, root: kp.root, ankle: kp.ankle, sole: kp.sole, head: kp.head});
     const V = {};
@@ -304,14 +310,15 @@
             e: s * (p.A[0] - p.co * p.A[0] + p.si * p.A[1]) + tx, f: s * (p.A[1] - p.si * p.A[0] - p.co * p.A[1]) + ty};
   }
 
-  /** Один снимок без шаблона позы: масштаб по силуэту, иначе по «нос–щиколотки» или корпусу (медианы med). */
+  /** Один снимок без шаблона позы: масштаб по силуэту, иначе по «нос–щиколотки», «плечи–колени» или корпусу (медианы med). */
   function alignTransform(kp, pose, med) {
     const m = key => med[key][pose] ?? med.all[key], p = prepare(kp), V = p.V;
     let S, by;
     if (V.crown != null && V.sole != null) { S = V.sole - V.crown; by = "силуэт"; }
     else if (V.head != null && V.ankle != null) { S = (V.ankle - V.head) * m("rN"); by = "рост"; }
+    else if (V.knees != null && V.knees > V.neck) { S = (V.knees - V.neck) * m("rK"); by = "колени"; }
     else { S = dist(kp.neck, kp.root) * m("rT"); by = "корпус"; }
-    const floor = V.sole ?? (V.ankle != null ? V.ankle + m("offA") * S : V.root + m("offR") * S);
+    const floor = V.sole ?? (V.ankle != null ? V.ankle + m("offA") * S : by === "колени" ? V.knees + m("offK") * S : V.root + m("offR") * S);
     const s = FRAME.HS / S;
     return Object.assign(matrix(p, s, (FRAME.H - FRAME.SOLE_Y) - s * floor), {s, th: p.th, by, feet_cut: !kp.sole});
   }
@@ -334,14 +341,23 @@
     }
   }
 
-  /** Подгонка всех снимков одной позы к общему шаблону (итерации: шаблон ← медианы, веса ← разброс точек). */
-  function fitPose(list, fit = FIT, floor = VAR_FLOOR) {
+  /**
+   * Подгонка всех снимков одной позы к общему шаблону (итерации: шаблон ← медианы, веса ← разброс точек). Старт — по
+   * силуэту; полных снимков (макушка и подошвы) меньше двух — неполные стартуют по медианам позы (alignTransform), так и
+   * поза без единого полного снимка идёт по точкам.
+   */
+  function fitPose(list, fit = FIT, floor = VAR_FLOOR, med = null, pose = null) {
     const P = list.map(e => prepare(e.kp)), FLOOR = FRAME.H - FRAME.SOLE_Y;
     let tf = P.map(p => {
       if (p.V.crown == null || p.V.sole == null) return null;
       const s = FRAME.HS / (p.V.sole - p.V.crown);
       return {s, ty: FLOOR - s * p.V.sole};
     });
+    // полных снимков позы меньше двух — старт неполных по медианам (с ними подгонка сходится хуже, поэтому только тогда)
+    if (tf.filter(Boolean).length < 2 && med) tf = tf.map((t, i) => t || (() => {
+      const a = alignTransform(list[i].kp, pose, med), p = P[i];
+      return {s: a.s, ty: a.f - a.s * (p.A[1] - p.si * p.A[0] - p.co * p.A[1])};
+    })());
     if (tf.filter(Boolean).length < 2) return {};
     const w = Object.fromEntries(fit.map(n => [n, 1])), sd = Object.fromEntries(fit.map(n => [n, Infinity]));
     for (let it = 0; it < 15; it++) {
@@ -350,9 +366,11 @@
         const v = P.map((p, i) => tf[i] && p.V[n] != null ? tf[i].s * p.V[n] + tf[i].ty : null).filter(x => x !== null);
         if (v.length >= 2) T[n] = median(v);
       }
-      if (T.crown == null || T.sole == null) return {};
-      const a = FRAME.HS / (T.sole - T.crown), b = FLOOR - a * T.sole;
-      for (const n in T) T[n] = a * T[n] + b;
+      // рост в шаблоне — FRAME.HS (нет макушки или подошв ни у одного снимка — масштаб остаётся от старта)
+      if (T.crown != null && T.sole != null) {
+        const a = FRAME.HS / (T.sole - T.crown), b = FLOOR - a * T.sole;
+        for (const n in T) T[n] = a * T[n] + b;
+      }
       tf = P.map(p => fitScale(p.V, T, w, it > 0 ? sd : null, fit));
       for (const n of fit) {
         const r = P.map((p, i) => tf[i] && p.V[n] != null && T[n] != null ? tf[i].s * p.V[n] + tf[i].ty - T[n] : null).filter(x => x !== null);
@@ -380,7 +398,7 @@
     const withKp = entries.filter(e => e.kp), med = poseMedians(withKp), byPose = {}, res = {};
     for (const e of withKp) (byPose[e.pose] = byPose[e.pose] || []).push(e);
     for (const [pose, list] of Object.entries(byPose)) {
-      const fitted = list.length >= MIN_FIT ? fitPose(list, opts.fit || FIT, opts.floor || VAR_FLOOR) : {};
+      const fitted = list.length >= MIN_FIT ? fitPose(list, opts.fit || FIT, opts.floor || VAR_FLOOR, med, pose) : {};
       for (const e of list) res[e.name] = fitted[e.name] || alignTransform(e.kp, pose, med);
     }
     return res;
@@ -428,6 +446,6 @@
     };
   }
 
-  root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
+  root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FIT, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
                      keypointsFromLandmarks, guessPose, silhouette, detectSize, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
 })(globalThis);
