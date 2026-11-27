@@ -8,7 +8,7 @@
   const VENDOR_BASE = SELF ? SELF.replace(/[^/]*$/, "vendor/") : "vendor/";
   const VENDOR = ["mediapipe_vision.js", "mediapipe_wasm_loader.js", "mediapipe_wasm.b64.js", "pose_model.b64.js", "libheif.js", "exifr.js"];
   const DETECT_SIDE = 1024;
-  let vendorReady = null, heif = null, heifDecoder = null, landmarker = null;
+  let vendorReady = null, heif = null, heifDecoder = null, landmarker = null, minDetect = null;
 
   const b64bytes = s => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
   const addScript = src => new Promise((ok, fail) => {
@@ -69,27 +69,33 @@
     if (img.close) img.close(); else { img.width = 0; img.height = 0; }
   }
 
-  /** Опорные точки фигуры в пикселях снимка (+ макушка, подошвы, центр корпуса по маске) или null (фигура не найдена). */
-  async function detect(img) {
+  /**
+   * Поиск фигуры, результат MediaPipe как есть: {lm — 33 точки (нормированные), mask — {w, h, data: Float32Array} | null,
+   * ms — время}. opts.side — длинная сторона копии для поиска (DETECT_SIDE), opts.minDetect — порог уверенности поиска.
+   */
+  async function detectRaw(img, opts = {}) {
     await loadVendor();
-    const k = Math.min(1, DETECT_SIDE / Math.max(img.width, img.height));
+    if (opts.minDetect != null && opts.minDetect !== minDetect) {
+      await landmarker.setOptions({minPoseDetectionConfidence: opts.minDetect});
+      minDetect = opts.minDetect;
+    }
+    const t0 = performance.now();
+    const k = Math.min(1, (opts.side || DETECT_SIDE) / Math.max(img.width, img.height));
     const c = canvas(Math.round(img.width * k), Math.round(img.height * k));
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
     const res = landmarker.detect(c);
     release(c);
     const masks = (res && res.segmentationMasks) || [];
     try {
-      const lm = res && res.landmarks && res.landmarks[0];
-      const kp = lm ? C.keypointsFromLandmarks(lm, img.width, img.height) : null;
-      if (!kp || !masks[0]) return kp;
-      // маска — в размере уменьшенной копии: точки туда, силуэт обратно в пиксели снимка
-      const m = masks[0], sx = m.width / img.width, sy = m.height / img.height;
-      const to = a => a && [a[0] * sx, a[1] * sy];
-      const sil = C.silhouette(m.getAsFloat32Array(), m.width, m.height,
-        {head: to(kp.head), neck: to(kp.neck), root: to(kp.root), ankle: to(kp.ankle), feet: kp.feet && [kp.feet[0] * sx, kp.feet[1] * sx]});
-      const back = a => a && [Math.round((a[0] + 0.5) / sx * 10) / 10, Math.round((a[1] + 0.5) / sy * 10) / 10];
-      return Object.assign(kp, {crown: back(sil.crown), sole: back(sil.sole), cx: sil.cx === null ? null : Math.round((sil.cx + 0.5) / sx * 10) / 10});
+      const lm = (res && res.landmarks && res.landmarks[0]) || null, m = masks[0];
+      const mask = lm && m ? {w: m.width, h: m.height, data: Float32Array.from(m.getAsFloat32Array())} : null;
+      return {lm, mask, ms: Math.round(performance.now() - t0)};
     } finally { masks.forEach(x => x.close && x.close()); }
+  }
+
+  /** Опорные точки фигуры в пикселях снимка (+ макушка, подошвы, центр корпуса по маске) или null (фигура не найдена). */
+  async function detect(img) {
+    return C.figureFromDetection(await detectRaw(img), img.width, img.height);
   }
 
   /** Выровненный кадр FRAME.W×FRAME.H (× scale — для превью) по матрице из PhotosCore.alignAll (поворот + масштаб) → JPEG. */
@@ -357,6 +363,6 @@
   /** Диагностика: сколько памяти занял декодер HEIC (байт wasm-кучи). */
   const memory = () => ({heif: heif ? heif.HEAPU8.length : 0});
 
-  root.PhotosApp = Object.assign(root.PhotosApp || {}, {loadVendor, decode, release, detect, renderAligned, renderScaled, readExif,
+  root.PhotosApp = Object.assign(root.PhotosApp || {}, {loadVendor, decode, release, detect, detectRaw, renderAligned, renderScaled, readExif,
     getDir, hasDir, forgetDir, useDirectory, readIndex, writeIndex, saveSeries, rebuildAll, removePhoto, sha256, memory});
 })(window);

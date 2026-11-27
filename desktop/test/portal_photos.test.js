@@ -238,6 +238,20 @@ test('silhouette: empty mask', () => {
   assert.deepStrictEqual(sil([]), {crown: null, sole: null, cx: null});
 });
 
+// результат MediaPipe как есть: 33 точки (нормированные) + маска в размере уменьшенной копии (здесь — вдвое меньше снимка)
+const DET_LM = {0: [0.5, 0.1], 11: [0.4, 0.16], 12: [0.6, 0.16], 23: [0.45, 0.525], 24: [0.55, 0.525], 27: [0.45, 0.86], 28: [0.55, 0.86],
+  29: [0.42, 0.88], 32: [0.6, 0.89]};
+const fig = (det, w = 200, h = 400) => js(`PhotosCore.figureFromDetection(${det}, ${w}, ${h})`);
+
+test('figure from detection: same as landmarks + silhouette, mask scaled to the photo', () => {
+  const r = fig(`{lm: ${lm(DET_LM)}, mask: {w: 100, h: 200, data: ${J(mask(100, 200, BODY))}}}`);
+  assert.deepStrictEqual(r.neck, [100, 64]);
+  assert.deepStrictEqual([r.crown[1], r.sole[1], r.cx], [21, 361, 101]);   // (y маски + 0.5) · 2; кулак выше головы не в счёт
+  const noMask = fig(`{lm: ${lm(DET_LM)}, mask: null}`);
+  assert.deepStrictEqual(noMask, js(`PhotosCore.keypointsFromLandmarks(${lm(DET_LM)}, 200, 400)`));
+  assert.strictEqual(fig('{lm: null, mask: null}'), null);
+});
+
 const align = (k, pose = 'front') => js(`PhotosCore.alignTransform(${J(k)}, "${pose}", ${J(MED)})`);
 
 test('align by silhouette', () => {

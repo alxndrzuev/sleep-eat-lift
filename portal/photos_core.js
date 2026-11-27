@@ -213,6 +213,24 @@
     return out;
   }
 
+  /**
+   * Результат MediaPipe как есть → опорные точки в пикселях снимка w×h (+ макушка, подошвы, центр корпуса по маске) или null.
+   * det = {lm: 33 точки (нормированные), mask: {w, h, data: 0…1} | null} — маска в размере уменьшенной копии снимка.
+   * Один путь для приложения (PhotosApp.detect) и проверки (scripts/photos_bench.js).
+   */
+  function figureFromDetection(det, w, h) {
+    const kp = det && det.lm ? keypointsFromLandmarks(det.lm, w, h) : null;
+    const m = det && det.mask;
+    if (!kp || !m) return kp;
+    // точки — в размер маски, силуэт — обратно в пиксели снимка
+    const sx = m.w / w, sy = m.h / h;
+    const to = a => a && [a[0] * sx, a[1] * sy];
+    const sil = silhouette(m.data, m.w, m.h,
+      {head: to(kp.head), neck: to(kp.neck), root: to(kp.root), ankle: to(kp.ankle), feet: kp.feet && [kp.feet[0] * sx, kp.feet[1] * sx]});
+    const back = a => a && [Math.round((a[0] + 0.5) / sx * 10) / 10, Math.round((a[1] + 0.5) / sy * 10) / 10];
+    return Object.assign(kp, {crown: back(sil.crown), sole: back(sil.sole), cx: sil.cx === null ? null : Math.round((sil.cx + 0.5) / sx * 10) / 10});
+  }
+
   /** Медианы по позам — по снимкам, где найден силуэт: силуэт/«нос–щиколотки», силуэт/корпус, где подошвы. */
   function poseMedians(entries) {
     const by = {};
@@ -384,5 +402,5 @@
   }
 
   root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
-                     keypointsFromLandmarks, guessPose, silhouette, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
+                     keypointsFromLandmarks, guessPose, silhouette, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
 })(globalThis);
