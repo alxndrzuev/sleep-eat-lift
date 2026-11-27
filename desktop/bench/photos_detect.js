@@ -53,7 +53,10 @@ async function main() {
       todo.forEach((c, i) => save(c, res[i]));
       await call('free');
       console.log(`${n}/${cfg.jobs.length} ${job.id}`);
-    } catch (e) { console.log(`ОШИБКА ${job.id}: ${e.message}`); }
+    } catch (e) {
+      console.log(`ОШИБКА ${job.id}: ${e.message}`);
+      await win.loadFile(path.join(__dirname, 'detect.html'));   // после сбоя wasm страница мертва — заново
+    }
   }
   console.log(`готово: ${fresh} новых`);
 }

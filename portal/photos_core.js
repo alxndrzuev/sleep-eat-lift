@@ -214,6 +214,16 @@
   }
 
   /**
+   * Размер копии снимка для поиска фигуры: длинная сторона ≤ side, ширина кратна 4 — MediaPipe с маской падает
+   * («Check failed: 1 == ChannelSize()») на ширине, не кратной 4 (строки одноканальной маски выравниваются).
+   * Растяжение по ширине — меньше 4 px: точки нормированы и пересчитываются в пиксели снимка, на них не влияет.
+   */
+  function detectSize(w, h, side) {
+    const k = Math.min(1, side / Math.max(w, h));
+    return {w: Math.ceil(Math.round(w * k) / 4) * 4, h: Math.round(h * k)};
+  }
+
+  /**
    * Результат MediaPipe как есть → опорные точки в пикселях снимка w×h (+ макушка, подошвы, центр корпуса по маске) или null.
    * det = {lm: 33 точки (нормированные), mask: {w, h, data: 0…1} | null} — маска в размере уменьшенной копии снимка.
    * Один путь для приложения (PhotosApp.detect) и проверки (scripts/photos_bench.js).
@@ -402,5 +412,5 @@
   }
 
   root.PhotosCore = {POSES, POSE_NAMES, PROTOCOL, FRAME, FOLDER, parseName, exifDate, planSeries, findAlready, dupGroup, keepDup, validatePlan, resolveFolder, projectPath,
-                     keypointsFromLandmarks, guessPose, silhouette, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
+                     keypointsFromLandmarks, guessPose, silhouette, detectSize, figureFromDetection, poseMedians, bodyAngle, alignTransform, alignAll, nearestWeight, exactWeight, parseKg, buildView};
 })(globalThis);

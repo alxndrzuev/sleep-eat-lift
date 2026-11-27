@@ -238,6 +238,13 @@ test('silhouette: empty mask', () => {
   assert.deepStrictEqual(sil([]), {crown: null, sole: null, cx: null});
 });
 
+test('detect size: long side ≤ side, width a multiple of 4 (MediaPipe falls on odd mask rows)', () => {
+  assert.deepStrictEqual(js('PhotosCore.detectSize(4284, 5712, 1024)'), {w: 768, h: 1024});
+  assert.deepStrictEqual(js('PhotosCore.detectSize(4284, 5662, 1024)'), {w: 776, h: 1024});   // 774.8 → не 775
+  assert.deepStrictEqual(js('PhotosCore.detectSize(5712, 4284, 1024)'), {w: 1024, h: 768});
+  assert.deepStrictEqual(js('PhotosCore.detectSize(601, 403, 1024)'), {w: 604, h: 403});     // меньше side — без уменьшения
+});
+
 // результат MediaPipe как есть: 33 точки (нормированные) + маска в размере уменьшенной копии (здесь — вдвое меньше снимка)
 const DET_LM = {0: [0.5, 0.1], 11: [0.4, 0.16], 12: [0.6, 0.16], 23: [0.45, 0.525], 24: [0.55, 0.525], 27: [0.45, 0.86], 28: [0.55, 0.86],
   29: [0.42, 0.88], 32: [0.6, 0.89]};

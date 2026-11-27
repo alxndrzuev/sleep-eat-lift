@@ -80,8 +80,8 @@
       minDetect = opts.minDetect;
     }
     const t0 = performance.now();
-    const k = Math.min(1, (opts.side || DETECT_SIDE) / Math.max(img.width, img.height));
-    const c = canvas(Math.round(img.width * k), Math.round(img.height * k));
+    const size = C.detectSize(img.width, img.height, opts.side || DETECT_SIDE);
+    const c = canvas(size.w, size.h);
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
     const res = landmarker.detect(c);
     release(c);
