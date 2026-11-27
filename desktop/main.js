@@ -4,8 +4,10 @@
 // HEALTH_DOCUMENTS — другая папка «Документы» (проверки); HEALTH_SMOKE=1 — загрузить страницу, вывести меню и выйти;
 // HEALTH_CONNECT=fatsecret|whoop — сразу открыть вход сервиса (проверка до появления «Настроек»);
 // HEALTH_WHATSNEW=<версия> — показать окно «Что нового», как будто последней была эта версия (настройки не трогаются).
+// Журнал работы (log.js) — в папке logs рядом с папкой данных: запуск, профили, входы, обновления, ошибки окна и программы.
 const {app, BrowserWindow, protocol, net, shell, ipcMain, dialog, Menu} = require('electron');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const store = require('./store');
@@ -23,6 +25,11 @@ const alcohol = require('./alcohol');
 const secretsFile = require('./secrets');
 const whatsnew = require('./whatsnew');
 const menu = require('./menu');
+const logLib = require('./log');
+
+const log = logLib.create();                     // до выбора папки данных строки ждут в памяти (log.setDir)
+process.on('uncaughtExceptionMonitor', e => log.crash('необработанная ошибка', e));
+process.on('unhandledRejection', e => { console.error(e); log.crash('необработанная ошибка (promise)', e); });
 
 protocol.registerSchemesAsPrivileged([{scheme: 'app', privileges: {standard: true, secure: true, supportFetchAPI: true}}]);
 
@@ -71,7 +78,7 @@ const services = {
     },
   },
 };
-let updater = updaterLib.create(services);
+let updater = updaterLib.create(services, undefined, log);
 
 const login = opts => oauthwin.open(opts);
 /** Пока идёт вход (окно, обмен кодом, первая загрузка), профиль не переключается: токены и данные легли бы в другой. */
@@ -150,6 +157,13 @@ async function makeFatSecretLink() {
 
 function reload() { if (win && !win.isDestroyed()) win.webContents.reload(); }
 
+/** Итог входа в сервис — в журнал (без ключей: только ok / отмена / код / текст ошибки). */
+function logSignIn(what, r) {
+  if (!r || r.ok || r.cancelled || r.oob) log.info(what + (!r || r.ok ? ': готово' : r.oob ? ': ждём код' : ': отменён'), {profile: PROFILE});
+  else log.warn(what + ': ошибка', {profile: PROFILE, error: r.error});
+  return r;
+}
+
 // ---------- где лежат данные ----------
 /** Спросить, где хранить данные (первый запуск, папка пропала или «Сменить папку»). → путь папки data или null. */
 async function askDataDir({missing = null, change = false} = {}) {
@@ -203,6 +217,7 @@ function pushStatus() { if (win && !win.isDestroyed()) win.webContents.send('hea
 
 async function updateAll(first) {
   if (!DATA || removing) return {};
+  if (!updater.busy) log.info('обновление данных', {profile: PROFILE, first});
   const p = updater.runAll(DATA, first);
   pushStatus();
   const r = await p;
@@ -213,8 +228,11 @@ async function updateAll(first) {
 
 function ipc(channel, fn) {
   ipcMain.handle(channel, (e, ...args) => {
-    if (!e.senderFrame || !e.senderFrame.url.startsWith('app://h/')) throw new Error('недоступно');
-    return fn(...args);
+    if (!e.senderFrame || !e.senderFrame.url.startsWith('app://h/')) { log.warn('запрос не со страницы SEL', {channel}); throw new Error('недоступно'); }
+    try {
+      const r = fn(...args);
+      return r && typeof r.then === 'function' ? r.catch(err => { log.warn(`ошибка ${channel}`, err); throw err; }) : r;
+    } catch (err) { log.warn(`ошибка ${channel}`, err); throw err; }
   });
 }
 
@@ -222,7 +240,7 @@ function ipc(channel, fn) {
 function need() { if (!DATA) throw new Error('Профиль не выбран'); return DATA; }
 /** Выполнить и ответить странице {ok: true, …} или {ok: false, error}. */
 async function answer(fn) {
-  try { return Object.assign({ok: true}, await fn()); } catch (e) { return {ok: false, error: e.message}; }
+  try { return Object.assign({ok: true}, await fn()); } catch (e) { log.warn('действие не выполнено', e); return {ok: false, error: e.message}; }
 }
 
 // ---------- профили ----------
@@ -237,12 +255,13 @@ function lockReason() {
 /** Сделать профиль id текущим: DATA, свой updater, без чужого незаконченного входа; запомнить. */
 function openProfile(id) {
   DATA = profiles.dir(ROOT, id); PROFILE = id;
-  updater = updaterLib.create(services);
+  updater = updaterLib.create(services, undefined, log);
   delete pending.fatsecret;
   store.init(DATA);
   profiles.writeRootReadme(ROOT);
   datadir.writeFormat(ROOT, app.getVersion());     // какой формат у папки и какая версия открывала её последней
   if (!TEST) datadir.saveCfg(app.getPath('userData'), {profile: id});
+  log.info('профиль открыт', {profile: id});
 }
 
 /** Переключиться на профиль: окно — на ту же страницу (с экрана имени — на сводку), обновить его данные. */
@@ -267,6 +286,7 @@ function createProfile(name) {
   const t = today();
   const r = firstRun === 'migrate' ? profiles.migrate(ROOT, name, t)
           : firstRun === 'adopt' ? profiles.adoptOld(ROOT, name, t) : profiles.create(ROOT, name, t);
+  log.info(firstRun === 'migrate' ? 'профиль создан из данных 1.x' : firstRun === 'adopt' ? 'профиль создан из старых данных' : 'профиль создан', {profile: r.id});
   return useProfile(r.id);
 }
 
@@ -276,6 +296,7 @@ async function removeProfile(id) {
   removing = true;
   try { await profiles.remove(ROOT, id, p => shell.trashItem(p)); }
   finally { removing = false; }
+  log.info('профиль удалён (в Корзину)', {profile: id});
   if (id === PROFILE) useProfile(profiles.pick(ROOT, null));
   else pushStatus();
 }
@@ -297,15 +318,18 @@ function openStart() {
 function setupIpc() {
   ipc('health:status', status);
   ipc('health:update', () => updateAll());
-  ipc('health:connect', async s => { const r = await signIn(() => connect(String(s))); pushStatus(); return r; });
+  ipc('health:connect', async s => { log.info(`вход ${s}`, {profile: PROFILE});
+    const r = logSignIn(`вход ${s}`, await signIn(() => connect(String(s)))); pushStatus(); return r; });
   ipc('health:code', async v => {
-    try { const r = await signIn(() => finishFatSecret(String(v || ''))); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
+    try { const r = await signIn(() => finishFatSecret(String(v || ''))); pushStatus(); return logSignIn('вход fatsecret по коду', r); }
+    catch (e) { return logSignIn('вход fatsecret по коду', {ok: false, error: e.message}); }
   });
   ipc('health:fsLink', async () => {
-    try { const r = await signIn(makeFatSecretLink); pushStatus(); return r; } catch (e) { return {ok: false, error: e.message}; }
+    try { const r = await signIn(makeFatSecretLink); pushStatus(); return logSignIn('ссылка fatsecret для входа', r); }
+    catch (e) { return logSignIn('ссылка fatsecret для входа', {ok: false, error: e.message}); }
   });
-  ipc('health:fsLinkCancel', () => { fatsecret.link.clear(need()); pushStatus(); return {ok: true}; });
-  ipc('health:disconnect', s => { if (s in services) keys.clear(s); pushStatus(); reload(); return {ok: true}; });
+  ipc('health:fsLinkCancel', () => { fatsecret.link.clear(need()); log.info('ссылка fatsecret отменена', {profile: PROFILE}); pushStatus(); return {ok: true}; });
+  ipc('health:disconnect', s => { if (s in services) { keys.clear(s); log.info(`${s} отключён`, {profile: PROFILE}); } pushStatus(); reload(); return {ok: true}; });
   ipc('health:targets', v => settings.saveTargets(need(), v || {}, today()));
   ipc('health:removeTarget', (kind, date) => settings.removeTarget(need(), String(kind), String(date)));
   // план, БАДы, алкоголь: пишем CSV — страница при следующей загрузке получит их из CSV (store.dataJs)
@@ -323,6 +347,7 @@ function setupIpc() {
     const d = await askDataDir({change: true});
     if (!d || d === ROOT) return {ok: false};
     datadir.save(app.getPath('userData'), d);
+    log.info('папка данных сменена — перезапуск', {dir: d});
     app.relaunch(); app.exit(0);
     return {ok: true};
   });
@@ -352,7 +377,8 @@ function serve(req) {
   if (isDataJs(req.url)) {                             // данные страниц — из CSV прямо сейчас (store.dataJs)
     let js;
     try { js = DATA ? store.dataJs(DATA, today()) : 'const RAW = null;\n'; }
-    catch (e) { return new Response('Данные не читаются: ' + e.message, {status: 500, headers: {'Content-Type': 'text/plain; charset=utf-8'}}); }
+    catch (e) { log.error('данные для страницы не читаются', e, {profile: PROFILE});
+                return new Response('Данные не читаются: ' + e.message, {status: 500, headers: {'Content-Type': 'text/plain; charset=utf-8'}}); }
     return new Response(js, {headers: {'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store',
                                        'Content-Security-Policy': CSP}});
   }
@@ -388,7 +414,8 @@ function go(dir) {
 function setMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(menu.template({platform: process.platform, packaged: app.isPackaged, go,
     whatsNew: () => { if (win && !win.isDestroyed() && DATA && !win.webContents.getURL().endsWith('/whatsnew.html'))
-      win.loadURL('app://h/portal/whatsnew.html'); }})));
+      win.loadURL('app://h/portal/whatsnew.html'); },
+    logs: () => { if (log.dir()) shell.openPath(log.dir()); }})));
 }
 
 function createWindow() {
@@ -401,6 +428,21 @@ function createWindow() {
     if (settings.externalAllowed(url)) shell.openExternal(url);
     return {action: 'deny'};
   });
+  watchWindow(win.webContents);
+}
+
+/** Сбои окна — в журнал: ошибки скриптов страниц, страница не загрузилась, процесс страницы упал или завис. */
+function watchWindow(wc) {
+  const page = u => String(u || '').replace(/^app:\/\/h\//, '').split('?')[0];
+  wc.on('console-message', (e, ...old) => {                 // Electron 35+: поля в e; раньше — (level, message, line, source)
+    const level = e.level ?? old[0];
+    if (level === 'error' || level === 3)
+      log.warn('страница: ошибка', {page: page(wc.getURL()), message: e.message ?? old[1], at: `${page(e.sourceId ?? old[3])}:${e.lineNumber ?? old[2]}`});
+  });
+  wc.on('did-fail-load', (e, code, desc, url, main) => { if (main && code !== -3) log.warn('страница не загрузилась', {page: page(url), code, error: desc}); });
+  wc.on('render-process-gone', (e, d) => log.error('процесс страницы завершился', {page: page(wc.getURL()), reason: d.reason, exitCode: d.exitCode}));
+  wc.on('unresponsive', () => log.warn('окно не отвечает', {page: page(wc.getURL())}));
+  wc.on('responsive', () => log.info('окно снова отвечает'));
 }
 
 // «О программе» (меню приложения): значок, имя, версия и весь текст — в нижней строке, её macOS ставит по центру (поле
@@ -424,6 +466,11 @@ function smoke() {
   });
 }
 
+log.info('запуск', {version: app.getVersion(), electron: process.versions.electron, os: `${process.platform} ${os.release()} ${process.arch}`,
+                    packaged: app.isPackaged, test: TEST || undefined});
+app.on('child-process-gone', (e, d) => log.warn('служебный процесс завершился', {type: d.type, reason: d.reason, exitCode: d.exitCode}));
+app.on('before-quit', () => log.info('выход'));
+
 app.whenReady().then(async () => {
   app.setAboutPanelOptions(Object.assign({applicationVersion: app.getVersion()}, ABOUT));
   setMenu();
@@ -431,9 +478,12 @@ app.whenReady().then(async () => {
   if (!process.env.HEALTH_SMOKE) app.focus({steal: true});
   const hadDataDir = !!datadir.readCfg(app.getPath('userData')).dataDir;   // до выбора папки: новичок или обновился
   ROOT = await resolveDataDir();
-  if (!ROOT) { app.quit(); return; }
+  if (!ROOT) { log.info('папка данных не выбрана — выход'); app.quit(); return; }
+  log.setDir(logLib.dir(ROOT));
+  log.info('папка данных', {dir: ROOT});
   // данные обновлены более новой версией SEL (формат новее) — не читаем и не пишем: эта версия может их испортить
   for (let fmt = datadir.checkFormat(ROOT); !fmt.ok; fmt = datadir.checkFormat(ROOT)) {
+    log.warn('папка данных от более новой SEL', {dir: ROOT, format: fmt.format, app: fmt.app});
     if (process.env.HEALTH_SMOKE) { console.log('SMOKE-NEWER ' + JSON.stringify(fmt)); app.quit(); return; }
     const {response} = await dialog.showMessageBox(win, {type: 'warning', title: 'SEL',
       message: 'Эти данные обновлены более новой версией SEL',
@@ -443,6 +493,8 @@ app.whenReady().then(async () => {
     const d = response === 0 ? await askDataDir({change: true}) : null;
     if (!d) { app.quit(); return; }
     ROOT = d;
+    log.setDir(logLib.dir(ROOT));
+    log.info('папка данных', {dir: ROOT});
     if (!TEST) datadir.save(app.getPath('userData'), d);
   }
   startNews(hadDataDir);
@@ -467,6 +519,7 @@ app.whenReady().then(async () => {
     openStart();
     if (process.env.HEALTH_SMOKE) { if (process.env.HEALTH_SMOKE_UPDATE) await updater.runAll(DATA); return; }
   } catch (e) {                                              // перенос или чтение профилей не удались — не пустое окно, а причина
+    log.crash('не получилось открыть данные', e);
     const text = `Не получилось открыть данные: ${e.message}\n\nПапка: ${ROOT}\nЕсли её держит другая программа (Finder, OneDrive, ` +
       'антивирус) — закройте её и запустите SEL снова. Перенос продолжится с того места, где остановился; данные не пропадут.';
     if (process.env.HEALTH_SMOKE) { console.log('SMOKE-ERROR ' + text); app.quit(); return; }

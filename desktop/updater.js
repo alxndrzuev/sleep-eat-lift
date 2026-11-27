@@ -1,6 +1,7 @@
 // Обновление всех подключённых сервисов: по очереди и независимо (ошибка одного не мешает другому), страницы перечитают CSV после перезагрузки.
 // Одно обновление за раз. Сервис: {connected(dir) → bool, update(dir, first) → {ok, error?}}.
 // Успех — время в data/sync.json: с него следующее обновление и грузит (пропуски догружаются), его показывает сводка.
+// log (log.js) — в журнал: что обновлялось, сколько пришло, сколько заняло, ошибка.
 const store = require('./store');
 
 const ym = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -38,7 +39,9 @@ function fatsecretRange(from, now) {
   return [d < first ? first : d < recent ? d : recent, cur];
 }
 
-function create(services, now = () => new Date()) {
+const quiet = {info() {}, warn() {}};
+
+function create(services, now = () => new Date(), log = quiet) {
   const u = {busy: false, status: {}};
   for (const name of Object.keys(services)) u.status[name] = {lastUpdate: null, lastError: null};
 
@@ -51,9 +54,13 @@ function create(services, now = () => new Date()) {
       for (const [name, svc] of Object.entries(services)) {
         if (!svc.connected(dir)) continue;
         let r;
+        const t0 = Date.now();
         try { r = await svc.update(dir, first === name); }
         catch (e) { r = {ok: false, error: String(e.message || e)}; }
         out[name] = r;
+        const {ok, error, ...got} = r, ms = Date.now() - t0, firstLoad = first === name || undefined;
+        if (ok) log.info(`обновление ${name}: готово`, Object.assign({first: firstLoad}, got, {ms}));
+        else log.warn(`обновление ${name}: ошибка`, Object.assign({first: firstLoad, error}, got, {ms}));
         const at = now().toISOString();
         if (r.ok) store.saveSync(dir, name, at);
         u.status[name] = r.ok ? {lastUpdate: at, lastError: null}

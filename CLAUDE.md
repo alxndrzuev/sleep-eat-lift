@@ -16,6 +16,8 @@ docs/                    ← 06 фото: как снимать и разбир�
                              sel-logo-light/dark.svg (README) собираются из Nav.logoSvg в portal/nav.js (тест), там же
                              плитки для меню; sel-mark.svg — одни плитки. Круг из трёх дуг — только где нужен квадрат:
                              sel-icon.svg — значок приложения → desktop/build/icon.png, 1024×1024, прозрачные углы
+~/Documents/SEL/logs      ← журнал работы SEL (log.js): рядом с папкой данных, sel-ГГГГ-ММ-ДД.log, 30 дней; «Справка» →
+                           «Журнал работы». Разбор сбоев — начинать отсюда. Ключи вырезаются (redact), данных из CSV не писать
 ~/Documents/SEL/data      ← ВСЁ ЛИЧНОЕ (вне проекта, БЕЗ git) — корень с профилями; путь берётся из настроек приложения
                            (~/Library/Application Support/SEL/config.json → dataDir, текущий профиль → profile;
                            scripts/csv.js → rootDir/profileDir; HEALTH_DATA — подменить). Формат — docs/07_формат_данных.md
@@ -76,7 +78,7 @@ dist/                    ← собранные приложения (не в gi
   Окно входа FatSecret/Whoop перед каждым входом очищается (иначе второй войдёт под первым)
 - Код: `main.js` (окно, протокол app://h/, IPC), `profiles.js` (профили, перенос 1.x), `root_readme.md` (README корня), `protocol.js` (что отдаёт app://h/ + CSP: страницы ничего не грузят и не шлют наружу), `store.js` (чтение и запись CSV), `fatsecret.js`, `whoop.js`, `alcohol.js`, `updater.js`,
   `settings.js`, `photosfs.js`, `secrets.js` (токены дописываются, ключи приложений не трогаются), `keys.js`, `datadir.js`, `preload.js`,
-  `changelog.js` (разбор CHANGELOG.md, версии, выпуск), `whatsnew.js` (что показать после обновления),
+  `changelog.js` (разбор CHANGELOG.md, версии, выпуск), `whatsnew.js` (что показать после обновления), `log.js` (журнал работы),
   `data_readme.md` (README папки данных — описание файлов для LLM; меняется схема — правим и его)
 - Node.js для сборки и тестов — 26+ (`engines` в package.json; проверено на 26.13)
 - Тесты: `cd desktop && npm test` — приложение, страницы portal/ (их скрипты выполняются в Node: test/_portal.js),

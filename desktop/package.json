@@ -48,6 +48,7 @@
       "changelog.js",
       "whatsnew.js",
       "menu.js",
+      "log.js",
       "CHANGELOG.md",
       "root_readme.md",
       "schema.json",

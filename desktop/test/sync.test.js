@@ -64,3 +64,18 @@ test('fatsecret months: from the month of the last update (with overlap), at lea
   assert.deepStrictEqual(updater.fatsecretRange('2023-05-01', now), ['2025-12', '2026-11']);
 });
 
+
+test('runAll writes to the log: what came, how long, the error', async () => {
+  const dir = tmp(), lines = [];
+  const log = {info: (m, f) => lines.push(['info', m, f]), warn: (m, f) => lines.push(['warn', m, f])};
+  const u = updater.create({
+    fatsecret: {connected: () => true, update: async () => ({ok: true, days: 31, weights: 2, entries: 40})},
+    whoop: {connected: () => true, update: async () => ({ok: false, kind: 'network', error: 'нет связи'})},
+  }, () => new Date('2026-11-22T08:30:00Z'), log);
+  await u.runAll(dir, 'fatsecret');
+  assert.deepStrictEqual(lines.map(l => [l[0], l[1]]), [['info', 'обновление fatsecret: готово'], ['warn', 'обновление whoop: ошибка']]);
+  const {ms: ms1, ...f1} = lines[0][2], {ms: ms2, ...f2} = lines[1][2];
+  assert.deepStrictEqual(f1, {first: true, days: 31, weights: 2, entries: 40});
+  assert.deepStrictEqual(f2, {first: undefined, error: 'нет связи', kind: 'network'});
+  assert.ok(ms1 >= 0 && ms2 >= 0);
+});

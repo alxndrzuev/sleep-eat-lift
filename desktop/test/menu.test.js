@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const {template} = require('../menu');
 
 const make = (platform, packaged = true, calls = []) =>
-  template({platform, packaged, go: d => calls.push(d), whatsNew: () => calls.push('whatsnew')});
+  template({platform, packaged, go: d => calls.push(d), whatsNew: () => calls.push('whatsnew'), logs: () => calls.push('logs')});
 const labels = t => t.map(m => m.label);
 const roles = t => t.flatMap(m => m.submenu.map(x => x.role).filter(Boolean));
 const item = (t, menu, label) => t.find(m => m.label === menu).submenu.find(x => x.label === label);
@@ -29,11 +29,12 @@ test('Windows: без пунктов Mac, «Выход» в «Файле», «О
   assert.strictEqual(item(t, 'Правка', 'Копировать').role, 'copy');
 });
 
-test('пункты вызывают назад/вперёд и «Что нового»; инструменты разработчика — только не в сборке', () => {
+test('пункты вызывают назад/вперёд, «Что нового» и «Журнал работы»; инструменты разработчика — только не в сборке', () => {
   for (const p of ['darwin', 'win32']) {
     const calls = [], t = make(p, true, calls);
     item(t, 'Вид', 'Назад').click(); item(t, 'Вид', 'Вперёд').click(); item(t, 'Справка', 'Что нового в SEL').click();
-    assert.deepStrictEqual(calls, ['goBack', 'goForward', 'whatsnew']);
+    item(t, 'Справка', 'Журнал работы').click();
+    assert.deepStrictEqual(calls, ['goBack', 'goForward', 'whatsnew', 'logs']);
     assert.ok(!roles(t).includes('toggleDevTools'));
     assert.ok(roles(make(p, false)).includes('toggleDevTools'));
   }

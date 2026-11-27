@@ -1,10 +1,10 @@
 // Меню приложения по-русски — для Mac и Windows (шаблон для Menu.buildFromTemplate; тест — test/menu.test.js).
 // Mac: меню программы (О программе, Службы, Скрыть…), «Окно», назад/вперёд — ⌘[ / ⌘].
 // Windows: «Файл → Выход», назад/вперёд — Alt+← / Alt+→, «О программе» — в «Справке».
-// «Справка» — «Что нового» вместо ссылок Electron; инструменты разработчика — только не в сборке.
+// «Справка» — «Что нового» и «Журнал работы» (папка logs) вместо ссылок Electron; инструменты разработчика — только не в сборке.
 
-/** {platform, packaged, go(dir), whatsNew()} → шаблон меню. */
-function template({platform, packaged, go, whatsNew}) {
+/** {platform, packaged, go(dir), whatsNew(), logs()} → шаблон меню. */
+function template({platform, packaged, go, whatsNew, logs}) {
   const mac = platform === 'darwin', sep = {type: 'separator'}, name = 'SEL';
   const about = {role: 'about', label: `О программе ${name}`};
   return [
@@ -24,7 +24,8 @@ function template({platform, packaged, go, whatsNew}) {
       {role: 'togglefullscreen', label: 'Во весь экран'}]},
     ...(mac ? [{label: 'Окно', role: 'window', submenu: [{role: 'minimize', label: 'Свернуть'}, {role: 'zoom', label: 'Масштаб'}, sep,
       {role: 'front', label: 'Все окна — на передний план'}]}] : []),
-    {label: 'Справка', role: 'help', submenu: [{label: `Что нового в ${name}`, click: whatsNew}, ...(mac ? [] : [sep, about])]},
+    {label: 'Справка', role: 'help', submenu: [{label: `Что нового в ${name}`, click: whatsNew},
+      {label: 'Журнал работы', click: logs}, ...(mac ? [] : [sep, about])]},
   ];
 }
 
