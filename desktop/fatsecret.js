@@ -135,6 +135,50 @@ async function weights(app, user, ym, deps) {
   return out;
 }
 
+// ---------- продукты из дневника (food_entries.get.v2: один запрос — один день) ----------
+const MEALS = ['breakfast', 'lunch', 'dinner', 'other'];
+const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const num = v => (v == null || v === '' || isNaN(+v) ? null : round1(+v));
+
+/** Порция для показа из food_entry_description: без названия, без служебного «:custom:» и мусора FatSecret. */
+function amount(description, name) {
+  let s = String(description || '');
+  if (name && s.endsWith(name)) s = s.slice(0, -name.length);
+  s = s.trim();
+  if (s.includes(':custom:')) s = s.split(':custom:')[1];
+  s = s.replace(/ininini/g, '').replace(/(\d)s\b/g, '$1').replace(/\s+/g, ' ').trim();
+  return s.replace(/^(\S+) (medium|large|small)$/, '$1 шт').replace(/^(\d[\d./]*)$/, '$1 шт')
+          .replace(/\b(coffee cup|cup)\b/, 'чашка').replace(/\bserving\b/, 'порция').replace(/\bg\b/, 'г');
+}
+
+/** Записи дневника за день ds (ГГГГ-ММ-ДД) → строки food_entries.csv. */
+async function entries(app, user, ds, deps) {
+  const day = Math.round((Date.parse(ds + 'T00:00:00Z') - EPOCH) / 864e5);
+  const text = await call('GET', API, {method: 'food_entries.get.v2', format: 'json', date: String(day),
+    oauth_consumer_key: app.consumer_key, oauth_token: user.access_token}, app.consumer_secret, user.access_secret, deps);
+  let j;
+  try { j = JSON.parse(text); } catch (e) { throw new FatSecretError('api', text.slice(0, 200)); }
+  if (j.error) throw new FatSecretError([9, 13].includes(Number(j.error.code)) ? 'token' : 'api', j.error.message);
+  let list = (j.food_entries || {}).food_entry || [];
+  if (!Array.isArray(list)) list = [list];
+  return list.map(x => {
+    const meal = String(x.meal || '').toLowerCase();
+    return {id: String(x.food_entry_id), date: new Date(EPOCH + Number(x.date_int) * 864e5).toISOString().slice(0, 10),
+      meal: MEALS.includes(meal) ? meal : 'other', name: x.food_entry_name || '', amount: amount(x.food_entry_description, x.food_entry_name),
+      kcal: num(x.calories), protein: num(x.protein), fat: num(x.fat), carbs: num(x.carbohydrate), fiber: num(x.fiber), sugar: num(x.sugar),
+      food_id: x.food_id == null ? null : String(x.food_id), serving_id: x.serving_id == null ? null : String(x.serving_id), units: num(x.number_of_units)};
+  });
+}
+
+/** Какие дни скачать: последние 7 (дневник дописывают задним числом), а пока за прошлую неделю продуктов нет — 14. */
+function entryDays(dir, today) {
+  const wk0 = addDays(today, -((today.getDay() + 6) % 7)), from = isoLocal(addDays(wk0, -7)), to = isoLocal(addDays(wk0, -1));
+  const have = store.read(dir, 'food_entries.csv').some(r => r.date >= from && r.date <= to);
+  const n = have ? 7 : 14;
+  return Array.from({length: n}, (_, i) => isoLocal(addDays(today, i - n + 1)));
+}
+
 function months(a, b) {
   const out = []; let [y, m] = [+a.slice(0, 4), +a.slice(5, 7)];
   while (y * 12 + m <= +b.slice(0, 4) * 12 + +b.slice(5, 7)) { out.push(`${y}-${String(m).padStart(2, '0')}`); [y, m] = m === 12 ? [y + 1, 1] : [y, m + 1]; }
@@ -142,13 +186,14 @@ function months(a, b) {
 }
 
 /** Выгрузить месяцы [a, b] → nutrition_daily.csv и body.csv; файлы пишутся только после всех запросов. */
-async function update({dir, app, user, months: [a, b], fetch, timeout}) {
-  const deps = {fetch, timeout}, food = {}, wt = {};
+async function update({dir, app, user, months: [a, b], fetch, timeout, today = new Date()}) {
+  const deps = {fetch, timeout}, food = {}, wt = {}, days = entryDays(dir, today), got = [];
   try {
     for (const ym of months(a, b)) {
       Object.assign(food, await month(app, user, ym, deps));
       Object.assign(wt, await weights(app, user, ym, deps));
     }
+    for (const ds of days) got.push(...await entries(app, user, ds, deps));
   } catch (e) {
     if (e instanceof FatSecretError) return {ok: false, error: e.message, kind: e.kind};
     throw e;
@@ -156,7 +201,11 @@ async function update({dir, app, user, months: [a, b], fetch, timeout}) {
   store.upsert(dir, 'nutrition_daily.csv', food);
   const have = new Set(store.read(dir, 'body.csv').map(r => r.date));
   store.upsert(dir, 'body.csv', Object.fromEntries(Object.entries(wt).map(([d, kg]) => [d, have.has(d) ? {weight_kg: kg} : {weight_kg: kg, note: 'FatSecret'}])));
-  return {ok: true, days: Object.keys(food).length, weights: Object.keys(wt).length};
+  // продукты скачанных дней заменяются целиком: удалённые в дневнике записи этих дней убираются
+  const fresh = new Set(got.map(r => r.id)), inDays = new Set(days);
+  store.remove(dir, 'food_entries.csv', store.read(dir, 'food_entries.csv').filter(r => inDays.has(r.date) && !fresh.has(r.id)).map(r => r.id));
+  store.upsert(dir, 'food_entries.csv', Object.fromEntries(got.map(({id, ...r}) => [id, r])));
+  return {ok: true, days: Object.keys(food).length, weights: Object.keys(wt).length, entries: got.length};
 }
 
-module.exports = {FatSecretError, signedUrl, enc, call, requestToken, authorizeUrl, accessToken, exchangeCode, link, month, weights, months, update, CALLBACK, TEXTS};
+module.exports = {FatSecretError, signedUrl, enc, call, requestToken, authorizeUrl, accessToken, exchangeCode, link, month, weights, months, update, amount, entries, entryDays, CALLBACK, TEXTS};

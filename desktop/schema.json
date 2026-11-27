@@ -98,6 +98,22 @@
   "plans.csv": [
    "start",
    "text"
+  ],
+  "food_entries.csv": [
+   "id",
+   "date",
+   "meal",
+   "name",
+   "amount",
+   "kcal",
+   "protein",
+   "fat",
+   "carbs",
+   "fiber",
+   "sugar",
+   "food_id",
+   "serving_id",
+   "units"
   ]
  },
  "key": {
@@ -105,24 +121,30 @@
   "targets.csv": "start",
   "events.csv": "start",
   "supplements.csv": "start",
-  "plans.csv": "start"
+  "plans.csv": "start",
+  "food_entries.csv": "id"
  },
  "sort": {
-  "whoop_workouts.csv": "start"
+  "whoop_workouts.csv": "start",
+  "food_entries.csv": "date"
  },
  "text": [
+  "amount",
   "bed",
   "date",
   "description",
   "dose",
   "end",
+  "food_id",
   "id",
   "kind",
   "level",
   "marker",
+  "meal",
   "name",
   "note",
   "purpose",
+  "serving_id",
   "sport",
   "start",
   "status",

@@ -59,7 +59,7 @@ const services = {
   fatsecret: {
     connected: () => !!userKey('fatsecret').access_token,
     update: (dir, first) => fatsecret.update({dir, app: appKey('fatsecret', {packaged: app.isPackaged}), user: userKey('fatsecret'),
-      months: updaterLib.fatsecretRange(first ? null : updaterLib.since(dir, 'fatsecret'), new Date())}),   // пропуски догружаются
+      months: updaterLib.fatsecretRange(first ? null : updaterLib.since(dir, 'fatsecret'), new Date()), today: new Date()}),   // пропуски догружаются; продукты — последние 7 дней
   },
   whoop: {
     connected: () => !!userKey('whoop').refresh_token,

@@ -32,6 +32,7 @@
 | Файл | Строка — это | Колонки | Откуда |
 |---|---|---|---|
 | `nutrition_daily.csv` | день питания | date, kcal, protein, fat, carbs, fiber (г) | FatSecret, дневник питания |
+| `food_entries.csv` | продукт из дневника | id, date, meal (breakfast / lunch / dinner / other), name, amount (порция, как её показывает приложение), kcal, protein, fat, carbs, fiber, sugar (г), food_id, serving_id, units (порция в FatSecret) | FatSecret, дневник питания: при каждом обновлении — последние 7 дней заново |
 | `body.csv` | взвешивание | date, weight_kg, note («FatSecret» — из FatSecret) | FatSecret или вручную на «Фото» (на дату серии; кто записал последним — тот и прав) |
 | `whoop_daily.csv` | день Whoop | date, recovery (%), hrv (мс), rhr (уд/мин), spo2 (%), skin_temp (°C), strain (0–21), kcal (расход), steps, sleep_h, deep_h, rem_h, light_h, awake_h, sleep_perf (%), sleep_eff (%), resp_rate, bed / wake (отбой и подъём, ЧЧ:ММ), note | Whoop |
 | `whoop_workouts.csv` | тренировка | id, date, start, sport (вид в Whoop), duration_min, strain, avg_hr, max_hr, kcal, z0_min…z5_min (минуты в пульсовых зонах 0–5) | Whoop |

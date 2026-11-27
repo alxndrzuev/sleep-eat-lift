@@ -20,11 +20,15 @@ function tmp() {
 }
 
 /** Заглушка API: питание и вес по месяцам (ym → дни), или ошибка на n-м запросе. */
-function fakeApi({food = {}, weight = {}, failAt = -1, fail} = {}) {
+function fakeApi({food = {}, weight = {}, entries = {}, failAt = -1, fail} = {}) {
   let n = 0;
   return async (url) => {
     if (n++ === failAt) return fail();
     const u = new URL(url), method = u.searchParams.get('method');
+    if (method === 'food_entries.get.v2') {
+      const ds = new Date(EPOCH + Number(u.searchParams.get('date')) * 864e5).toISOString().slice(0, 10);
+      return resp({food_entries: entries[ds] ? {food_entry: entries[ds]} : null});
+    }
     const ym = new Date(EPOCH + Number(u.searchParams.get('date')) * 864e5).toISOString().slice(0, 7);
     if (method === 'food_entries.get_month.v2')
       return resp({month: {day: (food[ym] || []).map(([d, k, p, f, c]) => ({date_int: di(d), calories: k, protein: p, fat: f, carbohydrate: c}))}});
@@ -53,7 +57,7 @@ test('update writes nutrition and weight', async () => {
   const fetch = fakeApi({food: {'2026-11': [['2026-11-01', 2000, 100, 60, 250]]},
                          weight: {'2026-10': [['2026-10-05', 72.5]], '2026-11': [['2026-11-02', 73]]}});
   const r = await fs_.update({dir, app: APP, user: USER, months: ['2026-10', '2026-11'], fetch});
-  assert.deepStrictEqual(r, {ok: true, days: 1, weights: 2});
+  assert.deepStrictEqual(r, {ok: true, days: 1, weights: 2, entries: 0});
   assert.deepStrictEqual(store.read(dir, 'nutrition_daily.csv')[0], {date: '2026-11-01', kcal: '2000', protein: '100', fat: '60', carbs: '250', fiber: ''});
   const body = store.read(dir, 'body.csv');
   assert.deepStrictEqual(body.map(b => [b.date, b.weight_kg, b.note]),
@@ -163,4 +167,70 @@ test('wrong code: text by where it went (link → make a new link; window → co
   const f = fakeAuth({net: true});
   await assert.rejects(fs_.exchangeCode(APP, [W('x'), L('good')], '1', {fetch: f.fetch}), {kind: 'network'});
   assert.strictEqual(f.seen.length, 1);
+});
+
+// ---------- продукты из дневника (food_entries.get.v2) — данные придуманные, той же формы, что у FatSecret ----------
+/** Запись дневника, как её отдаёт FatSecret: всё строками. */
+const fe = (id, ds, meal, name, desc, kcal, extra = {}) => Object.assign({food_entry_id: String(id), date_int: di(ds), meal,
+  food_entry_name: name, food_entry_description: `${desc} ${name}`, calories: String(kcal), protein: '1.25', fat: '0.5',
+  carbohydrate: '7.14', food_id: '100001', serving_id: '200001', number_of_units: '1.000'}, extra);
+
+test('amount: portion text for the window', () => {
+  const a = (d, n = 'Чай с лимоном') => fs_.amount(`${d} ${n}`, n);
+  assert.strictEqual(a('40 g'), '40 г');
+  assert.strictEqual(a('2 medium'), '2 шт');
+  assert.strictEqual(a('1 coffee cup'), '1 чашка');
+  assert.strictEqual(a('1 cup'), '1 чашка');
+  assert.strictEqual(a('2'), '2 шт');
+  assert.strictEqual(a('0.2 :custom:20 г'), '20 г');
+  assert.strictEqual(a('1/2 :custom:50 г'), '50 г');
+  assert.strictEqual(a('80 :custom:80s  г'), '80 г');
+  assert.strictEqual(a('1 :custom:1 порцияininini (250 г)'), '1 порция (250 г)');
+  assert.strictEqual(a('1 serving'), '1 порция');
+  assert.strictEqual(a('3 slices'), '3 slices');          // неизвестное — как есть
+});
+
+test('entries of a day: one object or a list, meal in lower case, numbers, empty day, token error', async () => {
+  const one = {food_entries: {food_entry: fe(11, '2026-11-23', 'Breakfast', 'Чай с лимоном', '1 cup', '30', {sugar: '6.54'})}};
+  const rows = await fs_.entries(APP, USER, '2026-11-23', {fetch: () => resp(one)});
+  assert.deepStrictEqual(rows, [{id: '11', date: '2026-11-23', meal: 'breakfast', name: 'Чай с лимоном', amount: '1 чашка',
+    kcal: 30, protein: 1.2, fat: 0.5, carbs: 7.1, fiber: null, sugar: 6.5, food_id: '100001', serving_id: '200001', units: 1}]);
+  const two = {food_entries: {food_entry: [fe(12, '2026-11-23', 'lunch', 'Гречка', '200 g', 220), fe(13, '2026-11-23', 'Other', 'Банан', '1 medium', 105)]}};
+  assert.deepStrictEqual((await fs_.entries(APP, USER, '2026-11-23', {fetch: () => resp(two)})).map(r => [r.id, r.meal, r.amount]),
+    [['12', 'lunch', '200 г'], ['13', 'other', '1 шт']]);
+  assert.deepStrictEqual(await fs_.entries(APP, USER, '2026-11-23', {fetch: () => resp({food_entries: null})}), []);
+  await assert.rejects(fs_.entries(APP, USER, '2026-11-23', {fetch: () => resp({error: {code: 9, message: 'Invalid token'}})}), e => e.kind === 'token');
+});
+
+test('entry days: 14 until last week has products, then 7', () => {
+  const dir = tmp(), today = new Date(2026, 10, 27);         // пятница; прошлая неделя — 16–22.11
+  const days = fs_.entryDays(dir, today);
+  assert.strictEqual(days.length, 14);
+  assert.deepStrictEqual([days[0], days[13]], ['2026-11-14', '2026-11-27']);
+  store.upsert(dir, 'food_entries.csv', {'1': {date: '2026-11-17', meal: 'lunch', name: 'Гречка', kcal: 220}});
+  assert.deepStrictEqual(fs_.entryDays(dir, today), ['2026-11-21', '2026-11-22', '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27']);
+});
+
+test('update writes entries: text with commas and quotes, entries gone from a day are removed, days outside kept', async () => {
+  const dir = tmp(), today = new Date(2026, 10, 27);
+  store.upsert(dir, 'food_entries.csv', {'5': {date: '2026-11-25', meal: 'dinner', name: 'Удалённый', kcal: 100},
+                                         '6': {date: '2026-11-10', meal: 'dinner', name: 'Давний', kcal: 100}});
+  const entries = {'2026-11-25': [fe(21, '2026-11-25', 'lunch', 'Сыр "Лёгкий", 20%', '0.2 :custom:20 г', 52)],
+                   '2026-11-27': [fe(22, '2026-11-27', 'breakfast', 'Чай с лимоном', '1 cup', 30)]};
+  const r = await fs_.update({dir, app: APP, user: USER, months: ['2026-11', '2026-11'], fetch: fakeApi({entries}), today});
+  assert.deepStrictEqual(r, {ok: true, days: 0, weights: 0, entries: 2});
+  const rows = store.read(dir, 'food_entries.csv');
+  assert.deepStrictEqual(rows.map(x => [x.id, x.date, x.name, x.amount]),
+    [['6', '2026-11-10', 'Давний', ''], ['21', '2026-11-25', 'Сыр "Лёгкий", 20%', '20 г'], ['22', '2026-11-27', 'Чай с лимоном', '1 чашка']]);
+});
+
+test('failed entries request: nothing written', async () => {
+  const dir = tmp(), today = new Date(2026, 10, 27);
+  store.upsert(dir, 'nutrition_daily.csv', {'2026-10-01': {kcal: 1900}});
+  store.upsert(dir, 'food_entries.csv', {'5': {date: '2026-11-25', meal: 'dinner', name: 'Ужин', kcal: 100}});
+  const files = ['nutrition_daily.csv', 'body.csv', 'food_entries.csv'], before = files.map(f => fs.readFileSync(path.join(dir, f), 'utf8'));
+  const fetch = fakeApi({food: {'2026-11': [['2026-11-02', 2000, 1, 1, 1]]}, failAt: 4, fail: () => Promise.reject(new TypeError('net'))});
+  const r = await fs_.update({dir, app: APP, user: USER, months: ['2026-11', '2026-11'], fetch, today});   // 2 месячных, потом дни
+  assert.strictEqual(r.ok, false);
+  assert.deepStrictEqual(files.map(f => fs.readFileSync(path.join(dir, f), 'utf8')), before);
 });
