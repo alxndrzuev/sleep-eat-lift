@@ -7,6 +7,9 @@
 //   node scripts/photos_bench.js fetch [--yes] [--max N]
 //        публичные фото COCO 2017 val: без --yes — только что и откуда скачает; с --yes — разметка (архив 241 МБ, из него
 //        остаётся person_keypoints_val2017.json) и подходящие снимки поштучно → photo-bench/public/
+//   node scripts/photos_bench.js eval [--baseline] [--min-detect X] [--side N]
+//        оценка кэша текущим portal/photos_core.js → консоль и photo-bench/report.md; --baseline — до правок алгоритма
+//        сохранить исходную точку (позы и выровненные точки целых своих снимков) в photo-bench/baseline.json
 'use strict';
 const fs = require('node:fs');
 const os = require('node:os');
@@ -108,9 +111,31 @@ function detect(o) {
   return r.status || 0;
 }
 
+function evalCmd(o) {
+  const {p, dir} = params(o), entries = [];
+  for (const src of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+    const d = path.join(dir, src);
+    if (!fs.statSync(d).isDirectory()) continue;
+    for (const f of fs.readdirSync(d)) if (f.endsWith('.json')) entries.push(JSON.parse(fs.readFileSync(path.join(d, f), 'utf8')));
+  }
+  if (!entries.length) throw new Error('Кэш пуст — сначала: node scripts/photos_bench.js detect');
+  const bf = path.join(BENCH, 'baseline.json');
+  if (o.baseline) {
+    const b = B.baselineOf(entries);
+    fs.writeFileSync(bf, JSON.stringify(b));
+    console.log(`исходная точка: ${Object.keys(b).length} снимков → ${bf}`);
+  }
+  const stats = B.evaluate(entries, {baseline: fs.existsSync(bf) ? JSON.parse(fs.readFileSync(bf, 'utf8')) : null});
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const text = B.report(stats, {date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, params: p});
+  fs.writeFileSync(path.join(BENCH, 'report.md'), text);
+  console.log(text);
+  return 0;
+}
+
 if (require.main === module) {
   const o = parseArgs(process.argv.slice(2));
-  const cmds = {detect, fetch: fetchCoco};
+  const cmds = {detect, fetch: fetchCoco, eval: evalCmd};
   if (!cmds[o.cmd]) { console.error('Команды: ' + Object.keys(cmds).join(', ') + ' (см. начало scripts/photos_bench.js)'); process.exit(1); }
   try { process.exit(cmds[o.cmd](o)); } catch (e) { console.error('ОШИБКА: ' + e.message); process.exit(1); }
 }

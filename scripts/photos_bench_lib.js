@@ -226,5 +226,133 @@ function lrSwapped(lm, k) {
   return n ? cross < straight : null;
 }
 
+// ---------- оценка по кэшу и отчёт ----------
+const median = a => a.length ? a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] : null;
+const pct = (a, q) => a.length ? a.slice().sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(q * a.length))] : null;
+const r1 = v => v === null ? null : Math.round(v * 10) / 10;
+const apply = (t, p) => [t.a * p[0] + t.c * p[1] + t.e, t.b * p[0] + t.d * p[1] + t.f];
+const baseVariant = v => v.replace(/_mirror$/, '');
+
+/** Запись кэша → опорные точки тем же путём, что в приложении (PhotosCore.figureFromDetection). */
+function figure(e) {
+  if (!e.lm) return null;
+  const mask = e.mask && {w: e.mask.w, h: e.mask.h, data: rleDecode(e.mask.rle, e.mask.w * e.mask.h)};
+  return C.figureFromDetection({lm: e.lm, mask}, e.w, e.h);
+}
+
+/** Точки сравнения выравнивания (плечи, таз, колени) целого снимка → в координаты варианта кадра (без зеркала). */
+function anchors(kp, crop) {
+  return [kp.neck, kp.root, kp.pts && kp.pts.knees].filter(Boolean).map(p => [p[0] - crop.x, p[1] - crop.y]);
+}
+
+/** Выровненные положения точек целых снимков своей позы: {id: [[x, y], …]} (как alignAll в приложении — по всей позе). */
+function alignedFull(fulls) {
+  const byPose = {}, out = {};
+  for (const f of fulls) (byPose[f.e.truth] = byPose[f.e.truth] || []).push(f);
+  for (const [pose, list] of Object.entries(byPose)) {
+    const tf = C.alignAll(list.map(f => ({name: f.e.id, pose, kp: f.kp})));
+    for (const f of list) if (tf[f.e.id]) out[f.e.id] = {tf: tf[f.e.id], pts: anchors(f.kp, f.e.crop).map(p => apply(tf[f.e.id], p))};
+  }
+  return out;
+}
+
+const meanDist = (a, b) => { const n = Math.min(a.length, b.length); let s = 0; for (let i = 0; i < n; i++) s += Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1]); return n ? s / n : 0; };
+
+/** Исходная точка: поза и выровненные точки целых своих снимков по нынешнему коду. */
+function baselineOf(entries) {
+  const fulls = entries.filter(e => e.source === 'own' && e.variant === 'full').map(e => ({e, kp: figure(e)})).filter(f => f.kp);
+  const al = alignedFull(fulls), out = {};
+  for (const f of fulls) out[f.e.id] = {pose: C.guessPose(f.kp), pts: al[f.e.id] ? al[f.e.id].pts.map(p => p.map(r1)) : []};
+  return out;
+}
+
+/**
+ * Записи кэша → цифры: rows[«источник|вариант»] = {n, found, correct, confusion: {правильная: {угаданная | none: n}}, ms};
+ * lr — COCO: левое/правое перепутаны; align[вариант] — свои, без зеркала: сдвиг выравнивания против целого (px, медиана, p90)
+ * и разница наклона (°); base — против исходной точки (opts.baseline); unclear — снимков без правильной позы.
+ */
+function evaluate(entries, opts = {}) {
+  const rows = {}, lr = {n: 0, swapped: 0};
+  let unclear = 0;
+  const withKp = entries.map(e => ({e, kp: figure(e)}));
+  for (const {e, kp} of withKp) {
+    if (!e.truth) { unclear++; continue; }
+    const key = `${e.source}|${e.variant}`;
+    const r = rows[key] = rows[key] || {source: e.source, variant: e.variant, n: 0, found: 0, correct: 0, confusion: {}, ms: []};
+    const guess = kp ? C.guessPose(kp) : null;
+    r.n++; r.ms.push(e.ms);
+    if (kp) r.found++;
+    if (kp && guess === e.truth) r.correct++;
+    if (kp) { const c = r.confusion[e.truth] = r.confusion[e.truth] || {}; c[guess || 'none'] = (c[guess || 'none'] || 0) + 1; }
+    if (e.source === 'coco' && e.gt && e.lm) {
+      const sw = lrSwapped(e.lm.map(p => ({x: p.x * e.w, y: p.y * e.h, visibility: p.visibility})), gtInCrop(e.gt, e.crop));
+      if (sw !== null) { lr.n++; if (sw) lr.swapped++; }
+    }
+  }
+  for (const r of Object.values(rows)) r.ms = Math.round(r.ms.reduce((a, b) => a + b, 0) / (r.ms.length || 1));
+  // выравнивание: вариант вместо целого в серии своей позы
+  const own = withKp.filter(x => x.e.source === 'own' && x.kp && x.e.truth);
+  const fulls = own.filter(x => x.e.variant === 'full'), byId = Object.fromEntries(fulls.map(f => [f.e.id, f]));
+  const al = alignedFull(fulls), shifts = {};
+  for (const x of own) {
+    const v = x.e.variant, f = byId[x.e.id];
+    if (v === 'full' || v.endsWith('_mirror') || !f || !al[x.e.id]) continue;
+    const list = fulls.filter(g => g.e.truth === x.e.truth).map(g => ({name: g.e.id, pose: g.e.truth, kp: g === f ? x.kp : g.kp}));
+    const tf = C.alignAll(list)[x.e.id];
+    if (!tf) continue;
+    const s = shifts[v] = shifts[v] || {d: [], th: []};
+    s.d.push(meanDist(anchors(f.kp, x.e.crop).map(p => apply(tf, p)), al[x.e.id].pts));
+    s.th.push(Math.abs(tf.th - al[x.e.id].tf.th) * 180 / Math.PI);
+  }
+  const align = Object.fromEntries(Object.entries(shifts).map(([v, s]) =>
+    [v, {n: s.d.length, median: r1(median(s.d)), p90: r1(pct(s.d, 0.9)), dth: r1(median(s.th))}]));
+  let base = null;
+  if (opts.baseline) {
+    const now = baselineOf(entries), ids = Object.keys(opts.baseline);
+    base = {n: ids.length, poseChanged: ids.filter(id => now[id] && now[id].pose !== opts.baseline[id].pose),
+            maxShift: r1(Math.max(0, ...ids.filter(id => now[id]).map(id => meanDist(now[id].pts, opts.baseline[id].pts))))};
+  }
+  return {rows, lr, align, base, unclear};
+}
+
+/** Цифры → отчёт (markdown): таблицы и планка «готово» из дизайна. Только сводные цифры — без координат точек. */
+function report(s, {date, params} = {}) {
+  const P = (a, b) => b ? `${Math.round(100 * a / b)} %` : '—';
+  const L = [`# Проверка фото — ${date || ''}`, '', `Параметры поиска: ${JSON.stringify(params || {})}`, '',
+    '## Фигура найдена / поза верна', '', '| источник | вариант | снимков | найдена | поза верна (из найденных) | мс |', '|---|---|---|---|---|---|'];
+  const rows = Object.values(s.rows).sort((a, b) => a.source.localeCompare(b.source) ||
+    VARIANTS.indexOf(baseVariant(a.variant)) - VARIANTS.indexOf(baseVariant(b.variant)) || a.variant.localeCompare(b.variant));
+  for (const r of rows) L.push(`| ${r.source} | ${r.variant} | ${r.n} | ${P(r.found, r.n)} | ${P(r.correct, r.found)} | ${r.ms} |`);
+  L.push('', '## Ошибки позы (правильная → угаданная: снимков)', '');
+  const errs = {};
+  for (const r of rows) for (const [t, g] of Object.entries(r.confusion)) for (const [k, n] of Object.entries(g))
+    if (k !== t) { const key = `${r.source}: ${t} → ${k}`; errs[key] = (errs[key] || 0) + n; }
+  L.push(...(Object.keys(errs).length ? Object.entries(errs).sort((a, b) => b[1] - a[1]).map(([k, n]) => `- ${k}: ${n}`) : ['- нет']));
+  if (s.lr.n) L.push('', `## Левое/правое (COCO)`, '', `MediaPipe перепутал стороны: ${s.lr.swapped} из ${s.lr.n} (${P(s.lr.swapped, s.lr.n)})`);
+  L.push('', '## Сдвиг выравнивания (свои, вариант против целого)', '', '| вариант | снимков | медиана, px | p90, px | наклон, ° |', '|---|---|---|---|---|');
+  for (const v of VARIANTS) if (s.align[v]) L.push(`| ${v} | ${s.align[v].n} | ${s.align[v].median} | ${s.align[v].p90} | ${s.align[v].dth} |`);
+  if (s.base) L.push('', '## Против исходного кода', '', `Снимков: ${s.base.n}; поза изменилась: ${s.base.poseChanged.length ? s.base.poseChanged.join(', ') : 'нет'}; наибольший сдвиг: ${s.base.maxShift} px`);
+  // планка
+  const sum = (src, pred) => rows.filter(r => r.source === src && pred(baseVariant(r.variant)))
+    .reduce((a, r) => ({n: a.n + r.n, found: a.found + r.found, correct: a.correct + r.correct}), {n: 0, found: 0, correct: 0});
+  const bar = [], ok = (c, text) => bar.push(`${c ? '✅' : '❌'} ${text}`);
+  const own = sum('own', () => true);
+  if (own.n) {
+    ok(own.correct === own.found, `свои: поза верна во всех найденных (${own.correct} из ${own.found})`);
+    for (const [vs, need] of [[['full'], 1], [['no_feet', 'no_head', 'core'], 0.95], [['tight'], 0.9]])
+      for (const v of vs) { const x = sum('own', w => w === v); if (x.n) ok(x.found / x.n >= need, `свои, ${v}: фигура найдена ${P(x.found, x.n)} (нужно ≥ ${need * 100} %)`); }
+    for (const v of VARIANTS) if (s.align[v]) ok(s.align[v].median <= 25 && s.align[v].p90 <= 50, `свои, ${v}: сдвиг медиана ${s.align[v].median} ≤ 25, p90 ${s.align[v].p90} ≤ 50`);
+    if (s.base) ok(!s.base.poseChanged.length && s.base.maxShift <= 5, `65 целых: поза та же, сдвиг ${s.base.maxShift} ≤ 5 px`);
+  }
+  const coco = sum('coco', () => true);
+  if (coco.n) ok(coco.correct / (coco.found || 1) >= 0.9, `COCO: поза верна ${P(coco.correct, coco.found)} найденных (нужно ≥ 90 %)`);
+  const extra = rows.filter(r => r.source === 'extra' && /^side/.test(Object.keys(r.confusion)[0] || ''))
+    .reduce((a, r) => ({found: a.found + r.found, correct: a.correct + r.correct}), {found: 0, correct: 0});
+  if (extra.found) ok(extra.correct / extra.found >= 0.95, `доснятые сбоку: «Сбоку» ${P(extra.correct, extra.found)} (нужно ≥ 95 %)`);
+  L.push('', '## Планка «готово»', '', ...bar, '');
+  return L.join('\n');
+}
+
 module.exports = {VARIANTS, cropBox, truthMirror, rleEncode, rleDecode, cacheKey, readIndex, ownJobs, extraJobs,
-  cocoTruth, cocoSelect, cocoAsLm, cocoCrops, gtInCrop, lrSwapped};
+  cocoTruth, cocoSelect, cocoAsLm, cocoCrops, gtInCrop, lrSwapped,
+  figure, evaluate, baselineOf, report};

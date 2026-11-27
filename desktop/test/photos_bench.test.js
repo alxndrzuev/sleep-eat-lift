@@ -174,3 +174,55 @@ test('lr swap: detected straight / swapped / side → null', () => {
   assert.strictEqual(B.lrSwapped(mp({11: 6, 12: 5, 23: 12, 24: 11, 25: 14, 26: 13}), k), true);
   assert.strictEqual(B.lrSwapped(mp({11: 5, 12: 6, 23: 11, 24: 12}), coco(SIDE)), null);
 });
+
+// ---------- оценка по кэшу ----------
+/** 33 точки MediaPipe (нормированные) из {индекс: [x, y]}; остальные невидимы. */
+function mlm(points) {
+  const out = Array.from({length: 33}, () => ({x: 0, y: 0, z: 0, visibility: 0}));
+  for (const [i, [x, y]] of Object.entries(points)) out[i] = {x, y, z: 0, visibility: 0.99};
+  return out;
+}
+const FRONT_LM = {0: [0.5, 0.1], 7: [0.53, 0.1], 8: [0.47, 0.1], 11: [0.6, 0.2], 12: [0.4, 0.2], 15: [0.62, 0.45], 16: [0.38, 0.45],
+  23: [0.56, 0.45], 24: [0.44, 0.45], 25: [0.56, 0.7], 26: [0.44, 0.7], 27: [0.56, 0.9], 28: [0.44, 0.9]};
+const SIDE_LM = {11: [0.51, 0.2], 12: [0.49, 0.2], 23: [0.51, 0.45], 24: [0.49, 0.45], 25: [0.52, 0.7], 26: [0.5, 0.7], 15: [0.5, 0.45]};
+const rec = (source, id, variant, truth, points, extra = {}) => Object.assign({source, id, variant, truth,
+  crop: {x: 0, y: 0, w: 1000, h: 2000, mirror: variant.endsWith('_mirror')}, full: {w: 1000, h: 2000}, w: 1000, h: 2000,
+  lm: points && mlm(points), mask: null, ms: 40, gt: null}, extra);
+
+test('evaluate on a synthetic cache: found, pose, confusion, alignment shift, left/right', () => {
+  const gt = coco({5: [600, 400], 6: [400, 400], 11: [560, 900], 12: [440, 900], 13: [560, 1400], 14: [440, 1400]});
+  const entries = [rec('own', 'a', 'full', 'front', FRONT_LM), rec('own', 'a', 'no_head', 'front', FRONT_LM),
+    rec('own', 'b', 'full', 'side', SIDE_LM), rec('own', 'b', 'tight', 'side', null),
+    rec('own', 'c', 'full', 'back', FRONT_LM),
+    rec('coco', 'coco_1', 'full', 'front', FRONT_LM, {gt}), rec('coco', 'coco_2', 'full', null, FRONT_LM)];
+  const s = B.evaluate(entries);
+  assert.deepStrictEqual(['n', 'found', 'correct'].map(k => s.rows['own|full'][k]), [3, 3, 2]);
+  assert.deepStrictEqual(s.rows['own|full'].confusion, {front: {front: 1}, side: {side: 1}, back: {front: 1}});
+  assert.deepStrictEqual(['n', 'found', 'correct'].map(k => s.rows['own|tight'][k]), [1, 0, 0]);
+  assert.strictEqual(s.align.no_head.n, 1);
+  assert.ok(s.align.no_head.median < 0.01, J(s.align));
+  assert.deepStrictEqual(s.lr, {n: 1, swapped: 0});
+  assert.strictEqual(s.unclear, 1);
+  assert.strictEqual(s.base, null);
+});
+
+test('baseline: pose and aligned points of full photos; later runs compare against it', () => {
+  const entries = [rec('own', 'a', 'full', 'front', FRONT_LM), rec('own', 'c', 'full', 'back', FRONT_LM)];
+  const base = B.baselineOf(entries);
+  assert.deepStrictEqual(Object.keys(base).sort(), ['a', 'c']);
+  assert.strictEqual(base.a.pose, 'front');
+  assert.deepStrictEqual(B.evaluate(entries, {baseline: base}).base, {n: 2, poseChanged: [], maxShift: 0});
+  base.a.pose = 'side';
+  assert.deepStrictEqual(B.evaluate(entries, {baseline: base}).base.poseChanged, ['a']);
+});
+
+test('report: tables and the bar with ✅/❌, no user coordinates', () => {
+  const pts = Object.assign({}, FRONT_LM, {11: [0.61234, 0.2]});
+  const s = B.evaluate([rec('own', 'a', 'full', 'front', pts), rec('own', 'a', 'no_head', 'front', pts)]);
+  const r = B.report(s, {date: '2026-11-27', params: {model: 'full', side: 1024, minDetect: null}});
+  assert.match(r, /# Проверка фото — 2026-11-27/);
+  assert.match(r, /\| own \| full \| 1 \| 100 % \| 100 % \|/);
+  assert.match(r, /✅ свои: поза верна во всех найденных/);
+  assert.match(r, /❌|✅/);
+  assert.doesNotMatch(r, /612|0\.612/);
+});
