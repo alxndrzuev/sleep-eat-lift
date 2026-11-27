@@ -2,7 +2,7 @@
 // Проверка перед коммитом в публичный репозиторий: в файлах проекта нет личного из папки данных.
 //
 // Ищет в каждом файле, который попадёт в git (отслеживаемые и новые, не игнорируемые; кроме portal/vendor — сторонние
-// библиотеки с хэшами) — и в рабочей копии, и в версии из индекса git (её заберёт коммит), строки CSV, id тренировок Whoop, значения из secrets/*.json и строки личных
+// библиотеки с хэшами) — и в рабочей копии, и в версии из индекса git (её заберёт коммит), строки CSV, id тренировок Whoop, id и названия продуктов из дневника (food_entries.csv), значения из secrets/*.json и строки личных
 // документов data/docs/*.md. Почта автора коммитов — только noreply GitHub.
 //
 //   node scripts/public_check.js            # код выхода 1 — нашлось личное (что и где; значения секретов не печатаются)
@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {rootDir, allDirs} = require('./csv');
+const store = require('../desktop/store');
 
 const ROOT = path.join(__dirname, '..');
 const DATE = /^\d{4}-\d{2}-\d{2}([T ][\d:.]+)?(Z|[+-]\d{2}:?\d{2})?$/;
@@ -34,6 +35,14 @@ function needles(data) {
     for (const r of rows) if (r.length >= 25) out.set(r, `строка ${f}`);
     if (f === 'whoop_workouts.csv')
       for (const r of rows) { const id = r.split(',')[0]; if (id.length >= 12) out.set(id, 'id тренировки Whoop'); }
+    if (f === 'food_entries.csv') {                                     // названия бывают в кавычках с запятыми — читаем как CSV
+      let rows;
+      try { rows = store.read(data, f); } catch (e) { rows = []; }
+      for (const r of rows) {
+        if (r.id.length >= 10) out.set(r.id, 'id записи дневника');
+        if (r.name.length >= 12) out.set(r.name, 'продукт из дневника');
+      }
+    }
   }
   const sec = path.join(data, 'secrets');
   for (const f of list(sec, '.json')) {
